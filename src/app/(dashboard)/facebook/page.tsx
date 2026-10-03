@@ -9,11 +9,12 @@ import {
   getDocs,
   query,
   where,
+  deleteDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { CredentialsForm } from "@/components/social/CredentialsForm";
+import { FacebookComposer } from "@/components/social/FacebookComposer";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -22,6 +23,8 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Info } from "lucide-react";
 
 export default function FacebookPage() {
   const searchParams = useSearchParams();
@@ -29,7 +32,6 @@ export default function FacebookPage() {
 
   const [hasCredentials, setHasCredentials] = useState<boolean | null>(null);
   const [account, setAccount] = useState<any>(null);
-  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<{
     type: "success" | "error";
@@ -37,16 +39,13 @@ export default function FacebookPage() {
   } | null>(null);
   const [checking, setChecking] = useState(true);
 
-  // 1. Verificar credenciales + cuenta conectada
   const loadData = async () => {
     try {
-      // Credenciales
       const credentialsSnap = await getDoc(
         doc(db, "platformCredentials", "facebook"),
       );
       setHasCredentials(credentialsSnap.exists());
 
-      // Cuenta conectada
       const q = query(
         collection(db, "socialAccounts"),
         where("platform", "==", "facebook"),
@@ -70,7 +69,6 @@ export default function FacebookPage() {
     loadData();
   }, []);
 
-  // 2. Manejar mensajes de la URL (?success=true o ?error=...)
   useEffect(() => {
     const success = searchParams.get("success");
     const error = searchParams.get("error");
@@ -80,8 +78,7 @@ export default function FacebookPage() {
         type: "success",
         text: "Cuenta de Facebook conectada correctamente",
       });
-      loadData(); // Recargamos para mostrar la cuenta
-      // Limpiamos la URL
+      loadData();
       router.replace("/facebook");
     }
 
@@ -98,40 +95,46 @@ export default function FacebookPage() {
         type: "error",
         text: messages[error] || "Ocurrió un error al conectar",
       });
-
       router.replace("/facebook");
     }
   }, [searchParams, router]);
 
-  // 3. Publicar post de texto
-  const handlePublish = async () => {
-    if (!message.trim() || !account) return;
+  const handlePublish = async (data: {
+    message: string;
+    link?: string;
+    image?: File | null;
+    video?: File | null;
+  }) => {
+    if (!account) return;
 
     setLoading(true);
     setStatus(null);
 
     try {
+      // Por ahora solo enviamos texto.
+      // Mañana conectamos la subida a R2 y luego enviamos image/video.
       const res = await fetch("/api/publish/facebook", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           pageId: account.pageId,
           accessToken: account.accessToken,
-          message,
+          message: data.message,
+          link: data.link,
+          // image y video los agregaremos mañana
         }),
       });
 
-      const data = await res.json();
+      const result = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Error al publicar");
+        throw new Error(result.error || "Error al publicar");
       }
 
       setStatus({
         type: "success",
         text: "Publicado correctamente en Facebook",
       });
-      setMessage("");
     } catch (err: any) {
       setStatus({ type: "error", text: err.message });
     } finally {
@@ -139,7 +142,42 @@ export default function FacebookPage() {
     }
   };
 
-  // ================== ESTADOS DE LA PÁGINA ==================
+  const handleDisconnectAccount = async () => {
+    if (!account) return;
+    if (!confirm("¿Seguro que quieres desconectar esta cuenta de Facebook?"))
+      return;
+
+    try {
+      await deleteDoc(doc(db, "socialAccounts", account.id));
+      setAccount(null);
+      setStatus({ type: "success", text: "Cuenta desconectada" });
+    } catch (error) {
+      setStatus({ type: "error", text: "Error al desconectar la cuenta" });
+    }
+  };
+
+  const handleDeleteCredentials = async () => {
+    if (
+      !confirm(
+        "¿Seguro que quieres eliminar las credenciales? También se desconectará la cuenta.",
+      )
+    )
+      return;
+
+    try {
+      await deleteDoc(doc(db, "platformCredentials", "facebook"));
+
+      if (account) {
+        await deleteDoc(doc(db, "socialAccounts", account.id));
+      }
+
+      setHasCredentials(false);
+      setAccount(null);
+      setStatus({ type: "success", text: "Credenciales eliminadas" });
+    } catch (error) {
+      setStatus({ type: "error", text: "Error al eliminar las credenciales" });
+    }
+  };
 
   if (checking) {
     return (
@@ -149,16 +187,50 @@ export default function FacebookPage() {
     );
   }
 
-  // Estado 1: No hay credenciales
+  // ================== ESTADO 1: Sin credenciales ==================
   if (!hasCredentials) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 max-w-2xl">
         <div>
           <h2 className="text-2xl font-bold">Facebook</h2>
           <p className="text-muted-foreground mt-1">
             Configura las credenciales de tu aplicación para comenzar
           </p>
         </div>
+
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Instrucciones importantes</AlertTitle>
+          <AlertDescription className="mt-2 space-y-2 text-sm">
+            <p>Antes de conectar, asegúrate de tener esto en tu App de Meta:</p>
+            <ol className="list-decimal list-inside space-y-1">
+              <li>
+                En <strong>Use cases</strong> agrega:{" "}
+                <code>Manage everything on your Page</code>
+              </li>
+              <li>
+                En <strong>Facebook Login for Business → Configurations</strong>{" "}
+                crea una configuration con estos permisos:
+                <ul className="list-disc list-inside ml-4 mt-1">
+                  <li>pages_show_list</li>
+                  <li>pages_read_engagement</li>
+                  <li>pages_manage_posts</li>
+                </ul>
+              </li>
+              <li>
+                En <strong>App settings → Basic</strong> agrega tu dominio de
+                Vercel
+              </li>
+              <li>
+                En <strong>Valid OAuth Redirect URIs</strong> agrega:
+                <br />
+                <code className="text-xs">
+                  https://tu-dominio.vercel.app/api/auth/facebook/callback
+                </code>
+              </li>
+            </ol>
+          </AlertDescription>
+        </Alert>
 
         <CredentialsForm
           platform="facebook"
@@ -168,15 +240,20 @@ export default function FacebookPage() {
     );
   }
 
-  // Estado 2: Hay credenciales pero no hay cuenta conectada
+  // ================== ESTADO 2: Credenciales pero sin cuenta ==================
   if (!account) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold">Facebook</h2>
-          <p className="text-muted-foreground mt-1">
-            Conecta tu página de Facebook para poder publicar
-          </p>
+      <div className="space-y-6 max-w-2xl">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold">Facebook</h2>
+            <p className="text-muted-foreground mt-1">
+              Conecta tu página de Facebook para poder publicar
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleDeleteCredentials}>
+            Eliminar credenciales
+          </Button>
         </div>
 
         {status && (
@@ -191,7 +268,7 @@ export default function FacebookPage() {
           </div>
         )}
 
-        <Card className="max-w-md">
+        <Card>
           <CardHeader>
             <CardTitle>Conectar página</CardTitle>
             <CardDescription>
@@ -212,7 +289,7 @@ export default function FacebookPage() {
     );
   }
 
-  // Estado 3: Todo listo → Composer
+  // ================== ESTADO 3: Todo listo (Composer) ==================
   return (
     <div className="max-w-2xl space-y-6">
       <div className="flex items-center justify-between">
@@ -223,7 +300,12 @@ export default function FacebookPage() {
             <span className="font-medium text-foreground">{account.name}</span>
           </p>
         </div>
-        <Badge variant="secondary">Conectado</Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary">Conectado</Badge>
+          <Button variant="outline" size="sm" onClick={handleDisconnectAccount}>
+            Desconectar
+          </Button>
+        </div>
       </div>
 
       {status && (
@@ -238,29 +320,22 @@ export default function FacebookPage() {
         </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Nueva publicación</CardTitle>
-          <CardDescription>Solo texto por ahora</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Textarea
-            placeholder="¿Qué quieres publicar en Facebook?"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            rows={6}
-          />
+      <FacebookComposer
+        pageName={account.name}
+        loading={loading}
+        onPublish={handlePublish}
+      />
 
-          <div className="flex justify-end">
-            <Button
-              onClick={handlePublish}
-              disabled={loading || !message.trim()}
-            >
-              {loading ? "Publicando..." : "Publicar ahora"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex justify-end">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleDeleteCredentials}
+          className="text-muted-foreground"
+        >
+          Eliminar credenciales
+        </Button>
+      </div>
     </div>
   );
 }
