@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
 
     const { appId, appSecret } = credentialsSnap.data();
 
-    // 2. Intercambiamos el code por un User Access Token
+    // 2. Intercambiamos el code por token
     const tokenRes = await fetch(
       `https://graph.facebook.com/v21.0/oauth/access_token?` +
         new URLSearchParams({
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
 
     const userAccessToken = tokenData.access_token;
 
-    // 3. Obtenemos las Pages del usuario
+    // 3. Obtenemos las Pages
     const pagesRes = await fetch(
       `https://graph.facebook.com/v21.0/me/accounts?fields=id,name,access_token&access_token=${userAccessToken}`,
     );
@@ -53,16 +53,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(`${baseUrl}/facebook?error=no_pages`);
     }
 
-    // Por ahora tomamos la primera página
-    // (más adelante podemos hacer un selector si hay varias)
+    // Tomamos la primera página
     const page = pagesData.data[0];
 
-    // 4. Guardamos la cuenta conectada
+    // 4. Guardamos en Firestore
     await setDoc(doc(db, "socialAccounts", page.id), {
       platform: "facebook",
       name: page.name,
       pageId: page.id,
-      accessToken: page.access_token, // Page Access Token
+      accessToken: page.access_token,
       connectedAt: new Date(),
     });
 
