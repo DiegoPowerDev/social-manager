@@ -4,7 +4,6 @@ import { doc, getDoc } from "firebase/firestore";
 
 export async function GET() {
   try {
-    // 1. Traemos las credenciales desde Firestore
     const credentialsSnap = await getDoc(
       doc(db, "platformCredentials", "facebook"),
     );
@@ -18,11 +17,13 @@ export async function GET() {
 
     const { appId } = credentialsSnap.data();
 
-    // 2. Construimos la URL de autorización
+    // ← Aquí pon el Configuration ID que acabas de crear
+    const configId = "1125563576591268";
+
     const params = new URLSearchParams({
       client_id: appId,
       redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/facebook/callback`,
-      scope: "pages_show_list,pages_read_engagement,pages_manage_posts",
+      config_id: configId,
       response_type: "code",
     });
 
