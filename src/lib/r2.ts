@@ -8,9 +8,6 @@ export const r2Client = new S3Client({
     accessKeyId: process.env.R2_ACCESS_KEY_ID!,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
   },
-  forcePathStyle: true,
-  requestChecksumCalculation: "WHEN_REQUIRED",
-  responseChecksumValidation: "WHEN_REQUIRED",
 });
 
 export async function generateUploadUrl(key: string, contentType: string) {
@@ -20,13 +17,11 @@ export async function generateUploadUrl(key: string, contentType: string) {
     ContentType: contentType,
   });
 
-  // Generamos la URL firmada sin incluir checksums
   const uploadUrl = await getSignedUrl(r2Client, command, {
     expiresIn: 300,
-    signableHeaders: new Set(["host"]), // Solo firmamos el host
+    signableHeaders: new Set(["host"]),
   });
 
   const publicUrl = `${process.env.R2_PUBLIC_URL}/${key}`;
-
   return { uploadUrl, publicUrl, key };
 }

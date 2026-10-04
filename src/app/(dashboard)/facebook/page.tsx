@@ -25,6 +25,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Info } from "lucide-react";
+import { PostHistory } from "@/components/social/PostHistory";
 
 export default function FacebookPage() {
   const searchParams = useSearchParams();
@@ -116,6 +117,7 @@ export default function FacebookPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           pageId: account.pageId,
+          pageName: account.name,
           accessToken: account.accessToken,
           message: data.message,
           link: data.link,
@@ -123,7 +125,6 @@ export default function FacebookPage() {
           videoUrl: data.videoUrl,
         }),
       });
-
       const result = await res.json();
 
       if (!res.ok) {
@@ -291,7 +292,7 @@ export default function FacebookPage() {
 
   // ================== ESTADO 3: Todo listo (Composer) ==================
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="w-full space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Facebook</h2>
@@ -320,21 +321,23 @@ export default function FacebookPage() {
         </div>
       )}
 
-      <FacebookComposer
-        pageName={account.name}
-        loading={loading}
-        onPublish={handlePublish}
-      />
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+        {/* Columna izquierda - Composer */}
+        <div className="xl:col-span-3">
+          <FacebookComposer
+            pageName={account.name}
+            loading={loading}
+            onPublish={handlePublish}
+          />
+        </div>
 
-      <div className="flex justify-end">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleDeleteCredentials}
-          className="text-muted-foreground"
-        >
-          Eliminar credenciales
-        </Button>
+        {/* Columna derecha - Historial */}
+        <div className="xl:col-span-2">
+          <PostHistory
+            pageId={account.pageId}
+            key={status?.type === "success" ? Date.now() : "history"} // Forzar refresh
+          />
+        </div>
       </div>
     </div>
   );

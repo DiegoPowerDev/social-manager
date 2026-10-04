@@ -52,3 +52,17 @@ export interface PlatformCredentials {
   createdAt: Date;
   updatedAt: Date;
 }
+
+export interface PublishedPost {
+  id: string;
+  platform: "facebook";
+  pageId: string;
+  pageName: string;
+  message?: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  link?: string;
+  facebookPostId?: string;
+  publishedAt: Date;
+  status: "published" | "failed";
+}

@@ -39,6 +39,9 @@ export function FacebookComposer({
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
+  const [mediaError, setMediaError] = useState<string | null>(null);
+  const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
+
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
 
@@ -56,7 +59,14 @@ export function FacebookComposer({
   const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setMediaError(null);
 
+    if (file.size > MAX_VIDEO_SIZE) {
+      setMediaError("El video es demasiado grande (máximo 100MB)");
+      // Limpiamos el input
+      if (videoInputRef.current) videoInputRef.current.value = "";
+      return;
+    }
     setImageFile(null);
     setImagePreview(null);
 
@@ -75,36 +85,21 @@ export function FacebookComposer({
 
   // Sube el archivo a R2 y devuelve la URL pública
   const uploadToR2 = async (file: File): Promise<string> => {
-    // 1. Pedimos la presigned URL
+    const formData = new FormData();
+    formData.append("file", file);
+
     const res = await fetch("/api/upload", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        filename: file.name,
-        contentType: file.type,
-      }),
+      body: formData,
     });
 
     if (!res.ok) {
-      throw new Error("No se pudo generar la URL de subida");
+      const error = await res.json();
+      throw new Error(error.error || "Error al subir el archivo");
     }
 
-    const { uploadUrl, publicUrl } = await res.json();
-
-    // 2. Subimos el archivo directamente a R2
-    const uploadRes = await fetch(uploadUrl, {
-      method: "PUT",
-      body: file,
-      headers: {
-        "Content-Type": file.type,
-      },
-    });
-
-    if (!uploadRes.ok) {
-      throw new Error("Error al subir el archivo a R2");
-    }
-
-    return publicUrl;
+    const data = await res.json();
+    return data.publicUrl;
   };
 
   const handleSubmit = async () => {
@@ -223,7 +218,13 @@ export function FacebookComposer({
             disabled={isLoading}
           />
         </div>
-
+        <div className="text-xs text-muted-foreground">
+          {mediaError ? (
+            <span className="text-red-500">{mediaError}</span>
+          ) : (
+            <span>Imágenes máx. 10MB · Videos máx. 100MB</span>
+          )}
+        </div>
         {/* Botones de media + Publicar */}
         <div className="flex items-center justify-between pt-2">
           <div className="flex items-center gap-2">
