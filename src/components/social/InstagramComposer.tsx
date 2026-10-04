@@ -3,8 +3,6 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -13,45 +11,50 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ImagePlus, Video, Link as LinkIcon, X, Loader2 } from "lucide-react";
+import { ImagePlus, Video, X, Loader2 } from "lucide-react";
 
 interface Props {
-  pageName: string;
+  username: string;
   onPublish: (data: {
-    message: string;
-    link?: string;
+    caption: string;
     imageUrl?: string;
     videoUrl?: string;
   }) => Promise<void>;
   loading?: boolean;
 }
 
-export function FacebookComposer({
-  pageName,
+export function InstagramComposer({
+  username,
   onPublish,
   loading = false,
 }: Props) {
-  const [message, setMessage] = useState("");
-  const [link, setLink] = useState("");
+  const [caption, setCaption] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-
   const [mediaError, setMediaError] = useState<string | null>(null);
-  const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+
+  const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
+  const MAX_IMAGE_SIZE = 8 * 1024 * 1024; // Instagram es más estricto
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setMediaError(null);
+
+    if (file.size > MAX_IMAGE_SIZE) {
+      setMediaError("La imagen es demasiado grande (máximo 8MB)");
+      return;
+    }
+
     setVideoFile(null);
     setVideoPreview(null);
-
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
   };
@@ -59,17 +62,17 @@ export function FacebookComposer({
   const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     setMediaError(null);
 
     if (file.size > MAX_VIDEO_SIZE) {
       setMediaError("El video es demasiado grande (máximo 100MB)");
-      // Limpiamos el input
       if (videoInputRef.current) videoInputRef.current.value = "";
       return;
     }
+
     setImageFile(null);
     setImagePreview(null);
-
     setVideoFile(file);
     setVideoPreview(URL.createObjectURL(file));
   };
@@ -79,15 +82,15 @@ export function FacebookComposer({
     setVideoFile(null);
     setImagePreview(null);
     setVideoPreview(null);
+    setMediaError(null);
     if (imageInputRef.current) imageInputRef.current.value = "";
     if (videoInputRef.current) videoInputRef.current.value = "";
   };
 
-  // Sube el archivo a R2 y devuelve la URL pública
   const uploadToR2 = async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("platform", "facebook"); // ← agrega esto
+    formData.append("platform", "instagram");
 
     const res = await fetch("/api/upload", {
       method: "POST",
@@ -104,46 +107,42 @@ export function FacebookComposer({
   };
 
   const handleSubmit = async () => {
-    if (!message.trim() && !imageFile && !videoFile) return;
+    if (!imageFile && !videoFile) {
+      setMediaError("Instagram requiere una imagen o un video");
+      return;
+    }
 
     try {
       setUploading(true);
+      setMediaError(null);
 
       let imageUrl: string | undefined;
       let videoUrl: string | undefined;
 
-      // Subir imagen si existe
       if (imageFile) {
         imageUrl = await uploadToR2(imageFile);
       }
-
-      // Subir video si existe
       if (videoFile) {
         videoUrl = await uploadToR2(videoFile);
       }
 
-      // Llamamos al onPublish con las URLs ya subidas
       await onPublish({
-        message,
-        link: link.trim() || undefined,
+        caption,
         imageUrl,
         videoUrl,
       });
 
-      // Solo limpiamos si todo salió bien
-      setMessage("");
-      setLink("");
+      // Limpiar solo si fue exitoso
+      setCaption("");
       removeMedia();
-    } catch (error) {
-      console.error("Error al publicar:", error);
-      // No limpiamos el formulario si falla
+    } catch (error: any) {
+      console.error(error);
+      setMediaError(error.message || "Error al publicar");
     } finally {
       setUploading(false);
     }
   };
 
-  const characterCount = message.length;
-  const isOverLimit = characterCount > 63206;
   const isLoading = loading || uploading;
 
   return (
@@ -152,35 +151,21 @@ export function FacebookComposer({
         <div className="flex items-center justify-between">
           <div>
             <CardTitle>Nueva publicación</CardTitle>
-            <CardDescription>Publicando en {pageName}</CardDescription>
+            <CardDescription>Publicando en @{username}</CardDescription>
           </div>
-          <Badge variant="secondary">Facebook</Badge>
+          <Badge variant="secondary">Instagram</Badge>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-5">
-        {/* Texto */}
-        <div className="space-y-2">
-          <Textarea
-            placeholder="¿Qué quieres publicar?"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            rows={5}
-            className="resize-none"
-            disabled={isLoading}
-          />
-          <div className="flex justify-end">
-            <span
-              className={`text-xs ${
-                isOverLimit ? "text-red-500" : "text-muted-foreground"
-              }`}
-            >
-              {characterCount.toLocaleString()} caracteres
-            </span>
-          </div>
-        </div>
+        <Textarea
+          placeholder="Escribe un pie de foto..."
+          value={caption}
+          onChange={(e) => setCaption(e.target.value)}
+          rows={4}
+          disabled={isLoading}
+        />
 
-        {/* Preview de media */}
         {(imagePreview || videoPreview) && (
           <div className="relative rounded-lg overflow-hidden border bg-muted/30">
             {imagePreview && (
@@ -205,29 +190,7 @@ export function FacebookComposer({
           </div>
         )}
 
-        {/* Enlace opcional */}
-        <div className="space-y-2">
-          <Label htmlFor="link" className="flex items-center gap-2">
-            <LinkIcon className="h-4 w-4" />
-            Enlace (opcional)
-          </Label>
-          <Input
-            id="link"
-            placeholder="https://ejemplo.com"
-            value={link}
-            onChange={(e) => setLink(e.target.value)}
-            disabled={isLoading}
-          />
-        </div>
-        <div className="text-xs text-muted-foreground">
-          {mediaError ? (
-            <span className="text-red-500">{mediaError}</span>
-          ) : (
-            <span>Imágenes máx. 10MB · Videos máx. 100MB</span>
-          )}
-        </div>
-        {/* Botones de media + Publicar */}
-        <div className="flex items-center justify-between pt-2">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <input
               type="file"
@@ -265,17 +228,13 @@ export function FacebookComposer({
               disabled={!!imageFile || isLoading}
             >
               <Video className="h-4 w-4 mr-2" />
-              Video
+              Video / Reel
             </Button>
           </div>
 
           <Button
             onClick={handleSubmit}
-            disabled={
-              isLoading ||
-              isOverLimit ||
-              (!message.trim() && !imageFile && !videoFile)
-            }
+            disabled={isLoading || (!imageFile && !videoFile)}
           >
             {isLoading ? (
               <>
@@ -286,6 +245,16 @@ export function FacebookComposer({
               "Publicar ahora"
             )}
           </Button>
+        </div>
+
+        <div className="text-xs text-muted-foreground">
+          {mediaError ? (
+            <span className="text-red-500">{mediaError}</span>
+          ) : (
+            <span>
+              Imágenes máx. 8MB · Videos máx. 100MB · Solo JPEG recomendado
+            </span>
+          )}
         </div>
       </CardContent>
     </Card>

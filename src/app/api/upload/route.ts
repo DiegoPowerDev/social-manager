@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
+    const platform = (formData.get("platform") as string) || "general";
 
     if (!file) {
       return NextResponse.json(
@@ -31,8 +32,7 @@ export async function POST(req: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const extension = file.name.split(".").pop() || "jpg";
-    const key = `facebook/${Date.now()}-${nanoid(8)}.${extension}`;
-
+    const key = `${platform}/${Date.now()}-${nanoid(8)}.${extension}`;
     await s3Client.send(
       new PutObjectCommand({
         Bucket: process.env.R2_BUCKET_NAME!,
