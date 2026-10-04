@@ -4,16 +4,24 @@ export async function publishTextPost(
   pageId: string,
   pageAccessToken: string,
   message: string,
+  link?: string,
 ) {
+  const body: any = {
+    message,
+    access_token: pageAccessToken,
+  };
+
+  // Si hay link, lo agregamos
+  if (link && link.trim() !== "") {
+    body.link = link.trim();
+  }
+
   const res = await fetch(`${GRAPH_API}/${pageId}/feed`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      message,
-      access_token: pageAccessToken,
-    }),
+    body: JSON.stringify(body),
   });
 
   const data = await res.json();
@@ -22,5 +30,5 @@ export async function publishTextPost(
     throw new Error(data.error?.message || "Error al publicar en Facebook");
   }
 
-  return data; // { id: "pageid_postid" }
+  return data;
 }

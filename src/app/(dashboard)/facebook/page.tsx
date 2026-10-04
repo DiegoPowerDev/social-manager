@@ -102,8 +102,8 @@ export default function FacebookPage() {
   const handlePublish = async (data: {
     message: string;
     link?: string;
-    image?: File | null;
-    video?: File | null;
+    imageUrl?: string;
+    videoUrl?: string;
   }) => {
     if (!account) return;
 
@@ -111,8 +111,6 @@ export default function FacebookPage() {
     setStatus(null);
 
     try {
-      // Por ahora solo enviamos texto.
-      // Mañana conectamos la subida a R2 y luego enviamos image/video.
       const res = await fetch("/api/publish/facebook", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -121,7 +119,8 @@ export default function FacebookPage() {
           accessToken: account.accessToken,
           message: data.message,
           link: data.link,
-          // image y video los agregaremos mañana
+          imageUrl: data.imageUrl,
+          videoUrl: data.videoUrl,
         }),
       });
 
@@ -137,6 +136,7 @@ export default function FacebookPage() {
       });
     } catch (err: any) {
       setStatus({ type: "error", text: err.message });
+      throw err;
     } finally {
       setLoading(false);
     }

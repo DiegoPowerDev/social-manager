@@ -3,13 +3,16 @@ import { publishTextPost } from "@/adapters/facebook";
 
 export async function POST(req: NextRequest) {
   try {
-    const { pageId, accessToken, message } = await req.json();
+    const { pageId, accessToken, message, link } = await req.json();
 
     if (!pageId || !accessToken || !message) {
-      return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Faltan datos obligatorios" },
+        { status: 400 },
+      );
     }
 
-    const result = await publishTextPost(pageId, accessToken, message);
+    const result = await publishTextPost(pageId, accessToken, message, link);
 
     return NextResponse.json({ success: true, postId: result.id });
   } catch (error: any) {

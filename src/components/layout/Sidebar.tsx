@@ -2,44 +2,62 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  Image as ImageIcon,
-  Users,
-  LayoutDashboard,
-  LogOut,
-} from "lucide-react";
+import { Image as ImageIcon, Users, LogOut, BarChart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import Image from "next/image";
 
 const mainNav = [
   {
     title: "Dashboard",
     href: "/",
-    icon: LayoutDashboard,
+    icon: BarChart,
   },
   {
     title: "Instagram",
     href: "/instagram",
-    icon: LayoutDashboard,
+    icon: "",
+    image: (
+      <Image
+        height={20}
+        width={20}
+        src="./instagram-icon.svg"
+        alt="Instagram logo"
+      />
+    ),
   },
   {
     title: "Facebook",
     href: "/facebook",
-    icon: LayoutDashboard,
+    icon: "",
+    image: (
+      <Image
+        height={20}
+        width={20}
+        src="./facebook-icon.svg"
+        alt="facebook logo"
+      />
+    ),
   },
   {
     title: "LinkedIn",
     href: "/linkedin",
-    icon: LayoutDashboard,
+    icon: "",
+    image: (
+      <Image height={20} width={20} src="./linkedin.svg" alt="Linkedin logo" />
+    ),
   },
   {
     title: "YouTube",
     href: "/youtube",
-    icon: LayoutDashboard,
+    icon: "",
+    image: (
+      <Image height={20} width={20} src="./youtube.svg" alt="Youtube logo" />
+    ),
   },
 ];
 
@@ -95,7 +113,7 @@ export function Sidebar() {
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
               >
-                <item.icon className="h-4 w-4" />
+                {item.icon ? <item.icon className="h-4 w-4" /> : item.image}
                 {item.title}
               </Link>
             );

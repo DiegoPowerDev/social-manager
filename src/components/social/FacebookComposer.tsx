@@ -13,15 +13,15 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ImagePlus, Video, Link as LinkIcon, X } from "lucide-react";
+import { ImagePlus, Video, Link as LinkIcon, X, Loader2 } from "lucide-react";
 
 interface Props {
   pageName: string;
   onPublish: (data: {
     message: string;
     link?: string;
-    image?: File | null;
-    video?: File | null;
+    imageUrl?: string;
+    videoUrl?: string;
   }) => Promise<void>;
   loading?: boolean;
 }
@@ -33,10 +33,11 @@ export function FacebookComposer({
 }: Props) {
   const [message, setMessage] = useState("");
   const [link, setLink] = useState("");
-  const [image, setImage] = useState<File | null>(null);
-  const [video, setVideo] = useState<File | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -45,11 +46,10 @@ export function FacebookComposer({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Limpiar video si había
-    setVideo(null);
+    setVideoFile(null);
     setVideoPreview(null);
 
-    setImage(file);
+    setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
   };
 
@@ -57,41 +57,98 @@ export function FacebookComposer({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Limpiar imagen si había
-    setImage(null);
+    setImageFile(null);
     setImagePreview(null);
 
-    setVideo(file);
+    setVideoFile(file);
     setVideoPreview(URL.createObjectURL(file));
   };
 
   const removeMedia = () => {
-    setImage(null);
-    setVideo(null);
+    setImageFile(null);
+    setVideoFile(null);
     setImagePreview(null);
     setVideoPreview(null);
     if (imageInputRef.current) imageInputRef.current.value = "";
     if (videoInputRef.current) videoInputRef.current.value = "";
   };
 
-  const handleSubmit = async () => {
-    if (!message.trim() && !image && !video) return;
-
-    await onPublish({
-      message,
-      link: link.trim() || undefined,
-      image,
-      video,
+  // Sube el archivo a R2 y devuelve la URL pública
+  const uploadToR2 = async (file: File): Promise<string> => {
+    // 1. Pedimos la presigned URL
+    const res = await fetch("/api/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        filename: file.name,
+        contentType: file.type,
+      }),
     });
 
-    // Limpiar después de publicar
-    setMessage("");
-    setLink("");
-    removeMedia();
+    if (!res.ok) {
+      throw new Error("No se pudo generar la URL de subida");
+    }
+
+    const { uploadUrl, publicUrl } = await res.json();
+
+    // 2. Subimos el archivo directamente a R2
+    const uploadRes = await fetch(uploadUrl, {
+      method: "PUT",
+      body: file,
+      headers: {
+        "Content-Type": file.type,
+      },
+    });
+
+    if (!uploadRes.ok) {
+      throw new Error("Error al subir el archivo a R2");
+    }
+
+    return publicUrl;
+  };
+
+  const handleSubmit = async () => {
+    if (!message.trim() && !imageFile && !videoFile) return;
+
+    try {
+      setUploading(true);
+
+      let imageUrl: string | undefined;
+      let videoUrl: string | undefined;
+
+      // Subir imagen si existe
+      if (imageFile) {
+        imageUrl = await uploadToR2(imageFile);
+      }
+
+      // Subir video si existe
+      if (videoFile) {
+        videoUrl = await uploadToR2(videoFile);
+      }
+
+      // Llamamos al onPublish con las URLs ya subidas
+      await onPublish({
+        message,
+        link: link.trim() || undefined,
+        imageUrl,
+        videoUrl,
+      });
+
+      // Solo limpiamos si todo salió bien
+      setMessage("");
+      setLink("");
+      removeMedia();
+    } catch (error) {
+      console.error("Error al publicar:", error);
+      // No limpiamos el formulario si falla
+    } finally {
+      setUploading(false);
+    }
   };
 
   const characterCount = message.length;
-  const isOverLimit = characterCount > 63206; // límite aproximado de Facebook
+  const isOverLimit = characterCount > 63206;
+  const isLoading = loading || uploading;
 
   return (
     <Card>
@@ -114,6 +171,7 @@ export function FacebookComposer({
             onChange={(e) => setMessage(e.target.value)}
             rows={5}
             className="resize-none"
+            disabled={isLoading}
           />
           <div className="flex justify-end">
             <span
@@ -144,6 +202,7 @@ export function FacebookComposer({
               size="icon"
               className="absolute top-2 right-2 h-8 w-8 rounded-full"
               onClick={removeMedia}
+              disabled={isLoading}
             >
               <X className="h-4 w-4" />
             </Button>
@@ -161,10 +220,11 @@ export function FacebookComposer({
             placeholder="https://ejemplo.com"
             value={link}
             onChange={(e) => setLink(e.target.value)}
+            disabled={isLoading}
           />
         </div>
 
-        {/* Acciones de media + Publicar */}
+        {/* Botones de media + Publicar */}
         <div className="flex items-center justify-between pt-2">
           <div className="flex items-center gap-2">
             <input
@@ -173,6 +233,7 @@ export function FacebookComposer({
               ref={imageInputRef}
               onChange={handleImageChange}
               className="hidden"
+              disabled={isLoading}
             />
             <input
               type="file"
@@ -180,6 +241,7 @@ export function FacebookComposer({
               ref={videoInputRef}
               onChange={handleVideoChange}
               className="hidden"
+              disabled={isLoading}
             />
 
             <Button
@@ -187,7 +249,7 @@ export function FacebookComposer({
               variant="outline"
               size="sm"
               onClick={() => imageInputRef.current?.click()}
-              disabled={!!video}
+              disabled={!!videoFile || isLoading}
             >
               <ImagePlus className="h-4 w-4 mr-2" />
               Imagen
@@ -198,7 +260,7 @@ export function FacebookComposer({
               variant="outline"
               size="sm"
               onClick={() => videoInputRef.current?.click()}
-              disabled={!!image}
+              disabled={!!imageFile || isLoading}
             >
               <Video className="h-4 w-4 mr-2" />
               Video
@@ -208,10 +270,19 @@ export function FacebookComposer({
           <Button
             onClick={handleSubmit}
             disabled={
-              loading || isOverLimit || (!message.trim() && !image && !video)
+              isLoading ||
+              isOverLimit ||
+              (!message.trim() && !imageFile && !videoFile)
             }
           >
-            {loading ? "Publicando..." : "Publicar ahora"}
+            {isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                {uploading ? "Subiendo..." : "Publicando..."}
+              </>
+            ) : (
+              "Publicar ahora"
+            )}
           </Button>
         </div>
       </CardContent>
