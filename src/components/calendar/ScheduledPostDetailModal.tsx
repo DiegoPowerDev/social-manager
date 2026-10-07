@@ -385,6 +385,53 @@ export function ScheduledPostDetailModal({
                 />
                 <Label htmlFor="edit-fb">Facebook</Label>
               </div>
+              {/* Avisos según redes y tipo */}
+              <div className="space-y-2 text-xs">
+                {selectedInstagram && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 text-amber-900 p-3 space-y-1">
+                    <p className="font-medium">Instagram — formato de media</p>
+                    {instagramMediaType === "FEED" && (
+                      <p>
+                        Imagen: ratio entre <strong>4:5</strong> (vertical) y{" "}
+                        <strong>1.91:1</strong> (horizontal). Cuadrado 1:1
+                        recomendado. Evita imágenes muy panorámicas.
+                      </p>
+                    )}
+                    {instagramMediaType === "REELS" && (
+                      <p>
+                        Reels: video vertical <strong>9:16</strong> (ej.
+                        1080×1920). Máx. ~90 segundos recomendado.
+                      </p>
+                    )}
+                    {instagramMediaType === "STORIES" && (
+                      <p>
+                        Historias: imagen o video vertical <strong>9:16</strong>
+                        . No se publica caption por la API.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {selectedLinkedIn && (
+                  <div className="rounded-md border border-sky-200 bg-sky-50 text-sky-900 p-3">
+                    <p className="font-medium">LinkedIn</p>
+                    <p>
+                      Soporta texto e imagen. El video aún no está habilitado en
+                      este flujo.
+                    </p>
+                  </div>
+                )}
+
+                {selectedFacebook && (
+                  <div className="rounded-md border border-blue-200 bg-blue-50 text-blue-900 p-3">
+                    <p className="font-medium">Facebook</p>
+                    <p>
+                      Texto, imagen, video y enlace. Más flexible con el
+                      formato.
+                    </p>
+                  </div>
+                )}
+              </div>
               <div className="space-y-2 p-3 border rounded-lg">
                 <div className="flex items-center gap-3">
                   <Checkbox

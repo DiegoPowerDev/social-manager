@@ -31,14 +31,19 @@ import { ScheduledPostDetailModal } from "@/components/calendar/ScheduledPostDet
 interface ScheduledPost {
   id: string;
   title: string;
-  message?: string;
+  message?: string | null;
+  imageUrl?: string | null;
+  videoUrl?: string | null;
+  link?: string | null;
   platforms: {
     facebook?: boolean;
     instagram?: boolean;
     linkedin?: boolean;
   };
+  instagramMediaType?: "FEED" | "REELS" | "STORIES" | null;
   scheduledAt: Date;
   status: "scheduled" | "publishing" | "published" | "failed";
+  results?: Record<string, { success: boolean; message?: string }>;
 }
 
 const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
@@ -79,11 +84,15 @@ export default function CalendarPage() {
         return {
           id: doc.id,
           title: d.title || "Sin título",
-          message: d.message,
-          results: d.results || undefined,
+          message: d.message || null,
+          imageUrl: d.imageUrl || null,
+          videoUrl: d.videoUrl || null,
+          link: d.link || null,
           platforms: d.platforms || {},
+          instagramMediaType: d.instagramMediaType || null,
           scheduledAt: d.scheduledAt?.toDate?.() || new Date(d.scheduledAt),
           status: d.status || "scheduled",
+          results: d.results || undefined,
         } as ScheduledPost;
       });
 

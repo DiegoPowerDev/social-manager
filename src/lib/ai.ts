@@ -54,29 +54,32 @@ export async function generateImage(options: {
 }) {
   const { prompt, imageUrl } = options;
 
-  // Si hay imagen de referencia → usamos FLUX Kontext (mucho mejor para editar)
+  // ===== EDICIÓN con Nano Banana 2 =====
   if (imageUrl) {
-    const result = await fal.subscribe("fal-ai/flux-pro/kontext", {
+    const result = await fal.subscribe("fal-ai/nano-banana-2.1/edit", {
       input: {
-        prompt: prompt,
-        image_url: imageUrl,
-        guidance_scale: 3.5,
+        prompt: prompt.trim(),
+        image_urls: [imageUrl], // array (importante)
         num_images: 1,
+        aspect_ratio: "auto",
         output_format: "jpeg",
-        safety_tolerance: "2",
+        resolution: "1K", // 1K es más barato; 2K/4K cuestan más
+        safety_tolerance: "4",
       },
     });
 
     return result.data.images[0].url;
   }
 
-  // Generación desde cero (sigue usando flux/dev)
-  const result = await fal.subscribe("fal-ai/flux/dev", {
+  // ===== GENERACIÓN desde cero con Nano Banana 2 =====
+  const result = await fal.subscribe("fal-ai/nano-banana-2.1", {
     input: {
-      prompt,
-      image_size: "square_hd",
+      prompt: prompt.trim(),
       num_images: 1,
+      aspect_ratio: "1:1", // bueno para redes
       output_format: "jpeg",
+      resolution: "1K",
+      safety_tolerance: "4",
     },
   });
 
