@@ -24,7 +24,7 @@ interface Post {
 
 interface Props {
   pageId: string;
-  platform?: "facebook" | "instagram";
+  platform?: "facebook" | "instagram" | "linkedin";
 }
 
 export function PostHistory({ pageId, platform = "facebook" }: Props) {

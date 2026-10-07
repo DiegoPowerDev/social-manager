@@ -35,11 +35,12 @@ import { AIImageGenerator } from "@/components/social/AIImageGenerator";
 
 interface SocialAccount {
   id: string;
-  platform: "facebook" | "instagram";
+  platform: "facebook" | "instagram" | "linkedin";
   name?: string;
   username?: string;
   pageId?: string;
   igUserId?: string;
+  personId?: string;
   accessToken: string;
 }
 
@@ -62,6 +63,7 @@ export default function BulkPublishPage() {
   // Selección de redes
   const [selectedFacebook, setSelectedFacebook] = useState(false);
   const [selectedInstagram, setSelectedInstagram] = useState(false);
+  const [selectedLinkedIn, setSelectedLinkedIn] = useState(false);
   const [instagramMediaType, setInstagramMediaType] = useState<
     "FEED" | "REELS" | "STORIES"
   >("FEED");
@@ -74,7 +76,6 @@ export default function BulkPublishPage() {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
 
-  // Cargar cuentas
   useEffect(() => {
     const loadAccounts = async () => {
       try {
@@ -86,10 +87,12 @@ export default function BulkPublishPage() {
 
         setAccounts(data);
 
-        const fb = data.find((a) => a.platform === "facebook");
-        const ig = data.find((a) => a.platform === "instagram");
-        if (fb) setSelectedFacebook(true);
-        if (ig) setSelectedInstagram(true);
+        if (data.find((a) => a.platform === "facebook"))
+          setSelectedFacebook(true);
+        if (data.find((a) => a.platform === "instagram"))
+          setSelectedInstagram(true);
+        if (data.find((a) => a.platform === "linkedin"))
+          setSelectedLinkedIn(true);
       } catch (error) {
         console.error(error);
       } finally {
@@ -102,8 +105,8 @@ export default function BulkPublishPage() {
 
   const facebookAccount = accounts.find((a) => a.platform === "facebook");
   const instagramAccount = accounts.find((a) => a.platform === "instagram");
+  const linkedinAccount = accounts.find((a) => a.platform === "linkedin");
 
-  // Subir archivo a R2
   const uploadToR2 = async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -184,7 +187,7 @@ export default function BulkPublishPage() {
   };
 
   const handlePublish = async () => {
-    if (!selectedFacebook && !selectedInstagram) {
+    if (!selectedFacebook && !selectedInstagram && !selectedLinkedIn) {
       alert("Selecciona al menos una red");
       return;
     }
@@ -246,7 +249,7 @@ export default function BulkPublishPage() {
             igUserId: instagramAccount.igUserId,
             accessToken: instagramAccount.accessToken,
             username: instagramAccount.username,
-            caption: instagramMediaType === "STORIES" ? undefined : message, // Stories no soportan caption
+            caption: instagramMediaType === "STORIES" ? undefined : message,
             imageUrl: imageUrl || undefined,
             videoUrl: videoUrl || undefined,
             mediaType: instagramMediaType,
@@ -272,10 +275,49 @@ export default function BulkPublishPage() {
       }
     }
 
+    // LinkedIn
+    if (selectedLinkedIn && linkedinAccount) {
+      try {
+        // LinkedIn no soporta video en este flujo simple (solo texto + imagen)
+        if (videoUrl && !imageUrl) {
+          publishResults.push({
+            platform: "LinkedIn",
+            success: false,
+            message:
+              "Por ahora LinkedIn solo soporta texto e imagen (no video)",
+          });
+        } else {
+          const res = await fetch("/api/publish/linkedin", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              personId: linkedinAccount.personId,
+              accessToken: linkedinAccount.accessToken,
+              name: linkedinAccount.name,
+              text: message,
+              imageUrl: imageUrl || undefined,
+            }),
+          });
+
+          const data = await res.json();
+          publishResults.push({
+            platform: "LinkedIn",
+            success: res.ok,
+            message: res.ok ? "Publicado correctamente" : data.error || "Error",
+          });
+        }
+      } catch (err: any) {
+        publishResults.push({
+          platform: "LinkedIn",
+          success: false,
+          message: err.message || "Error de conexión",
+        });
+      }
+    }
+
     setResults(publishResults);
     setPublishing(false);
 
-    // Limpiar solo si todo salió bien
     const allSuccess = publishResults.every((r) => r.success);
     if (allSuccess) {
       clearForm();
@@ -295,12 +337,18 @@ export default function BulkPublishPage() {
       <div className="max-w-md space-y-4">
         <h2 className="text-2xl font-bold">Publicar en varias redes</h2>
         <p className="text-muted-foreground">
-          No tienes ninguna red conectada. Ve a Facebook o Instagram y conecta
-          una cuenta primero.
+          No tienes ninguna red conectada. Conecta Facebook, Instagram o
+          LinkedIn primero.
         </p>
       </div>
     );
   }
+
+  const selectedCount = [
+    selectedFacebook,
+    selectedInstagram,
+    selectedLinkedIn,
+  ].filter(Boolean).length;
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -312,7 +360,7 @@ export default function BulkPublishPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Columna principal */}
+        {/* Contenido */}
         <div className="lg:col-span-2 space-y-5">
           <Card>
             <CardHeader>
@@ -322,7 +370,6 @@ export default function BulkPublishPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              {/* Generador de texto */}
               {instagramMediaType !== "STORIES" && (
                 <AICaptionGenerator
                   platform="general"
@@ -330,7 +377,6 @@ export default function BulkPublishPage() {
                 />
               )}
 
-              {/* Generador de imagen */}
               <AIImageGenerator
                 onGenerate={(url) => {
                   setImageUrl(url);
@@ -338,7 +384,6 @@ export default function BulkPublishPage() {
                 }}
               />
 
-              {/* Texto */}
               {instagramMediaType !== "STORIES" && (
                 <div className="space-y-2">
                   <Label>Texto / Caption</Label>
@@ -354,8 +399,8 @@ export default function BulkPublishPage() {
 
               {instagramMediaType === "STORIES" && (
                 <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
-                  Las Historias de Instagram no permiten texto/caption a través
-                  de la API. Solo se publicará la imagen o el video.
+                  Las Historias de Instagram no permiten texto a través de la
+                  API.
                 </p>
               )}
 
@@ -442,7 +487,6 @@ export default function BulkPublishPage() {
                 )}
               </div>
 
-              {/* Enlace (solo Facebook) */}
               <div className="space-y-2">
                 <Label>Enlace (solo Facebook)</Label>
                 <Input
@@ -456,7 +500,7 @@ export default function BulkPublishPage() {
           </Card>
         </div>
 
-        {/* Columna derecha */}
+        {/* Redes */}
         <div className="space-y-5">
           <Card>
             <CardHeader>
@@ -530,6 +574,30 @@ export default function BulkPublishPage() {
                   )}
                 </div>
               )}
+
+              {linkedinAccount && (
+                <div className="flex items-start space-x-3 p-3 rounded-lg border">
+                  <Checkbox
+                    id="li"
+                    checked={selectedLinkedIn}
+                    onCheckedChange={(checked) =>
+                      setSelectedLinkedIn(checked === true)
+                    }
+                    disabled={publishing}
+                  />
+                  <div className="space-y-1">
+                    <Label htmlFor="li" className="font-medium cursor-pointer">
+                      LinkedIn
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {linkedinAccount.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Solo texto e imagen
+                    </p>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -540,7 +608,7 @@ export default function BulkPublishPage() {
             disabled={
               publishing ||
               uploadingMedia ||
-              (!selectedFacebook && !selectedInstagram) ||
+              selectedCount === 0 ||
               (selectedInstagram && !imageUrl && !videoUrl)
             }
           >
@@ -555,14 +623,7 @@ export default function BulkPublishPage() {
                 Publicando...
               </>
             ) : (
-              `Publicar en ${
-                [
-                  selectedFacebook && "Facebook",
-                  selectedInstagram && "Instagram",
-                ]
-                  .filter(Boolean)
-                  .join(" + ") || "..."
-              }`
+              `Publicar en ${selectedCount} red${selectedCount !== 1 ? "es" : ""}`
             )}
           </Button>
 

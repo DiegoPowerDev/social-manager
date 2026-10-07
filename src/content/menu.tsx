@@ -1,4 +1,4 @@
-import { BarChart, Send } from "lucide-react";
+import { BarChart, Calendar, Send } from "lucide-react";
 import Image from "next/image";
 
 export const mainNav = [
@@ -52,14 +52,7 @@ export const mainNav = [
   {
     title: "Publicar en masa",
     href: "/publish",
-    icon: Send, // o Layers, Share2, etc.
+    icon: Send,
   },
-  {
-    title: "LinkedIn",
-    href: "/linkedin",
-    icon: "",
-    image: (
-      <Image height={20} width={20} src="./linkedin.svg" alt="LinkedIn logo" />
-    ),
-  },
+  { title: "Calendario", href: "/calendar", icon: Calendar },
 ];
