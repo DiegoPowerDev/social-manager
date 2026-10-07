@@ -5,8 +5,15 @@ import { collection, addDoc } from "firebase/firestore";
 
 export async function POST(req: NextRequest) {
   try {
-    const { igUserId, accessToken, caption, imageUrl, videoUrl, username } =
-      await req.json();
+    const {
+      igUserId,
+      accessToken,
+      caption,
+      imageUrl,
+      videoUrl,
+      username,
+      mediaType,
+    } = await req.json();
 
     if (!igUserId || !accessToken) {
       return NextResponse.json(
@@ -26,6 +33,7 @@ export async function POST(req: NextRequest) {
       caption,
       imageUrl,
       videoUrl,
+      mediaType: mediaType || "FEED",
     });
 
     // Guardar en historial

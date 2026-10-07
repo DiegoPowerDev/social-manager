@@ -3,7 +3,7 @@ const GRAPH_API = "https://graph.facebook.com/v21.0";
 async function waitForContainer(
   containerId: string,
   accessToken: string,
-  maxAttempts = 30, // ← aumentamos a 30 intentos (≈ 90 segundos)
+  maxAttempts = 30,
 ) {
   for (let i = 0; i < maxAttempts; i++) {
     const res = await fetch(
@@ -11,17 +11,11 @@ async function waitForContainer(
     );
     const data = await res.json();
 
-    console.log(`Intento ${i + 1}:`, data.status_code, data.status);
-
-    if (data.status_code === "FINISHED") {
-      return true;
-    }
-
+    if (data.status_code === "FINISHED") return true;
     if (data.status_code === "ERROR") {
       throw new Error(data.status || "Instagram no pudo procesar el media");
     }
 
-    // Esperar 3 segundos
     await new Promise((resolve) => setTimeout(resolve, 3000));
   }
 
@@ -35,30 +29,58 @@ export async function publishToInstagram(
     caption?: string;
     imageUrl?: string;
     videoUrl?: string;
+    mediaType?: "FEED" | "REELS" | "STORIES";
   },
 ) {
+  const mediaType = data.mediaType || "FEED";
   let containerId: string;
 
-  if (data.imageUrl) {
-    const containerRes = await fetch(`${GRAPH_API}/${igUserId}/media`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        image_url: data.imageUrl,
-        caption: data.caption || "",
-        access_token: accessToken,
-      }),
-    });
-
-    const containerData = await containerRes.json();
-    if (!containerRes.ok) {
-      throw new Error(
-        containerData.error?.message || "Error al crear contenedor de imagen",
-      );
+  // ========== HISTORIA ==========
+  if (mediaType === "STORIES") {
+    if (data.imageUrl) {
+      const res = await fetch(`${GRAPH_API}/${igUserId}/media`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          media_type: "STORIES",
+          image_url: data.imageUrl,
+          access_token: accessToken,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok)
+        throw new Error(
+          json.error?.message || "Error al crear historia (imagen)",
+        );
+      containerId = json.id;
+    } else if (data.videoUrl) {
+      const res = await fetch(`${GRAPH_API}/${igUserId}/media`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          media_type: "STORIES",
+          video_url: data.videoUrl,
+          access_token: accessToken,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok)
+        throw new Error(
+          json.error?.message || "Error al crear historia (video)",
+        );
+      containerId = json.id;
+    } else {
+      throw new Error("Las historias requieren una imagen o un video");
     }
-    containerId = containerData.id;
-  } else if (data.videoUrl) {
-    const containerRes = await fetch(`${GRAPH_API}/${igUserId}/media`, {
+  }
+
+  // ========== REEL ==========
+  else if (mediaType === "REELS") {
+    if (!data.videoUrl) {
+      throw new Error("Los Reels requieren un video");
+    }
+
+    const res = await fetch(`${GRAPH_API}/${igUserId}/media`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -68,19 +90,53 @@ export async function publishToInstagram(
         access_token: accessToken,
       }),
     });
-
-    const containerData = await containerRes.json();
-    if (!containerRes.ok) {
-      throw new Error(
-        containerData.error?.message || "Error al crear contenedor de video",
-      );
-    }
-    containerId = containerData.id;
-  } else {
-    throw new Error("Instagram requiere una imagen o un video");
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error?.message || "Error al crear Reel");
+    containerId = json.id;
   }
 
-  // Esperar a que Instagram termine de procesar
+  // ========== FEED (publicación normal) ==========
+  else {
+    if (data.imageUrl) {
+      const res = await fetch(`${GRAPH_API}/${igUserId}/media`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image_url: data.imageUrl,
+          caption: data.caption || "",
+          access_token: accessToken,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok)
+        throw new Error(
+          json.error?.message || "Error al crear publicación (imagen)",
+        );
+      containerId = json.id;
+    } else if (data.videoUrl) {
+      // Video en feed también se publica como REELS actualmente
+      const res = await fetch(`${GRAPH_API}/${igUserId}/media`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          media_type: "REELS",
+          video_url: data.videoUrl,
+          caption: data.caption || "",
+          access_token: accessToken,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok)
+        throw new Error(
+          json.error?.message || "Error al crear publicación (video)",
+        );
+      containerId = json.id;
+    } else {
+      throw new Error("Instagram requiere una imagen o un video");
+    }
+  }
+
+  // Esperar procesamiento
   await waitForContainer(containerId, accessToken);
 
   // Publicar
@@ -94,7 +150,6 @@ export async function publishToInstagram(
   });
 
   const publishData = await publishRes.json();
-
   if (!publishRes.ok) {
     throw new Error(
       publishData.error?.message || "Error al publicar en Instagram",

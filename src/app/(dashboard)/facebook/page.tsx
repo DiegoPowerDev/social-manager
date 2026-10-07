@@ -4,17 +4,19 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   collection,
-  doc,
-  getDoc,
   getDocs,
   query,
   where,
   deleteDoc,
+  doc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { CredentialsForm } from "@/components/social/CredentialsForm";
 import { FacebookComposer } from "@/components/social/FacebookComposer";
+import { PostHistory } from "@/components/social/PostHistory";
+import { PostPreview } from "@/components/social/PostPreview";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
   CardContent,
@@ -22,52 +24,50 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Info } from "lucide-react";
-import { PostHistory } from "@/components/social/PostHistory";
 
 export default function FacebookPage() {
+  const [activeTab, setActiveTab] = useState("create");
+
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const [hasCredentials, setHasCredentials] = useState<boolean | null>(null);
   const [account, setAccount] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
   const [status, setStatus] = useState<{
     type: "success" | "error";
     text: string;
   } | null>(null);
-  const [checking, setChecking] = useState(true);
 
-  const loadData = async () => {
+  // Estado del post (controlado)
+  const [message, setMessage] = useState("");
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [link, setLink] = useState("");
+
+  const loadAccount = async () => {
     try {
-      const credentialsSnap = await getDoc(
-        doc(db, "platformCredentials", "facebook"),
-      );
-      setHasCredentials(credentialsSnap.exists());
-
       const q = query(
         collection(db, "socialAccounts"),
         where("platform", "==", "facebook"),
       );
-      const accountsSnap = await getDocs(q);
+      const snapshot = await getDocs(q);
 
-      if (!accountsSnap.empty) {
-        const data = accountsSnap.docs[0].data();
-        setAccount({ id: accountsSnap.docs[0].id, ...data });
+      if (!snapshot.empty) {
+        const data = snapshot.docs[0].data();
+        setAccount({ id: snapshot.docs[0].id, ...data });
       } else {
         setAccount(null);
       }
     } catch (error) {
-      console.error("Error cargando datos de Facebook:", error);
+      console.error(error);
     } finally {
       setChecking(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    loadAccount();
   }, []);
 
   useEffect(() => {
@@ -75,38 +75,20 @@ export default function FacebookPage() {
     const error = searchParams.get("error");
 
     if (success === "true") {
-      setStatus({
-        type: "success",
-        text: "Cuenta de Facebook conectada correctamente",
-      });
-      loadData();
+      setStatus({ type: "success", text: "Cuenta de Facebook conectada" });
+      loadAccount();
       router.replace("/facebook");
     }
 
     if (error) {
-      const messages: Record<string, string> = {
-        no_code: "No se recibió el código de autorización",
-        no_credentials: "No hay credenciales configuradas",
-        token_error: "Error al obtener el token de acceso",
-        no_pages: "No se encontraron páginas de Facebook",
-        connection_failed: "Error al conectar la cuenta",
-      };
-
-      setStatus({
-        type: "error",
-        text: messages[error] || "Ocurrió un error al conectar",
-      });
+      setStatus({ type: "error", text: "Error al conectar la cuenta" });
       router.replace("/facebook");
     }
-  }, [searchParams, router]);
+  }, [searchParams]);
 
-  const handlePublish = async (data: {
-    message: string;
-    link?: string;
-    imageUrl?: string;
-    videoUrl?: string;
-  }) => {
+  const handlePublish = async () => {
     if (!account) return;
+    if (!message.trim() && !imageUrl && !videoUrl) return;
 
     setLoading(true);
     setStatus(null);
@@ -117,67 +99,39 @@ export default function FacebookPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           pageId: account.pageId,
-          pageName: account.name,
           accessToken: account.accessToken,
-          message: data.message,
-          link: data.link,
-          imageUrl: data.imageUrl,
-          videoUrl: data.videoUrl,
+          pageName: account.name,
+          message,
+          link: link || undefined,
+          imageUrl: imageUrl || undefined,
+          videoUrl: videoUrl || undefined,
         }),
       });
-      const result = await res.json();
 
-      if (!res.ok) {
-        throw new Error(result.error || "Error al publicar");
-      }
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Error al publicar");
 
       setStatus({
         type: "success",
         text: "Publicado correctamente en Facebook",
       });
+
+      // Limpiar solo después de publicar exitosamente
+      setMessage("");
+      setImageUrl(null);
+      setVideoUrl(null);
+      setLink("");
     } catch (err: any) {
       setStatus({ type: "error", text: err.message });
-      throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDisconnectAccount = async () => {
-    if (!account) return;
-    if (!confirm("¿Seguro que quieres desconectar esta cuenta de Facebook?"))
-      return;
-
-    try {
-      await deleteDoc(doc(db, "socialAccounts", account.id));
-      setAccount(null);
-      setStatus({ type: "success", text: "Cuenta desconectada" });
-    } catch (error) {
-      setStatus({ type: "error", text: "Error al desconectar la cuenta" });
-    }
-  };
-
-  const handleDeleteCredentials = async () => {
-    if (
-      !confirm(
-        "¿Seguro que quieres eliminar las credenciales? También se desconectará la cuenta.",
-      )
-    )
-      return;
-
-    try {
-      await deleteDoc(doc(db, "platformCredentials", "facebook"));
-
-      if (account) {
-        await deleteDoc(doc(db, "socialAccounts", account.id));
-      }
-
-      setHasCredentials(false);
-      setAccount(null);
-      setStatus({ type: "success", text: "Credenciales eliminadas" });
-    } catch (error) {
-      setStatus({ type: "error", text: "Error al eliminar las credenciales" });
-    }
+  const handleDisconnect = async () => {
+    if (!account || !confirm("¿Desconectar esta cuenta de Facebook?")) return;
+    await deleteDoc(doc(db, "socialAccounts", account.id));
+    setAccount(null);
   };
 
   if (checking) {
@@ -188,73 +142,14 @@ export default function FacebookPage() {
     );
   }
 
-  // ================== ESTADO 1: Sin credenciales ==================
-  if (!hasCredentials) {
+  if (!account) {
     return (
-      <div className="space-y-6 max-w-2xl">
+      <div className="max-w-md space-y-6">
         <div>
           <h2 className="text-2xl font-bold">Facebook</h2>
           <p className="text-muted-foreground mt-1">
-            Configura las credenciales de tu aplicación para comenzar
+            Conecta tu página de Facebook
           </p>
-        </div>
-
-        <Alert>
-          <Info className="h-4 w-4" />
-          <AlertTitle>Instrucciones importantes</AlertTitle>
-          <AlertDescription className="mt-2 space-y-2 text-sm">
-            <p>Antes de conectar, asegúrate de tener esto en tu App de Meta:</p>
-            <ol className="list-decimal list-inside space-y-1">
-              <li>
-                En <strong>Use cases</strong> agrega:{" "}
-                <code>Manage everything on your Page</code>
-              </li>
-              <li>
-                En <strong>Facebook Login for Business → Configurations</strong>{" "}
-                crea una configuration con estos permisos:
-                <ul className="list-disc list-inside ml-4 mt-1">
-                  <li>pages_show_list</li>
-                  <li>pages_read_engagement</li>
-                  <li>pages_manage_posts</li>
-                </ul>
-              </li>
-              <li>
-                En <strong>App settings → Basic</strong> agrega tu dominio de
-                Vercel
-              </li>
-              <li>
-                En <strong>Valid OAuth Redirect URIs</strong> agrega:
-                <br />
-                <code className="text-xs">
-                  https://tu-dominio.vercel.app/api/auth/facebook/callback
-                </code>
-              </li>
-            </ol>
-          </AlertDescription>
-        </Alert>
-
-        <CredentialsForm
-          platform="facebook"
-          onSuccess={() => setHasCredentials(true)}
-        />
-      </div>
-    );
-  }
-
-  // ================== ESTADO 2: Credenciales pero sin cuenta ==================
-  if (!account) {
-    return (
-      <div className="space-y-6 max-w-2xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">Facebook</h2>
-            <p className="text-muted-foreground mt-1">
-              Conecta tu página de Facebook para poder publicar
-            </p>
-          </div>
-          <Button variant="outline" size="sm" onClick={handleDeleteCredentials}>
-            Eliminar credenciales
-          </Button>
         </div>
 
         {status && (
@@ -271,16 +166,14 @@ export default function FacebookPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Conectar página</CardTitle>
+            <CardTitle>Conectar Facebook</CardTitle>
             <CardDescription>
-              Se te redirigirá a Facebook para autorizar el acceso a tu página.
+              Necesitas una Página de Facebook para publicar contenido.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Button
-              onClick={() => {
-                window.location.href = "/api/auth/facebook";
-              }}
+              onClick={() => (window.location.href = "/api/auth/facebook")}
             >
               Conectar Facebook
             </Button>
@@ -290,9 +183,9 @@ export default function FacebookPage() {
     );
   }
 
-  // ================== ESTADO 3: Todo listo (Composer) ==================
   return (
-    <div className="w-full space-y-6">
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Facebook</h2>
@@ -303,7 +196,7 @@ export default function FacebookPage() {
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="secondary">Conectado</Badge>
-          <Button variant="outline" size="sm" onClick={handleDisconnectAccount}>
+          <Button variant="outline" size="sm" onClick={handleDisconnect}>
             Desconectar
           </Button>
         </div>
@@ -321,23 +214,51 @@ export default function FacebookPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
-        {/* Columna izquierda - Composer */}
-        <div className="xl:col-span-3">
-          <FacebookComposer
-            pageName={account.name}
-            loading={loading}
-            onPublish={handlePublish}
-          />
-        </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="create">Crear contenido</TabsTrigger>
+          <TabsTrigger value="history">Historial</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-        {/* Columna derecha - Historial */}
-        <div className="xl:col-span-2">
-          <PostHistory
-            pageId={account.pageId}
-            key={status?.type === "success" ? Date.now() : "history"} // Forzar refresh
-          />
+      {/* Crear - siempre montado, solo se oculta */}
+      <div className={activeTab === "create" ? "mt-6 block" : "hidden"}>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="xl:col-span-2">
+            <FacebookComposer
+              pageName={account.name}
+              loading={loading}
+              message={message}
+              onMessageChange={setMessage}
+              imageUrl={imageUrl}
+              onImageChange={setImageUrl}
+              videoUrl={videoUrl}
+              onVideoChange={setVideoUrl}
+              link={link}
+              onLinkChange={setLink}
+              onPublish={handlePublish}
+            />
+          </div>
+
+          <div>
+            <PostPreview
+              platform="facebook"
+              accountName={account.name}
+              message={message}
+              imageUrl={imageUrl}
+              videoUrl={videoUrl}
+            />
+          </div>
         </div>
+      </div>
+
+      {/* Historial - siempre montado, solo se oculta */}
+      <div className={activeTab === "history" ? "mt-6 block" : "hidden"}>
+        <PostHistory
+          pageId={account.pageId}
+          platform="facebook"
+          key={status?.type === "success" ? Date.now() : "history"}
+        />
       </div>
     </div>
   );

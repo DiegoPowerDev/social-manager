@@ -13,7 +13,10 @@ import {
 import { db } from "@/lib/firebase";
 import { InstagramComposer } from "@/components/social/InstagramComposer";
 import { PostHistory } from "@/components/social/PostHistory";
+import { PostPreview } from "@/components/social/PostPreview";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
   CardContent,
@@ -21,9 +24,10 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 
 export default function InstagramPage() {
+  const [activeTab, setActiveTab] = useState("create");
+
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -34,6 +38,14 @@ export default function InstagramPage() {
     type: "success" | "error";
     text: string;
   } | null>(null);
+
+  // Estado del post (controlado)
+  const [mediaType, setMediaType] = useState<"FEED" | "REELS" | "STORIES">(
+    "FEED",
+  );
+  const [caption, setCaption] = useState("");
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
   const loadAccount = async () => {
     try {
@@ -50,7 +62,7 @@ export default function InstagramPage() {
         setAccount(null);
       }
     } catch (error) {
-      console.error("Error cargando cuenta de Instagram:", error);
+      console.error(error);
     } finally {
       setChecking(false);
     }
@@ -65,39 +77,20 @@ export default function InstagramPage() {
     const error = searchParams.get("error");
 
     if (success === "true") {
-      setStatus({
-        type: "success",
-        text: "Cuenta de Instagram conectada correctamente",
-      });
+      setStatus({ type: "success", text: "Cuenta de Instagram conectada" });
       loadAccount();
       router.replace("/instagram");
     }
 
     if (error) {
-      const messages: Record<string, string> = {
-        no_code: "No se recibió el código de autorización",
-        no_credentials: "No hay credenciales configuradas",
-        token_error: "Error al obtener el token",
-        no_pages: "No se encontraron páginas de Facebook",
-        no_instagram:
-          "No se encontró una cuenta de Instagram Business vinculada",
-        connection_failed: "Error al conectar la cuenta",
-      };
-
-      setStatus({
-        type: "error",
-        text: messages[error] || "Ocurrió un error al conectar",
-      });
+      setStatus({ type: "error", text: "Error al conectar la cuenta" });
       router.replace("/instagram");
     }
-  }, [searchParams, router]);
+  }, [searchParams]);
 
-  const handlePublish = async (data: {
-    caption: string;
-    imageUrl?: string;
-    videoUrl?: string;
-  }) => {
+  const handlePublish = async () => {
     if (!account) return;
+    if (!imageUrl && !videoUrl) return;
 
     setLoading(true);
     setStatus(null);
@@ -110,42 +103,36 @@ export default function InstagramPage() {
           igUserId: account.igUserId,
           accessToken: account.accessToken,
           username: account.username,
-          caption: data.caption,
-          imageUrl: data.imageUrl,
-          videoUrl: data.videoUrl,
+          caption,
+          imageUrl: imageUrl || undefined,
+          videoUrl: videoUrl || undefined,
+          mediaType,
         }),
       });
 
       const result = await res.json();
-
-      if (!res.ok) {
-        throw new Error(result.error || "Error al publicar");
-      }
+      if (!res.ok) throw new Error(result.error || "Error al publicar");
 
       setStatus({
         type: "success",
         text: "Publicado correctamente en Instagram",
       });
+
+      // Limpiar solo después de publicar
+      setCaption("");
+      setImageUrl(null);
+      setVideoUrl(null);
     } catch (err: any) {
       setStatus({ type: "error", text: err.message });
-      throw err;
     } finally {
       setLoading(false);
     }
   };
 
   const handleDisconnect = async () => {
-    if (!account) return;
-    if (!confirm("¿Seguro que quieres desconectar esta cuenta de Instagram?"))
-      return;
-
-    try {
-      await deleteDoc(doc(db, "socialAccounts", account.id));
-      setAccount(null);
-      setStatus({ type: "success", text: "Cuenta desconectada" });
-    } catch (error) {
-      setStatus({ type: "error", text: "Error al desconectar la cuenta" });
-    }
+    if (!account || !confirm("¿Desconectar esta cuenta de Instagram?")) return;
+    await deleteDoc(doc(db, "socialAccounts", account.id));
+    setAccount(null);
   };
 
   if (checking) {
@@ -156,14 +143,13 @@ export default function InstagramPage() {
     );
   }
 
-  // ================== SIN CUENTA CONECTADA ==================
   if (!account) {
     return (
-      <div className="space-y-6 max-w-md">
+      <div className="max-w-md space-y-6">
         <div>
           <h2 className="text-2xl font-bold">Instagram</h2>
           <p className="text-muted-foreground mt-1">
-            Conecta tu cuenta de Instagram Business o Creator
+            Conecta tu cuenta de Instagram Business
           </p>
         </div>
 
@@ -189,9 +175,7 @@ export default function InstagramPage() {
           </CardHeader>
           <CardContent>
             <Button
-              onClick={() => {
-                window.location.href = "/api/auth/instagram";
-              }}
+              onClick={() => (window.location.href = "/api/auth/instagram")}
             >
               Conectar Instagram
             </Button>
@@ -201,7 +185,6 @@ export default function InstagramPage() {
     );
   }
 
-  // ================== CUENTA CONECTADA ==================
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -235,25 +218,51 @@ export default function InstagramPage() {
         </div>
       )}
 
-      {/* Layout de dos columnas */}
-      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
-        {/* Composer */}
-        <div className="xl:col-span-3">
-          <InstagramComposer
-            username={account.username}
-            loading={loading}
-            onPublish={handlePublish}
-          />
-        </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="create">Crear contenido</TabsTrigger>
+          <TabsTrigger value="history">Historial</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-        {/* Historial */}
-        <div className="xl:col-span-2">
-          <PostHistory
-            pageId={account.igUserId}
-            platform="instagram"
-            key={status?.type === "success" ? Date.now() : "history"}
-          />
+      {/* TAB: Crear */}
+      <div className={activeTab === "create" ? "mt-6 block" : "hidden"}>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="xl:col-span-2">
+            <InstagramComposer
+              username={account.username}
+              loading={loading}
+              caption={caption}
+              onCaptionChange={setCaption}
+              imageUrl={imageUrl}
+              onImageChange={setImageUrl}
+              videoUrl={videoUrl}
+              onVideoChange={setVideoUrl}
+              mediaType={mediaType}
+              onMediaTypeChange={setMediaType}
+              onPublish={handlePublish}
+            />
+          </div>
+
+          <div>
+            <PostPreview
+              platform="instagram"
+              accountName={account.username}
+              message={caption}
+              imageUrl={imageUrl}
+              videoUrl={videoUrl}
+            />
+          </div>
         </div>
+      </div>
+
+      {/* Historial - siempre montado, solo se oculta */}
+      <div className={activeTab === "history" ? "mt-6 block" : "hidden"}>
+        <PostHistory
+          pageId={account.igUserId}
+          platform="instagram"
+          key={status?.type === "success" ? Date.now() : "history"}
+        />
       </div>
     </div>
   );

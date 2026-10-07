@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { Sidebar } from "@/components/layout/Sidebar";
-import { Header } from "@/components/layout/Header";
+import { LucideLoaderCircle } from "lucide-react";
 
 export default function DashboardLayout({
   children,
@@ -23,10 +23,8 @@ export default function DashboardLayout({
   // Mientras carga la autenticación
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-center">
-          <p className="text-muted-foreground">Verificando sesión...</p>
-        </div>
+      <div className="flex h-screen w-full items-center justify-center">
+        <LucideLoaderCircle className="animate-spin h-16 w-16 text-lime-300" />
       </div>
     );
   }
@@ -34,8 +32,8 @@ export default function DashboardLayout({
   // Si no hay usuario, no renderizamos nada (mientras redirige)
   if (!user) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <p className="text-muted-foreground">Redirigiendo al login...</p>
+      <div className="flex h-screen w-full items-center justify-center">
+        <LucideLoaderCircle className="animate-spin h-16 w-16 text-lime-600" />
       </div>
     );
   }
@@ -45,7 +43,6 @@ export default function DashboardLayout({
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Header />
         <main className="flex-1 overflow-y-auto p-6">{children}</main>
       </div>
     </div>

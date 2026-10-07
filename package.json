@@ -9,9 +9,13 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1145.0",
+    "@aws-sdk/client-s3": "^3.1146.0",
     "@aws-sdk/s3-request-presigner": "^3.1145.0",
     "@base-ui/react": "^1.8.0",
+    "@fal-ai/client": "^1.10.1",
+    "@fal-ai/server-proxy": "^1.2.1",
+    "@google/genai": "^2.27.0",
+    "@google/generative-ai": "^0.24.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cn": "^0.4.0",

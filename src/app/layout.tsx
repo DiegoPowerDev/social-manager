@@ -18,7 +18,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body className={cn(inter.className, "bg-black text-white")}>
+      <body className={cn(inter.className, "")}>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
