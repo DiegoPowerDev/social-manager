@@ -198,7 +198,11 @@ export function AIImageGenerator({ onGenerate }: Props) {
       {/* Estilo */}
       <div className="space-y-2">
         <Label>Estilo</Label>
-        <Select value={style} onValueChange={setStyle} disabled={loading}>
+        <Select
+          value={style}
+          onValueChange={(v) => setStyle(v as any)}
+          disabled={loading}
+        >
           <SelectTrigger>
             <SelectValue placeholder="Selecciona un estilo" />
           </SelectTrigger>

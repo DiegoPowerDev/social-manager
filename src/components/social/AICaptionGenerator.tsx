@@ -82,7 +82,11 @@ export function AICaptionGenerator({
 
       <div className="space-y-2">
         <Label>Tono</Label>
-        <Select value={tone} onValueChange={setTone} disabled={loading}>
+        <Select
+          value={tone}
+          onValueChange={(v) => setTone(v as any)}
+          disabled={loading}
+        >
           <SelectTrigger>
             <SelectValue placeholder="Selecciona un tono" />
           </SelectTrigger>
