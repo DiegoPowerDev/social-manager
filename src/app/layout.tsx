@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { cn } from "cn";
+import EmberParticles from "@/components/animations/EmberParticles";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -18,7 +19,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body className={cn(inter.className, "")}>
+      <body
+        style={{ backgroundImage: `url("./background.webp")` }}
+        className={cn(inter.className, "bg-cover bg-no-repeat ")}
+      >
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

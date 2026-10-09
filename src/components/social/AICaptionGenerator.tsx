@@ -63,7 +63,7 @@ export function AICaptionGenerator({
   };
 
   return (
-    <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+    <div className="space-y-3 p-4 flex flex-col w-full">
       <div className="flex items-center gap-2 text-sm font-medium">
         <Sparkles className="h-4 w-4 text-purple-500" />
         Generar caption con IA
@@ -75,6 +75,7 @@ export function AICaptionGenerator({
           id="topic"
           placeholder="Ej: Lanzamiento de nuevo producto, tips de productividad..."
           value={topic}
+          className="bg-white"
           onChange={(e) => setTopic(e.target.value)}
           disabled={loading}
         />
@@ -87,7 +88,7 @@ export function AICaptionGenerator({
           onValueChange={(v) => setTone(v as any)}
           disabled={loading}
         >
-          <SelectTrigger>
+          <SelectTrigger className="bg-white">
             <SelectValue placeholder="Selecciona un tono" />
           </SelectTrigger>
           <SelectContent>
@@ -112,7 +113,7 @@ export function AICaptionGenerator({
       <Button
         onClick={handleGenerate}
         disabled={loading || !topic.trim()}
-        className="w-full"
+        className="w-full bg-yellow-500/30 h-10 hover:bg-yellow-500/20"
         variant="secondary"
       >
         {loading ? (

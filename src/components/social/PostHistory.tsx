@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { Video, FileText, ExternalLink } from "lucide-react";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 interface Post {
   id: string;
@@ -17,9 +18,12 @@ interface Post {
   message?: string;
   imageUrl?: string;
   videoUrl?: string;
-  link?: string;
+  link?: string | null;
+  permalink?: string | null;
   publishedAt: Date;
-  postId?: string; // facebookPostId o instagramPostId
+  facebookPostId?: string | null;
+  instagramPostId?: string | null;
+  linkedinPostId?: string | null;
 }
 
 interface Props {
@@ -27,17 +31,38 @@ interface Props {
   platform?: "facebook" | "instagram" | "linkedin";
 }
 
+function getPostUrl(post: Post): string | null {
+  // 1. Permalink real (Instagram / LinkedIn)
+  if (post.permalink) return post.permalink;
+
+  // 2. Facebook
+  if (post.platform === "facebook" && post.facebookPostId) {
+    return `https://www.facebook.com/${post.facebookPostId}`;
+  }
+
+  // 3. LinkedIn (URN)
+  if (post.platform === "linkedin" && post.linkedinPostId) {
+    return `https://www.linkedin.com/feed/update/${post.linkedinPostId}/`;
+  }
+
+  // 4. Instagram SIN permalink → no inventar /p/{mediaId}/
+  return null;
+}
+
 export function PostHistory({ pageId, platform = "facebook" }: Props) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
-
+  const companyId = useAuthStore((s) => s.companyId);
   const fetchPosts = async () => {
     try {
+      if (!companyId) {
+        return;
+      }
       setLoading(true);
-
       const q = query(
         collection(db, "publishedPosts"),
-        where("platform", "==", platform), // ← ahora usa el platform recibido
+        where("companyId", "==", companyId),
+        where("platform", "==", platform),
         limit(30),
       );
 
@@ -48,17 +73,20 @@ export function PostHistory({ pageId, platform = "facebook" }: Props) {
           const d = doc.data();
           return {
             id: doc.id,
-            pageId: d.pageId || d.igUserId || "",
+            pageId: d.pageId || d.igUserId || d.personId || "",
             platform: d.platform,
             message: d.message,
             imageUrl: d.imageUrl,
             videoUrl: d.videoUrl,
-            link: d.link,
+            link: d.link || null,
+            permalink: d.permalink || null,
             publishedAt: d.publishedAt?.toDate?.() || new Date(d.publishedAt),
-            postId: d.facebookPostId || d.instagramPostId,
-          };
+            facebookPostId: d.facebookPostId || d.postId || null,
+            instagramPostId: d.instagramPostId || null,
+            linkedinPostId: d.linkedinPostId || null,
+          } as Post;
         })
-        .filter((post) => post.pageId === pageId)
+        .filter((post) => !pageId || post.pageId === pageId)
         .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime())
         .slice(0, 10);
 
@@ -73,17 +101,6 @@ export function PostHistory({ pageId, platform = "facebook" }: Props) {
   useEffect(() => {
     if (pageId) fetchPosts();
   }, [pageId, platform]);
-
-  const getPostUrl = (post: Post) => {
-    if (!post.postId) return null;
-
-    if (post.platform === "instagram") {
-      return `https://www.instagram.com/p/${post.postId}/`;
-    }
-
-    // Facebook
-    return `https://www.facebook.com/${post.postId}`;
-  };
 
   if (loading) {
     return (
@@ -123,7 +140,6 @@ export function PostHistory({ pageId, platform = "facebook" }: Props) {
                 key={post.id}
                 className="flex gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
               >
-                {/* Thumbnail */}
                 <div className="w-14 h-14 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
                   {post.imageUrl ? (
                     <img
@@ -138,7 +154,6 @@ export function PostHistory({ pageId, platform = "facebook" }: Props) {
                   )}
                 </div>
 
-                {/* Contenido */}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm line-clamp-2 leading-snug">
                     {post.message || (

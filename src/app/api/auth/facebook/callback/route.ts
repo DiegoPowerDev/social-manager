@@ -1,69 +1,75 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { adminDb } from "@/lib/firebase-admin";
 
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code");
+  const companyId = req.nextUrl.searchParams.get("state");
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
   if (!code) {
     return NextResponse.redirect(`${baseUrl}/facebook?error=no_code`);
   }
+  if (!companyId) {
+    return NextResponse.redirect(`${baseUrl}/facebook?error=no_company`);
+  }
 
   try {
-    // 1. Traemos las credenciales
-    const credentialsSnap = await getDoc(
-      doc(db, "platformCredentials", "facebook"),
-    );
+    const credentialsSnap = await adminDb
+      .collection("platformCredentials")
+      .doc(`${companyId}_facebook`)
+      .get();
 
-    if (!credentialsSnap.exists()) {
+    if (!credentialsSnap.exists) {
       return NextResponse.redirect(`${baseUrl}/facebook?error=no_credentials`);
     }
 
-    const { appId, appSecret } = credentialsSnap.data();
+    const { appId, appSecret } = credentialsSnap.data()!;
+    const redirectUri = `${baseUrl}/api/auth/facebook/callback`;
 
-    // 2. Intercambiamos el code por token
     const tokenRes = await fetch(
       `https://graph.facebook.com/v21.0/oauth/access_token?` +
         new URLSearchParams({
           client_id: appId,
           client_secret: appSecret,
-          redirect_uri: `${baseUrl}/api/auth/facebook/callback`,
+          redirect_uri: redirectUri,
           code,
         }),
     );
-
     const tokenData = await tokenRes.json();
 
-    if (tokenData.error) {
+    if (tokenData.error || !tokenData.access_token) {
       console.error("Error obteniendo token:", tokenData.error);
       return NextResponse.redirect(`${baseUrl}/facebook?error=token_error`);
     }
 
-    const userAccessToken = tokenData.access_token;
+    const userAccessToken = tokenData.access_token as string;
 
-    // 3. Obtenemos las Pages
     const pagesRes = await fetch(
       `https://graph.facebook.com/v21.0/me/accounts?fields=id,name,access_token&access_token=${userAccessToken}`,
     );
-
     const pagesData = await pagesRes.json();
 
-    if (!pagesData.data || pagesData.data.length === 0) {
+    if (!pagesData.data?.length) {
       return NextResponse.redirect(`${baseUrl}/facebook?error=no_pages`);
     }
 
-    // Tomamos la primera página
     const page = pagesData.data[0];
 
-    // 4. Guardamos en Firestore
-    await setDoc(doc(db, "socialAccounts", page.id), {
-      platform: "facebook",
-      name: page.name,
-      pageId: page.id,
-      accessToken: page.access_token,
-      connectedAt: new Date(),
-    });
+    await adminDb
+      .collection("socialAccounts")
+      .doc(page.id)
+      .set(
+        {
+          companyId,
+          platform: "facebook",
+          name: page.name,
+          pageId: page.id,
+          accessToken: page.access_token,
+          connectedAt: new Date(),
+          expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+        },
+        { merge: true },
+      );
 
     return NextResponse.redirect(`${baseUrl}/facebook?success=true`);
   } catch (error) {

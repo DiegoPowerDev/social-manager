@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getTokenStatus, tokenStatusLabel } from "@/lib/tokenStatus";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   collection,
@@ -24,6 +25,10 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import { LucideLoaderCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { InstagramConnectFlow } from "@/components/social/InstagramConnectFlow";
 
 export default function InstagramPage() {
   const [activeTab, setActiveTab] = useState("create");
@@ -43,21 +48,41 @@ export default function InstagramPage() {
   const [mediaType, setMediaType] = useState<"FEED" | "REELS" | "STORIES">(
     "FEED",
   );
+
+  const companyId = useAuthStore((s) => s.companyId);
+
+  const memberRole = useAuthStore((s) => s.memberRole);
+  const canEdit = memberRole === "admin" || memberRole === "editor";
+  const canConnect = memberRole === "admin";
   const [caption, setCaption] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
   const loadAccount = async () => {
     try {
+      if (!companyId) {
+        return;
+      }
       const q = query(
         collection(db, "socialAccounts"),
+        where("companyId", "==", companyId),
         where("platform", "==", "instagram"),
       );
+      console.log(memberRole);
       const snapshot = await getDocs(q);
 
       if (!snapshot.empty) {
         const data = snapshot.docs[0].data();
-        setAccount({ id: snapshot.docs[0].id, ...data });
+
+        setAccount({
+          id: snapshot.docs[0].id,
+          ...data,
+          expiresAt: data.expiresAt?.toDate?.()
+            ? data.expiresAt.toDate()
+            : data.expiresAt
+              ? new Date(data.expiresAt)
+              : null,
+        });
       } else {
         setAccount(null);
       }
@@ -69,8 +94,9 @@ export default function InstagramPage() {
   };
 
   useEffect(() => {
-    loadAccount();
-  }, []);
+    if (companyId) loadAccount();
+    else setChecking(false);
+  }, [companyId]);
 
   useEffect(() => {
     const success = searchParams.get("success");
@@ -89,8 +115,8 @@ export default function InstagramPage() {
   }, [searchParams]);
 
   const handlePublish = async () => {
-    if (!account) return;
-    if (!imageUrl && !videoUrl) return;
+    if (!account || !companyId || !canEdit) return;
+    if (!caption.trim() && !imageUrl && !videoUrl) return;
 
     setLoading(true);
     setStatus(null);
@@ -103,6 +129,7 @@ export default function InstagramPage() {
           igUserId: account.igUserId,
           accessToken: account.accessToken,
           username: account.username,
+          companyId,
           caption,
           imageUrl: imageUrl || undefined,
           videoUrl: videoUrl || undefined,
@@ -123,7 +150,19 @@ export default function InstagramPage() {
       setImageUrl(null);
       setVideoUrl(null);
     } catch (err: any) {
-      setStatus({ type: "error", text: err.message });
+      const msg = err.message || "Error al publicar";
+      if (
+        msg === "TOKEN_EXPIRED" ||
+        msg.toLowerCase().includes("token") ||
+        msg.includes("401")
+      ) {
+        setStatus({
+          type: "error",
+          text: "El token expiró o es inválido. Reconecta la cuenta.",
+        });
+      } else {
+        setStatus({ type: "error", text: err.message });
+      }
     } finally {
       setLoading(false);
     }
@@ -137,22 +176,101 @@ export default function InstagramPage() {
 
   if (checking) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Cargando...</p>
+      <div className="flex h-screen w-full items-center justify-center">
+        <LucideLoaderCircle className="animate-spin h-16 w-16 text-yellow-200" />
+      </div>
+    );
+  }
+  if (!companyId) {
+    return (
+      <div className="p-6 text-muted-foreground">
+        No hay empresa asociada. Completa el acceso o recarga la página.
       </div>
     );
   }
 
   if (!account) {
     return (
-      <div className="max-w-md space-y-6">
+      <InstagramConnectFlow
+        companyId={companyId}
+        canConnect={canConnect}
+        status={status}
+      />
+    );
+  }
+
+  return (
+    <div className="">
+      {/* Header */}
+      <div className="flex items-center justify-between bg-yellow-500/20 p-6">
         <div>
           <h2 className="text-2xl font-bold">Instagram</h2>
-          <p className="text-muted-foreground mt-1">
-            Conecta tu cuenta de Instagram Business
+          <p className=" mt-1">
+            Publicando como{" "}
+            <span className="font-medium ">@{account.username}</span>
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          {(() => {
+            const s = getTokenStatus(account.expiresAt);
+            if (s === "expired")
+              return <Badge variant="destructive">Token expirado</Badge>;
+            if (s === "expiring_soon")
+              return (
+                <Badge className="bg-amber-500 hover:bg-amber-500">
+                  Por vencer
+                </Badge>
+              );
+            return <Badge variant="secondary">Conectado</Badge>;
+          })()}
+          <Button
+            disabled={!canConnect}
+            variant="outline"
+            size="sm"
+            onClick={handleDisconnect}
+          >
+            Desconectar
+          </Button>
+        </div>
+      </div>
+      {(() => {
+        const tokenStatus = getTokenStatus(account.expiresAt);
+        if (tokenStatus === "ok") return null;
 
+        return (
+          <div
+            className={`mx-6 mb-2 p-3 rounded-md text-sm border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
+              tokenStatus === "expired"
+                ? "bg-red-50 text-red-800 border-red-200"
+                : "bg-amber-50 text-amber-900 border-amber-200"
+            }`}
+          >
+            <div>
+              <p className="font-medium">{tokenStatusLabel(tokenStatus)}</p>
+              {account.expiresAt && (
+                <p className="text-xs mt-0.5 opacity-80">
+                  Expira: {account.expiresAt.toLocaleString()}
+                </p>
+              )}
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                window.location.href = `/api/auth/instagram?companyId=${companyId}`;
+              }}
+            >
+              Reconectar Instagram
+            </Button>
+          </div>
+        );
+      })()}
+      {!canEdit && (
+        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded-md mb-4">
+          Tu rol es solo lectura. No puedes publicar ni desconectar.
+        </p>
+      )}
+      <div className="w-full h-full p-6">
         {status && (
           <div
             className={`p-3 rounded-md text-sm ${
@@ -165,104 +283,62 @@ export default function InstagramPage() {
           </div>
         )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Conectar Instagram</CardTitle>
-            <CardDescription>
-              Necesitas una cuenta Business o Creator vinculada a una Página de
-              Facebook.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button
-              onClick={() => (window.location.href = "/api/auth/instagram")}
-            >
-              Conectar Instagram
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Instagram</h2>
-          <p className="text-muted-foreground mt-1">
-            Publicando como{" "}
-            <span className="font-medium text-foreground">
-              @{account.username}
-            </span>
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary">Conectado</Badge>
-          <Button variant="outline" size="sm" onClick={handleDisconnect}>
-            Desconectar
-          </Button>
-        </div>
-      </div>
-
-      {status && (
-        <div
-          className={`p-3 rounded-md text-sm ${
-            status.type === "success"
-              ? "bg-green-50 text-green-700 border border-green-200"
-              : "bg-red-50 text-red-700 border border-red-200"
-          }`}
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="w-full "
         >
-          {status.text}
+          <TabsList className="grid w-full max-w-md grid-cols-2 bg-yellow-500/60 font-bold backdrop-blur-xs">
+            <TabsTrigger value="create">Crear contenido</TabsTrigger>
+            <TabsTrigger value="history">Historial</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {/* TAB: Crear */}
+        <div className={cn(activeTab === "create" ? "mt-6 block" : "hidden")}>
+          {!canEdit ? (
+            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded-md mb-4">
+              Tu rol es solo lectura. No puedes publicar ni desconectar.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              <div className="xl:col-span-2">
+                <InstagramComposer
+                  username={account.username}
+                  loading={loading}
+                  caption={caption}
+                  onCaptionChange={setCaption}
+                  imageUrl={imageUrl}
+                  onImageChange={setImageUrl}
+                  videoUrl={videoUrl}
+                  onVideoChange={setVideoUrl}
+                  mediaType={mediaType}
+                  onMediaTypeChange={setMediaType}
+                  onPublish={handlePublish}
+                />
+              </div>
+
+              <div>
+                <PostPreview
+                  platform="instagram"
+                  accountName={account.username}
+                  message={caption}
+                  imageUrl={imageUrl}
+                  videoUrl={videoUrl}
+                />
+              </div>
+            </div>
+          )}
         </div>
-      )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="create">Crear contenido</TabsTrigger>
-          <TabsTrigger value="history">Historial</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      {/* TAB: Crear */}
-      <div className={activeTab === "create" ? "mt-6 block" : "hidden"}>
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <div className="xl:col-span-2">
-            <InstagramComposer
-              username={account.username}
-              loading={loading}
-              caption={caption}
-              onCaptionChange={setCaption}
-              imageUrl={imageUrl}
-              onImageChange={setImageUrl}
-              videoUrl={videoUrl}
-              onVideoChange={setVideoUrl}
-              mediaType={mediaType}
-              onMediaTypeChange={setMediaType}
-              onPublish={handlePublish}
-            />
-          </div>
-
-          <div>
-            <PostPreview
-              platform="instagram"
-              accountName={account.username}
-              message={caption}
-              imageUrl={imageUrl}
-              videoUrl={videoUrl}
-            />
-          </div>
+        {/* Historial - siempre montado, solo se oculta */}
+        <div className={activeTab === "history" ? "mt-6 block" : "hidden"}>
+          <PostHistory
+            pageId={account.igUserId}
+            platform="instagram"
+            key={status?.type === "success" ? Date.now() : "history"}
+          />
         </div>
-      </div>
-
-      {/* Historial - siempre montado, solo se oculta */}
-      <div className={activeTab === "history" ? "mt-6 block" : "hidden"}>
-        <PostHistory
-          pageId={account.igUserId}
-          platform="instagram"
-          key={status?.type === "success" ? Date.now() : "history"}
-        />
       </div>
     </div>
   );

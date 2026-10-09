@@ -26,7 +26,8 @@ const secondaryNav = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { appUser, logout } = useAuthStore();
+  const { appUser, logout, companyName, companyLogo } = useAuthStore();
+
   const router = useRouter();
 
   const handleLogout = async () => {
@@ -36,15 +37,28 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="flex h-screen w-64 flex-col border-r bg-background">
+    <aside className="flex h-screen w-64 flex-col border-r text-white bg-yellow-500/20  backdrop-blur-xs">
       {/* Logo / Nombre */}
-      <div className="flex h-14 items-center border-b px-6">
-        <Link href="/" className="flex items-center gap-2 font-semibold">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
+      <div className="flex flex-col justify-center">
+        <Link
+          href="/"
+          className="flex items-center gap-2 p-3 font-semibold bg-black text-white"
+        >
+          <div className="flex h-8 w-8 rounded-md bg-primary text-primary-foreground items-center justify-center">
             SP
           </div>
-          <span className="text-black">Social Publisher</span>
+          <span className="">Social Publisher</span>
         </Link>
+        <div className="flex items-center p-3 border-b gap-4 select-none">
+          {companyLogo && (
+            <img
+              src={companyLogo}
+              className="h-8 w-8 rounded-md object-cover"
+              alt=""
+            />
+          )}
+          <span>{companyName || "Tu empresa"}</span>
+        </div>
       </div>
 
       {/* Navegación principal */}
@@ -59,8 +73,8 @@ export function Sidebar() {
                 className={cn(
                   "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    ? "bg-primary text-white"
+                    : " hover:bg-muted hover:text-foreground",
                 )}
               >
                 {item.icon ? <item.icon className="h-4 w-4" /> : item.image}
@@ -82,8 +96,8 @@ export function Sidebar() {
                 className={cn(
                   "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground  hover:text-foreground",
+                    ? "bg-primary text-white"
+                    : " hover:bg-muted hover:text-foreground",
                 )}
               >
                 <item.icon className="h-4 w-4" />
@@ -98,7 +112,7 @@ export function Sidebar() {
       <div className="border-t p-4">
         <div className="mb-3 px-2">
           <p className="text-sm font-medium">{appUser?.name || "Usuario"}</p>
-          <p className="text-xs text-muted-foreground capitalize">
+          <p className="text-xs  capitalize">
             {appUser?.role || "—"} · {appUser?.email}
           </p>
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,9 +29,13 @@ import {
   X,
   CheckCircle2,
   XCircle,
+  LucideLoaderCircle,
 } from "lucide-react";
 import { AICaptionGenerator } from "@/components/social/AICaptionGenerator";
 import { AIImageGenerator } from "@/components/social/AIImageGenerator";
+import { Separator } from "@/components/ui/separator";
+import { PostPreview } from "@/components/social/PostPreview";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 interface SocialAccount {
   id: string;
@@ -53,6 +57,10 @@ interface PublishResult {
 export default function BulkPublishPage() {
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [loadingAccounts, setLoadingAccounts] = useState(true);
+
+  const companyId = useAuthStore((s) => s.companyId);
+  const memberRole = useAuthStore((s) => s.memberRole);
+  const canEdit = memberRole === "admin" || memberRole === "editor";
 
   // Contenido
   const [message, setMessage] = useState("");
@@ -77,22 +85,27 @@ export default function BulkPublishPage() {
   const videoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (!companyId) {
+      setLoadingAccounts(false);
+      return;
+    }
     const loadAccounts = async () => {
       try {
-        const snapshot = await getDocs(collection(db, "socialAccounts"));
+        setLoadingAccounts(true);
+        const q = query(
+          collection(db, "socialAccounts"),
+          where("companyId", "==", companyId),
+        );
+        const snapshot = await getDocs(q);
         const data = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         })) as SocialAccount[];
 
         setAccounts(data);
-
-        if (data.find((a) => a.platform === "facebook"))
-          setSelectedFacebook(true);
-        if (data.find((a) => a.platform === "instagram"))
-          setSelectedInstagram(true);
-        if (data.find((a) => a.platform === "linkedin"))
-          setSelectedLinkedIn(true);
+        setSelectedFacebook(!!data.find((a) => a.platform === "facebook"));
+        setSelectedInstagram(!!data.find((a) => a.platform === "instagram"));
+        setSelectedLinkedIn(!!data.find((a) => a.platform === "linkedin"));
       } catch (error) {
         console.error(error);
       } finally {
@@ -101,7 +114,7 @@ export default function BulkPublishPage() {
     };
 
     loadAccounts();
-  }, []);
+  }, [companyId]);
 
   const facebookAccount = accounts.find((a) => a.platform === "facebook");
   const instagramAccount = accounts.find((a) => a.platform === "instagram");
@@ -111,7 +124,7 @@ export default function BulkPublishPage() {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("platform", "bulk");
-
+    if (companyId) formData.append("companyId", companyId);
     const res = await fetch("/api/upload", {
       method: "POST",
       body: formData,
@@ -187,6 +200,10 @@ export default function BulkPublishPage() {
   };
 
   const handlePublish = async () => {
+    if (!companyId || !canEdit) {
+      alert(!canEdit ? "No tienes permiso para publicar" : "Sin empresa");
+      return;
+    }
     if (!selectedFacebook && !selectedInstagram && !selectedLinkedIn) {
       alert("Selecciona al menos una red");
       return;
@@ -217,6 +234,7 @@ export default function BulkPublishPage() {
             pageId: facebookAccount.pageId,
             accessToken: facebookAccount.accessToken,
             pageName: facebookAccount.name,
+            companyId,
             message,
             link: link || undefined,
             imageUrl: imageUrl || undefined,
@@ -278,34 +296,25 @@ export default function BulkPublishPage() {
     // LinkedIn
     if (selectedLinkedIn && linkedinAccount) {
       try {
-        // LinkedIn no soporta video en este flujo simple (solo texto + imagen)
-        if (videoUrl && !imageUrl) {
-          publishResults.push({
-            platform: "LinkedIn",
-            success: false,
-            message:
-              "Por ahora LinkedIn solo soporta texto e imagen (no video)",
-          });
-        } else {
-          const res = await fetch("/api/publish/linkedin", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              personId: linkedinAccount.personId,
-              accessToken: linkedinAccount.accessToken,
-              name: linkedinAccount.name,
-              text: message,
-              imageUrl: imageUrl || undefined,
-            }),
-          });
+        const res = await fetch("/api/publish/linkedin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            personId: linkedinAccount.personId,
+            accessToken: linkedinAccount.accessToken,
+            name: linkedinAccount.name,
+            text: message,
+            imageUrl: imageUrl || undefined,
+            videoUrl: videoUrl || undefined,
+          }),
+        });
 
-          const data = await res.json();
-          publishResults.push({
-            platform: "LinkedIn",
-            success: res.ok,
-            message: res.ok ? "Publicado correctamente" : data.error || "Error",
-          });
-        }
+        const data = await res.json();
+        publishResults.push({
+          platform: "LinkedIn",
+          success: res.ok,
+          message: res.ok ? "Publicado correctamente" : data.error || "Error",
+        });
       } catch (err: any) {
         publishResults.push({
           platform: "LinkedIn",
@@ -326,8 +335,8 @@ export default function BulkPublishPage() {
 
   if (loadingAccounts) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Cargando cuentas...</p>
+      <div className="flex h-screen w-full items-center justify-center">
+        <LucideLoaderCircle className="animate-spin h-16 w-16 text-orange-400" />
       </div>
     );
   }
@@ -351,18 +360,18 @@ export default function BulkPublishPage() {
   ].filter(Boolean).length;
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div>
+    <div className="">
+      <div className="p-6 bg-yellow-500/20 ">
         <h2 className="text-2xl font-bold">Publicar en varias redes</h2>
         <p className="text-muted-foreground mt-1">
           Crea el contenido una vez y publícalo en todas las redes seleccionadas
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
         {/* Contenido */}
         <div className="lg:col-span-2 space-y-5">
-          <Card>
+          <Card className="bg-white/70">
             <CardHeader>
               <CardTitle>Contenido</CardTitle>
               <CardDescription>
@@ -370,74 +379,156 @@ export default function BulkPublishPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              {instagramMediaType !== "STORIES" && (
-                <AICaptionGenerator
-                  platform="general"
-                  onGenerate={(caption) => setMessage(caption)}
-                />
-              )}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Redes</CardTitle>
+                  <CardDescription>Selecciona dónde publicar</CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-3">
+                  {facebookAccount && (
+                    <div className="flex items-start space-x-3 p-3 rounded-lg bg-white/60">
+                      <Checkbox
+                        id="fb"
+                        checked={selectedFacebook}
+                        onCheckedChange={(checked) =>
+                          setSelectedFacebook(checked === true)
+                        }
+                        disabled={publishing}
+                      />
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor="fb"
+                          className="font-medium cursor-pointer"
+                        >
+                          Facebook
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          {facebookAccount.name}
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
-              <AIImageGenerator
-                onGenerate={(url) => {
-                  setImageUrl(url);
-                  setVideoUrl(null);
-                }}
-              />
+                  {instagramAccount && (
+                    <div className="space-y-3 p-3 rounded-lg bg-white/60">
+                      <div className="flex items-start space-x-3">
+                        <Checkbox
+                          id="ig"
+                          checked={selectedInstagram}
+                          onCheckedChange={(checked) => {
+                            const on = checked === true;
+                            setSelectedInstagram(on);
+                            if (!on) setInstagramMediaType("FEED");
+                          }}
+                          disabled={publishing}
+                        />
+                        <div className="space-y-1 flex-1">
+                          <Label
+                            htmlFor="ig"
+                            className="font-medium cursor-pointer"
+                          >
+                            Instagram
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            @{instagramAccount.username}
+                          </p>
+                        </div>
+                      </div>
 
-              {instagramMediaType !== "STORIES" && (
-                <div className="space-y-2">
-                  <Label>Texto / Caption</Label>
-                  <Textarea
-                    placeholder="Escribe tu publicación..."
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    rows={5}
-                    disabled={publishing || uploadingMedia}
+                      {selectedInstagram && (
+                        <div className="ml-7 space-y-2">
+                          <Label className="text-xs">Tipo de publicación</Label>
+                          <Select
+                            value={instagramMediaType}
+                            onValueChange={(v) =>
+                              setInstagramMediaType(v as any)
+                            }
+                            disabled={publishing}
+                          >
+                            <SelectTrigger className="h-8 bg-white">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="FEED">Feed</SelectItem>
+                              <SelectItem value="REELS">Reel</SelectItem>
+                              <SelectItem value="STORIES">Historia</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {linkedinAccount && (
+                    <div className="flex items-start space-x-3 p-3 rounded-lg bg-white/60">
+                      <Checkbox
+                        id="li"
+                        checked={selectedLinkedIn}
+                        onCheckedChange={(checked) =>
+                          setSelectedLinkedIn(checked === true)
+                        }
+                        disabled={publishing}
+                      />
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor="li"
+                          className="font-medium cursor-pointer"
+                        >
+                          LinkedIn
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          {linkedinAccount.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Texto, imagen y video
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              {/* Texto + AI Caption */}
+              {!(selectedInstagram && instagramMediaType === "STORIES") && (
+                <div className="flex justify-between gap-2 bg-white/60 rounded">
+                  <AICaptionGenerator
+                    platform="general"
+                    onGenerate={(caption) => setMessage(caption)}
                   />
+                  <Separator orientation="vertical" />
+                  <div className="flex flex-col w-full gap-2 p-4">
+                    <span>Texto / Caption</span>
+                    <Textarea
+                      placeholder="Escribe tu publicación..."
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      rows={5}
+                      className="resize-none flex-1 bg-white"
+                      disabled={publishing || uploadingMedia}
+                    />
+                  </div>
                 </div>
               )}
 
-              {instagramMediaType === "STORIES" && (
-                <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
+              {selectedInstagram && instagramMediaType === "STORIES" && (
+                <p className="text-sm text-muted-foreground bg-white/60 p-3 rounded">
                   Las Historias de Instagram no permiten texto a través de la
                   API.
                 </p>
               )}
 
-              {/* Media */}
-              <div className="space-y-3">
-                <Label>Media (imagen o video)</Label>
+              {/* Media + AI Image */}
+              <div className="flex justify-between gap-2 bg-white/60 rounded">
+                <AIImageGenerator
+                  onGenerate={(url) => {
+                    setImageUrl(url);
+                    setVideoUrl(null);
+                  }}
+                />
+                <Separator orientation="vertical" />
+                <div className="flex w-full flex-col gap-2 p-4">
+                  <span>Media (imagen o video)</span>
 
-                {(imageUrl || videoUrl) && (
-                  <div className="relative rounded-lg overflow-hidden border bg-muted/30">
-                    {imageUrl && (
-                      <img
-                        src={imageUrl}
-                        alt="Preview"
-                        className="w-full max-h-64 object-contain"
-                      />
-                    )}
-                    {videoUrl && (
-                      <video
-                        src={videoUrl}
-                        controls
-                        className="w-full max-h-64"
-                      />
-                    )}
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="absolute top-2 right-2 h-8 w-8 rounded-full"
-                      onClick={removeMedia}
-                      disabled={publishing || uploadingMedia}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-
-                {!imageUrl && !videoUrl && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center gap-2">
                     <input
                       type="file"
                       accept="image/*"
@@ -460,10 +551,10 @@ export default function BulkPublishPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => imageInputRef.current?.click()}
-                      disabled={publishing || uploadingMedia}
+                      disabled={publishing || uploadingMedia || !!videoUrl}
                     >
                       <ImagePlus className="h-4 w-4 mr-2" />
-                      Subir imagen
+                      Imagen
                     </Button>
 
                     <Button
@@ -471,22 +562,57 @@ export default function BulkPublishPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => videoInputRef.current?.click()}
-                      disabled={publishing || uploadingMedia}
+                      disabled={publishing || uploadingMedia || !!imageUrl}
                     >
                       <Video className="h-4 w-4 mr-2" />
-                      Subir video
+                      Video
                     </Button>
                   </div>
-                )}
 
-                {uploadingMedia && (
-                  <p className="text-sm text-muted-foreground flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Subiendo archivo...
-                  </p>
-                )}
+                  <div className="flex-1 flex items-center justify-center">
+                    {(imageUrl || videoUrl) && (
+                      <div className="relative rounded-lg overflow-hidden border bg-muted/30">
+                        {imageUrl && (
+                          <img
+                            src={imageUrl}
+                            alt="Preview"
+                            className="w-full max-h-64 object-contain"
+                          />
+                        )}
+                        {videoUrl && (
+                          <video
+                            src={videoUrl}
+                            controls
+                            className="w-full max-h-64"
+                          />
+                        )}
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="absolute top-2 right-2 h-8 w-8 rounded-full"
+                          onClick={removeMedia}
+                          disabled={publishing || uploadingMedia}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {uploadingMedia && (
+                    <p className="text-sm text-muted-foreground flex items-center gap-2 justify-center">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Subiendo archivo...
+                    </p>
+                  )}
+                </div>
               </div>
-
+              {videoUrl && (
+                <p className="text-sm text-muted-foreground bg-white/60 p-3 rounded">
+                  LinkedIn video: MP4 recomendado, máx. ~200 MB, hasta ~10 min.
+                </p>
+              )}
+              {/* Enlace */}
               <div className="space-y-2">
                 <Label>Enlace (solo Facebook)</Label>
                 <Input
@@ -494,122 +620,34 @@ export default function BulkPublishPage() {
                   value={link}
                   onChange={(e) => setLink(e.target.value)}
                   disabled={publishing || uploadingMedia}
+                  className="bg-white"
                 />
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Redes */}
         <div className="space-y-5">
-          <Card>
-            <CardHeader>
-              <CardTitle>Redes</CardTitle>
-              <CardDescription>Selecciona dónde publicar</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {facebookAccount && (
-                <div className="flex items-start space-x-3 p-3 rounded-lg border">
-                  <Checkbox
-                    id="fb"
-                    checked={selectedFacebook}
-                    onCheckedChange={(checked) =>
-                      setSelectedFacebook(checked === true)
-                    }
-                    disabled={publishing}
-                  />
-                  <div className="space-y-1">
-                    <Label htmlFor="fb" className="font-medium cursor-pointer">
-                      Facebook
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      {facebookAccount.name}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {instagramAccount && (
-                <div className="space-y-3 p-3 rounded-lg border">
-                  <div className="flex items-start space-x-3">
-                    <Checkbox
-                      id="ig"
-                      checked={selectedInstagram}
-                      onCheckedChange={(checked) =>
-                        setSelectedInstagram(checked === true)
-                      }
-                      disabled={publishing}
-                    />
-                    <div className="space-y-1 flex-1">
-                      <Label
-                        htmlFor="ig"
-                        className="font-medium cursor-pointer"
-                      >
-                        Instagram
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        @{instagramAccount.username}
-                      </p>
-                    </div>
-                  </div>
-
-                  {selectedInstagram && (
-                    <div className="ml-7 space-y-2">
-                      <Label className="text-xs">Tipo de publicación</Label>
-                      <Select
-                        value={instagramMediaType}
-                        onValueChange={(v) => setInstagramMediaType(v as any)}
-                        disabled={publishing}
-                      >
-                        <SelectTrigger className="h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="FEED">Feed</SelectItem>
-                          <SelectItem value="REELS">Reel</SelectItem>
-                          <SelectItem value="STORIES">Historia</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {linkedinAccount && (
-                <div className="flex items-start space-x-3 p-3 rounded-lg border">
-                  <Checkbox
-                    id="li"
-                    checked={selectedLinkedIn}
-                    onCheckedChange={(checked) =>
-                      setSelectedLinkedIn(checked === true)
-                    }
-                    disabled={publishing}
-                  />
-                  <div className="space-y-1">
-                    <Label htmlFor="li" className="font-medium cursor-pointer">
-                      LinkedIn
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      {linkedinAccount.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Solo texto e imagen
-                    </p>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
+          <div>
+            <PostPreview
+              platform="linkedin"
+              message={message}
+              imageUrl={imageUrl}
+              videoUrl={videoUrl}
+            />
+          </div>
           <Button
-            className="w-full"
+            className="w-full h-12 text-base font-semibold rounded-xl bg-gradient-to-r from-orange-400 to-yellow-500 hover:from-orange-500 hover:to-yellow-500 text-white shadow-lg shadow-orange-500/25 transition-all"
             size="lg"
             onClick={handlePublish}
             disabled={
+              !canEdit ||
+              !companyId ||
               publishing ||
               uploadingMedia ||
               selectedCount === 0 ||
-              (selectedInstagram && !imageUrl && !videoUrl)
+              (selectedInstagram && !imageUrl && !videoUrl) ||
+              (!imageUrl && !videoUrl && !message.trim() && !selectedInstagram)
             }
           >
             {uploadingMedia ? (
@@ -628,7 +666,7 @@ export default function BulkPublishPage() {
           </Button>
 
           {results.length > 0 && (
-            <Card>
+            <Card className="bg-white/70">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Resultados</CardTitle>
               </CardHeader>

@@ -4,8 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 interface Props {
-  platform: "facebook" | "instagram";
-  accountName: string;
+  platform?: string;
+  accountName?: string;
   message?: string;
   imageUrl?: string | null;
   videoUrl?: string | null;
@@ -19,30 +19,34 @@ export function PostPreview({
   videoUrl,
 }: Props) {
   return (
-    <Card className="h-fit sticky top-6">
+    <Card className="h-fit sticky top-6 bg-white text-foreground">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base">Vista previa</CardTitle>
-          <Badge variant="secondary" className="capitalize">
-            {platform}
-          </Badge>
+          <CardTitle className="">Vista previa</CardTitle>
+          {platform && (
+            <Badge variant="secondary" className="capitalize">
+              {platform}
+            </Badge>
+          )}
         </div>
       </CardHeader>
 
       <CardContent>
-        <div className="rounded-lg border bg-background overflow-hidden">
+        <div className="rounded-lg overflow-hidden">
           {/* Header del post */}
-          <div className="flex items-center gap-2 p-3 border-b">
-            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
-              {accountName.charAt(0).toUpperCase()}
+          {accountName && (
+            <div className="flex items-center gap-2 p-3">
+              <div className="w-8 h-8 rounded-full bg-muted text-black flex items-center justify-center text-xs font-medium">
+                {accountName.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <p className="text-sm font-medium leading-none">
+                  {platform === "instagram" ? `@${accountName}` : accountName}
+                </p>
+                <p className="text-xs text-muted-foreground">Ahora</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-medium leading-none">
-                {platform === "instagram" ? `@${accountName}` : accountName}
-              </p>
-              <p className="text-xs text-muted-foreground">Ahora</p>
-            </div>
-          </div>
+          )}
 
           {/* Media */}
           {(imageUrl || videoUrl) && (

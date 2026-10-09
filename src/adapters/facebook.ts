@@ -76,5 +76,8 @@ export async function publishPost(
     throw new Error(result.error?.message || "Error al publicar el post");
   }
 
-  return result;
+  return {
+    ...result,
+    id: result.id || result.post_id || null,
+  };
 }

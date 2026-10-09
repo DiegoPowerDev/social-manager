@@ -176,8 +176,8 @@ export function AIImageGenerator({ onGenerate }: Props) {
   };
 
   return (
-    <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
-      <div className="flex items-center gap-2 text-sm font-medium">
+    <div className="space-y-4 p-4 w-full flex flex-col">
+      <div className=" flex items-center gap-2 text-sm font-medium">
         <Sparkles className="h-4 w-4 text-purple-500" />
         Generar imagen con IA
       </div>
@@ -187,6 +187,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
         <Label htmlFor="image-prompt">Describe la imagen</Label>
         <Textarea
           id="image-prompt"
+          className="resize-none bg-white"
           placeholder="Ej: Un café latte sobre una mesa de madera con luz natural..."
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
@@ -203,8 +204,8 @@ export function AIImageGenerator({ onGenerate }: Props) {
           onValueChange={(v) => setStyle(v as any)}
           disabled={loading}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Selecciona un estilo" />
+          <SelectTrigger className="bg-white">
+            <SelectValue className="w-40" placeholder="Selecciona un estilo" />
           </SelectTrigger>
           <SelectContent>
             {STYLES.map((s) => (
@@ -269,7 +270,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
       <Button
         onClick={handleGenerate}
         disabled={loading || !prompt.trim()}
-        className="w-full"
+        className="w-full bg-yellow-500/30 h-10 hover:bg-yellow-500/20"
         variant="secondary"
       >
         {loading ? (

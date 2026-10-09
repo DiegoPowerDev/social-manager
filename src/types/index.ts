@@ -66,3 +66,22 @@ export interface PublishedPost {
   publishedAt: Date;
   status: "published" | "failed";
 }
+export type MemberRole = "admin" | "editor" | "viewer";
+
+export interface Company {
+  id: string;
+  name: string;
+  createdAt: Date;
+  logoUrl: string | null;
+  createdBy: string;
+  plan: "free" | "monthly" | "yearly";
+  planStatus: "active" | "past_due" | "canceled" | "trialing";
+}
+
+export interface Membership {
+  id: string;
+  uid: string;
+  companyId: string;
+  role: MemberRole;
+  createdAt: Date;
+}

@@ -1,10 +1,18 @@
-import { BarChart, Calendar, Send } from "lucide-react";
+import { BarChart, Calendar, LucideIcon, Send, Settings } from "lucide-react";
 import Image from "next/image";
+import { ReactElement } from "react";
 
-export const mainNav = [
+interface Menu {
+  title: string;
+  href: string;
+  icon: LucideIcon | "";
+  image?: ReactElement;
+}
+
+export const mainNav: Menu[] = [
   {
     title: "Dashboard",
-    href: "/",
+    href: "/dashboard",
     icon: BarChart,
   },
   {
@@ -38,15 +46,13 @@ export const mainNav = [
     href: "/linkedin",
     icon: "",
     image: (
-      <Image height={20} width={20} src="./linkedin.svg" alt="Linkedin logo" />
-    ),
-  },
-  {
-    title: "YouTube",
-    href: "/youtube",
-    icon: "",
-    image: (
-      <Image height={20} width={20} src="./youtube.svg" alt="Youtube logo" />
+      <Image
+        className="bg-white rounded"
+        height={20}
+        width={20}
+        src="./linkedin.svg"
+        alt="Linkedin logo"
+      />
     ),
   },
   {
@@ -55,4 +61,5 @@ export const mainNav = [
     icon: Send,
   },
   { title: "Calendario", href: "/calendar", icon: Calendar },
+  { title: "Configuración", href: "/settings", icon: Settings },
 ];

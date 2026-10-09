@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { publishToLinkedIn } from "@/adapters/linkedin";
-import { db } from "@/lib/firebase";
-import { collection, addDoc } from "firebase/firestore";
+import { adminDb } from "@/lib/firebase-admin";
+
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
-    const { personId, accessToken, name, text, imageUrl } = await req.json();
+    const { personId, accessToken, name, text, imageUrl, videoUrl, companyId } =
+      await req.json();
 
     if (!personId || !accessToken) {
       return NextResponse.json(
@@ -13,10 +15,12 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-
-    if (!text?.trim() && !imageUrl) {
+    if (!companyId) {
+      return NextResponse.json({ error: "Falta companyId" }, { status: 400 });
+    }
+    if (!text?.trim() && !imageUrl && !videoUrl) {
       return NextResponse.json(
-        { error: "Escribe un texto o agrega una imagen" },
+        { error: "Escribe un texto o agrega media" },
         { status: 400 },
       );
     }
@@ -26,17 +30,21 @@ export async function POST(req: NextRequest) {
       personId,
       text: text || "",
       imageUrl,
+      videoUrl,
     });
 
-    // Guardar en historial
-    await addDoc(collection(db, "publishedPosts"), {
+    await adminDb.collection("publishedPosts").add({
+      companyId,
       platform: "linkedin",
       personId,
       name: name || null,
       message: text || null,
       imageUrl: imageUrl || null,
+      videoUrl: videoUrl || null,
+      linkedinPostId: result?.id || null,
+      permalink: result?.permalink || null,
       publishedAt: new Date(),
-      linkedinResponse: result || null,
+      status: "published",
     });
 
     return NextResponse.json({ success: true, result });

@@ -1,18 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { publishPost } from "@/adapters/facebook";
-import { db } from "@/lib/firebase";
-import { collection, addDoc } from "firebase/firestore";
+import { adminDb } from "@/lib/firebase-admin";
 
 export async function POST(req: NextRequest) {
   try {
-    const { pageId, accessToken, message, link, imageUrl, videoUrl, pageName } =
-      await req.json();
+    const {
+      pageId,
+      accessToken,
+      message,
+      link,
+      imageUrl,
+      videoUrl,
+      pageName,
+      companyId,
+    } = await req.json();
 
     if (!pageId || !accessToken) {
       return NextResponse.json(
         { error: "Faltan datos de la cuenta" },
         { status: 400 },
       );
+    }
+
+    if (!companyId) {
+      return NextResponse.json({ error: "Falta companyId" }, { status: 400 });
     }
 
     if (!message && !imageUrl && !videoUrl) {
@@ -22,7 +33,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Publicar en Facebook
     const result = await publishPost(pageId, accessToken, {
       message,
       link,
@@ -30,8 +40,10 @@ export async function POST(req: NextRequest) {
       videoUrl,
     });
 
-    // Guardar en el historial
-    await addDoc(collection(db, "publishedPosts"), {
+    const facebookPostId = result.id || result.post_id || null;
+
+    await adminDb.collection("publishedPosts").add({
+      companyId,
       platform: "facebook",
       pageId,
       pageName: pageName || "",
@@ -39,14 +51,17 @@ export async function POST(req: NextRequest) {
       imageUrl: imageUrl || null,
       videoUrl: videoUrl || null,
       link: link || null,
-      facebookPostId: result.id || result.post_id || null,
+      facebookPostId,
+      permalink: facebookPostId
+        ? `https://www.facebook.com/${facebookPostId}`
+        : null,
       publishedAt: new Date(),
       status: "published",
     });
 
     return NextResponse.json({
       success: true,
-      postId: result.id || result.post_id,
+      postId: facebookPostId,
     });
   } catch (error: any) {
     console.error("Error publicando en Facebook:", error);

@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, ImagePlus, Video, X, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 interface ScheduledPost {
   id: string;
@@ -65,6 +66,12 @@ export function ScheduledPostDetailModal({
   const [dateStr, setDateStr] = useState("");
   const [time, setTime] = useState("10:00");
 
+  const companyId = useAuthStore((s) => s.companyId);
+  const memberRole = useAuthStore((s) => s.memberRole);
+  const canEditContent =
+    post?.status === "scheduled" &&
+    (memberRole === "admin" || memberRole === "editor");
+
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
@@ -72,8 +79,6 @@ export function ScheduledPostDetailModal({
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
-
-  const canEdit = post?.status === "scheduled";
 
   useEffect(() => {
     if (!post || !open) return;
@@ -94,9 +99,10 @@ export function ScheduledPostDetailModal({
 
   const uploadToR2 = async (file: File) => {
     const formData = new FormData();
+
     formData.append("file", file);
     formData.append("platform", "scheduled");
-
+    if (companyId) formData.append("companyId", companyId);
     const res = await fetch("/api/upload", {
       method: "POST",
       body: formData,
@@ -142,7 +148,7 @@ export function ScheduledPostDetailModal({
   };
 
   const handleSave = async () => {
-    if (!post || !canEdit) return;
+    if (!post || !canEditContent) return;
     setError(null);
 
     if (!title.trim()) {
@@ -220,11 +226,12 @@ export function ScheduledPostDetailModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-background rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-background border-b px-6 py-4 flex items-center justify-between">
+      <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-white/40">
+        {/* Header */}
+        <div className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-white/40 px-6 py-4 flex items-center justify-between rounded-t-2xl">
           <div>
             <h3 className="text-lg font-semibold">
-              {canEdit ? "Editar publicación" : "Detalle de publicación"}
+              {canEditContent ? "Editar publicación" : "Detalle de publicación"}
             </h3>
             <div className="flex items-center gap-2 mt-1">
               <Badge
@@ -246,26 +253,26 @@ export function ScheduledPostDetailModal({
         </div>
 
         <div className="p-6 space-y-5">
-          {/* Título */}
-          <div className="space-y-2">
-            <Label>Título</Label>
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              disabled={!canEdit || saving}
-              maxLength={80}
-            />
-          </div>
-
-          {/* Fecha y hora */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Título + Fecha/Hora */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-2 sm:col-span-1">
+              <Label>Título</Label>
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                disabled={!canEditContent || saving}
+                maxLength={80}
+                className="bg-white"
+              />
+            </div>
             <div className="space-y-2">
               <Label>Fecha</Label>
               <Input
                 type="date"
                 value={dateStr}
                 onChange={(e) => setDateStr(e.target.value)}
-                disabled={!canEdit || saving}
+                disabled={!canEditContent || saving}
+                className="bg-white"
               />
             </div>
             <div className="space-y-2">
@@ -274,8 +281,114 @@ export function ScheduledPostDetailModal({
                 type="time"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
-                disabled={!canEdit || saving}
+                disabled={!canEditContent || saving}
+                className="bg-white"
               />
+            </div>
+          </div>
+
+          {/* Redes */}
+          <div className="space-y-3">
+            <Label>Redes</Label>
+            <div className="flex gap-2 justify-center flex-wrap">
+              <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg">
+                <Checkbox
+                  id="edit-fb"
+                  checked={selectedFacebook}
+                  onCheckedChange={(c) => setSelectedFacebook(c === true)}
+                  disabled={!canEditContent || saving}
+                />
+                <Label htmlFor="edit-fb" className="cursor-pointer">
+                  Facebook
+                </Label>
+              </div>
+
+              <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg">
+                <Checkbox
+                  id="edit-ig"
+                  checked={selectedInstagram}
+                  onCheckedChange={(c) => setSelectedInstagram(c === true)}
+                  disabled={!canEditContent || saving}
+                />
+                <Label htmlFor="edit-ig" className="cursor-pointer">
+                  Instagram
+                </Label>
+                {selectedInstagram && canEditContent && (
+                  <Select
+                    value={instagramMediaType}
+                    onValueChange={(v) => setInstagramMediaType(v as any)}
+                    disabled={saving}
+                  >
+                    <SelectTrigger className="h-8 w-32 bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="FEED">Feed</SelectItem>
+                      <SelectItem value="REELS">Reel</SelectItem>
+                      <SelectItem value="STORIES">Historia</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg">
+                <Checkbox
+                  id="edit-li"
+                  checked={selectedLinkedIn}
+                  onCheckedChange={(c) => setSelectedLinkedIn(c === true)}
+                  disabled={!canEditContent || saving}
+                />
+                <Label htmlFor="edit-li" className="cursor-pointer">
+                  LinkedIn
+                </Label>
+              </div>
+            </div>
+
+            {/* Avisos */}
+            <div className="space-y-2 text-xs">
+              {selectedInstagram && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 text-amber-900 p-3 space-y-1">
+                  <p className="font-medium">Instagram — formato de media</p>
+                  {instagramMediaType === "FEED" && (
+                    <p>
+                      Imagen: ratio entre <strong>4:5</strong> (vertical) y{" "}
+                      <strong>1.91:1</strong> (horizontal). Cuadrado 1:1
+                      recomendado.
+                    </p>
+                  )}
+                  {instagramMediaType === "REELS" && (
+                    <p>
+                      Reels: video vertical <strong>9:16</strong> (ej.
+                      1080×1920). Máx. ~90 segundos recomendado.
+                    </p>
+                  )}
+                  {instagramMediaType === "STORIES" && (
+                    <p>
+                      Historias: imagen o video vertical <strong>9:16</strong>.
+                      No se publica caption por la API.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {selectedLinkedIn && (
+                <div className="rounded-md border border-sky-200 bg-sky-50 text-sky-900 p-3">
+                  <p className="font-medium">LinkedIn</p>
+                  <p>
+                    Soporta texto e imagen. El video aún no está habilitado en
+                    este flujo.
+                  </p>
+                </div>
+              )}
+
+              {selectedFacebook && (
+                <div className="rounded-md border border-blue-200 bg-blue-50 text-blue-900 p-3">
+                  <p className="font-medium">Facebook</p>
+                  <p>
+                    Texto, imagen, video y enlace. Más flexible con el formato.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -286,13 +399,15 @@ export function ScheduledPostDetailModal({
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               rows={4}
-              disabled={!canEdit || saving}
+              disabled={!canEditContent || saving}
+              className="bg-white"
             />
           </div>
 
           {/* Media */}
           <div className="space-y-3">
             <Label>Media</Label>
+
             {(imageUrl || videoUrl) && (
               <div className="relative rounded-lg overflow-hidden border bg-muted/30">
                 {imageUrl && (
@@ -305,7 +420,7 @@ export function ScheduledPostDetailModal({
                 {videoUrl && (
                   <video src={videoUrl} controls className="w-full max-h-48" />
                 )}
-                {canEdit && (
+                {canEditContent && (
                   <Button
                     variant="secondary"
                     size="icon"
@@ -322,7 +437,7 @@ export function ScheduledPostDetailModal({
               </div>
             )}
 
-            {canEdit && !imageUrl && !videoUrl && (
+            {canEditContent && !imageUrl && !videoUrl && (
               <div className="flex gap-2">
                 <input
                   type="file"
@@ -368,114 +483,14 @@ export function ScheduledPostDetailModal({
             <Input
               value={link}
               onChange={(e) => setLink(e.target.value)}
-              disabled={!canEdit || saving}
+              disabled={!canEditContent || saving}
+              className="bg-white"
             />
           </div>
 
-          {/* Redes */}
-          <div className="space-y-3">
-            <Label>Redes</Label>
-            <div className="space-y-2">
-              <div className="flex items-center gap-3 p-3 border rounded-lg">
-                <Checkbox
-                  id="edit-fb"
-                  checked={selectedFacebook}
-                  onCheckedChange={(c) => setSelectedFacebook(c === true)}
-                  disabled={!canEdit || saving}
-                />
-                <Label htmlFor="edit-fb">Facebook</Label>
-              </div>
-              {/* Avisos según redes y tipo */}
-              <div className="space-y-2 text-xs">
-                {selectedInstagram && (
-                  <div className="rounded-md border border-amber-200 bg-amber-50 text-amber-900 p-3 space-y-1">
-                    <p className="font-medium">Instagram — formato de media</p>
-                    {instagramMediaType === "FEED" && (
-                      <p>
-                        Imagen: ratio entre <strong>4:5</strong> (vertical) y{" "}
-                        <strong>1.91:1</strong> (horizontal). Cuadrado 1:1
-                        recomendado. Evita imágenes muy panorámicas.
-                      </p>
-                    )}
-                    {instagramMediaType === "REELS" && (
-                      <p>
-                        Reels: video vertical <strong>9:16</strong> (ej.
-                        1080×1920). Máx. ~90 segundos recomendado.
-                      </p>
-                    )}
-                    {instagramMediaType === "STORIES" && (
-                      <p>
-                        Historias: imagen o video vertical <strong>9:16</strong>
-                        . No se publica caption por la API.
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {selectedLinkedIn && (
-                  <div className="rounded-md border border-sky-200 bg-sky-50 text-sky-900 p-3">
-                    <p className="font-medium">LinkedIn</p>
-                    <p>
-                      Soporta texto e imagen. El video aún no está habilitado en
-                      este flujo.
-                    </p>
-                  </div>
-                )}
-
-                {selectedFacebook && (
-                  <div className="rounded-md border border-blue-200 bg-blue-50 text-blue-900 p-3">
-                    <p className="font-medium">Facebook</p>
-                    <p>
-                      Texto, imagen, video y enlace. Más flexible con el
-                      formato.
-                    </p>
-                  </div>
-                )}
-              </div>
-              <div className="space-y-2 p-3 border rounded-lg">
-                <div className="flex items-center gap-3">
-                  <Checkbox
-                    id="edit-ig"
-                    checked={selectedInstagram}
-                    onCheckedChange={(c) => setSelectedInstagram(c === true)}
-                    disabled={!canEdit || saving}
-                  />
-                  <Label htmlFor="edit-ig">Instagram</Label>
-                </div>
-                {selectedInstagram && canEdit && (
-                  <div className="ml-7">
-                    <Select
-                      value={instagramMediaType}
-                      onValueChange={(v) => setInstagramMediaType(v as any)}
-                      disabled={saving}
-                    >
-                      <SelectTrigger className="h-8 w-40">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="FEED">Feed</SelectItem>
-                        <SelectItem value="REELS">Reel</SelectItem>
-                        <SelectItem value="STORIES">Historia</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-3 p-3 border rounded-lg">
-                <Checkbox
-                  id="edit-li"
-                  checked={selectedLinkedIn}
-                  onCheckedChange={(c) => setSelectedLinkedIn(c === true)}
-                  disabled={!canEdit || saving}
-                />
-                <Label htmlFor="edit-li">LinkedIn</Label>
-              </div>
-            </div>
-          </div>
-
-          {/* Resultados si ya se publicó */}
+          {/* Resultados */}
           {post.results && Object.keys(post.results).length > 0 && (
-            <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+            <div className="space-y-2 p-3 bg-white/60 rounded-lg">
               <Label>Resultados de publicación</Label>
               {Object.entries(post.results).map(([platform, result]) => (
                 <p key={platform} className="text-sm">
@@ -495,7 +510,7 @@ export function ScheduledPostDetailModal({
           {error && <p className="text-sm text-red-500">{error}</p>}
 
           {/* Acciones */}
-          <div className="flex items-center justify-between gap-2 pt-2 border-t">
+          <div className="flex items-center justify-between gap-2 pt-4 border-t border-white/40">
             <Button
               variant="destructive"
               onClick={handleDelete}
@@ -515,10 +530,11 @@ export function ScheduledPostDetailModal({
               <Button variant="outline" onClick={onClose} disabled={saving}>
                 Cerrar
               </Button>
-              {canEdit && (
+              {canEditContent && (
                 <Button
                   onClick={handleSave}
                   disabled={saving || uploadingMedia}
+                  className="bg-gradient-to-r from-orange-400 to-yellow-500 hover:from-orange-500 hover:to-yellow-500 text-white shadow-lg shadow-orange-500/25"
                 >
                   {saving ? (
                     <>

@@ -18,15 +18,14 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { ImagePlus, Video, X, Loader2 } from "lucide-react";
 import { AICaptionGenerator } from "@/components/social/AICaptionGenerator";
 import { AIImageGenerator } from "@/components/social/AIImageGenerator";
+import { Separator } from "../ui/separator";
 
 interface Props {
   username: string;
   loading?: boolean;
-  // Estado controlado
   caption: string;
   onCaptionChange: (value: string) => void;
   imageUrl: string | null;
@@ -160,14 +159,13 @@ export function InstagramComposer({
   const isLoading = loading || uploading;
 
   return (
-    <Card>
+    <Card className="bg-white/70">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
             <CardTitle>Nueva publicación</CardTitle>
-            <CardDescription>Publicando en @{username}</CardDescription>
+            <CardDescription>Crear Publicación</CardDescription>
           </div>
-          <Badge variant="secondary">Instagram</Badge>
         </div>
       </CardHeader>
 
@@ -182,8 +180,8 @@ export function InstagramComposer({
             }
             disabled={isLoading}
           >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona el tipo" />
+            <SelectTrigger className="bg-white">
+              <SelectValue className="w-64" placeholder="Selecciona el tipo" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="FEED">Publicación (Feed)</SelectItem>
@@ -201,101 +199,116 @@ export function InstagramComposer({
         </div>
 
         {/* Generador de Captions (no se muestra en Historias) */}
-        {mediaType !== "STORIES" && (
-          <AICaptionGenerator
-            platform="instagram"
-            onGenerate={(generated) => onCaptionChange(generated)}
-          />
-        )}
 
-        {/* Generador de Imágenes */}
-        <AIImageGenerator
-          onGenerate={(url) => {
-            onImageChange(url);
-            onVideoChange(null);
-          }}
-        />
-
-        {/* Caption (no se usa en Historias) */}
-        {mediaType !== "STORIES" && (
-          <Textarea
-            placeholder="Escribe un pie de foto..."
-            value={caption}
-            onChange={(e) => onCaptionChange(e.target.value)}
-            rows={4}
-            disabled={isLoading}
-          />
-        )}
-
-        {/* Preview de media */}
-        {(imageUrl || videoUrl) && (
-          <div className="relative rounded-lg overflow-hidden border bg-muted/30">
-            {imageUrl && (
-              <img
-                src={imageUrl}
-                alt="Preview"
-                className="w-full max-h-64 object-contain"
+        <div className="flex justify-between gap-2 bg-white/60 rounded">
+          {mediaType !== "STORIES" && (
+            <AICaptionGenerator
+              platform="instagram"
+              onGenerate={(generated) => onCaptionChange(generated)}
+            />
+          )}
+          <Separator orientation="vertical" />
+          {mediaType !== "STORIES" && (
+            <div className="flex flex-col w-full gap-2 p-4">
+              <span>Ingresa un caption para publicar:</span>
+              <Textarea
+                placeholder="Escribe un pie de foto..."
+                value={caption}
+                onChange={(e) => onCaptionChange(e.target.value)}
+                rows={4}
+                className="resize-none flex-1 flex bg-white"
+                disabled={isLoading}
               />
-            )}
-            {videoUrl && (
-              <video src={videoUrl} controls className="w-full max-h-64" />
-            )}
-            <Button
-              variant="secondary"
-              size="icon"
-              className="absolute top-2 right-2 h-8 w-8 rounded-full"
-              onClick={removeMedia}
-              disabled={isLoading}
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            </div>
+          )}
+          {/* Generador de Imágenes */}
+        </div>
+
+        <div className="flex justify-between gap-2 bg-white/60 rounded">
+          <AIImageGenerator
+            onGenerate={(url) => {
+              onImageChange(url);
+              onVideoChange(null);
+            }}
+          />{" "}
+          <Separator orientation="vertical" />
+          <div className="flex w-full flex-col gap-2 p-4">
+            <span>Ingresa una imagen para publicar:</span>
+            <div className="flex items-center justify-center gap-2">
+              <input
+                type="file"
+                accept="image/*"
+                ref={imageInputRef}
+                onChange={handleImageChange}
+                className="hidden"
+                disabled={isLoading || mediaType === "REELS"}
+              />
+              <input
+                type="file"
+                accept="video/*"
+                ref={videoInputRef}
+                onChange={handleVideoChange}
+                className="hidden"
+                disabled={isLoading}
+              />
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={!!videoUrl || isLoading || mediaType === "REELS"}
+              >
+                <ImagePlus className="h-4 w-4 mr-2" />
+                Imagen
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => videoInputRef.current?.click()}
+                disabled={!!imageUrl || isLoading}
+              >
+                <Video className="h-4 w-4 mr-2" />
+                Video {mediaType === "REELS" ? "/ Reel" : ""}
+              </Button>
+            </div>
+            <div className="flex-1 flex items-center justify-center">
+              {(imageUrl || videoUrl) && (
+                <div className="relative rounded-lg overflow-hidden border bg-muted/30">
+                  {imageUrl && (
+                    <img
+                      src={imageUrl}
+                      alt="Preview"
+                      className="w-full max-h-64 object-contain"
+                    />
+                  )}
+                  {videoUrl && (
+                    <video
+                      src={videoUrl}
+                      controls
+                      className="w-full max-h-64"
+                    />
+                  )}
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="absolute top-2 right-2 h-8 w-8 rounded-full"
+                    onClick={removeMedia}
+                    disabled={isLoading}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
-        )}
+        </div>
 
-        {/* Botones de media + Publicar */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <input
-              type="file"
-              accept="image/*"
-              ref={imageInputRef}
-              onChange={handleImageChange}
-              className="hidden"
-              disabled={isLoading || mediaType === "REELS"}
-            />
-            <input
-              type="file"
-              accept="video/*"
-              ref={videoInputRef}
-              onChange={handleVideoChange}
-              className="hidden"
-              disabled={isLoading}
-            />
-
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => imageInputRef.current?.click()}
-              disabled={!!videoUrl || isLoading || mediaType === "REELS"}
-            >
-              <ImagePlus className="h-4 w-4 mr-2" />
-              Imagen
-            </Button>
-
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => videoInputRef.current?.click()}
-              disabled={!!imageUrl || isLoading}
-            >
-              <Video className="h-4 w-4 mr-2" />
-              Video {mediaType === "REELS" ? "/ Reel" : ""}
-            </Button>
-          </div>
-
+        <div className="flex w-full items-center justify-center">
           <Button
+            className="w-full max-w-xs h-12 text-base font-semibold rounded-xl bg-gradient-to-r from-orange-400 to-yellow-500 hover:from-orange-500 hover:to-yellow-500 text-white shadow-lg shadow-orange-500/25 transition-all"
             onClick={handleSubmit}
             disabled={
               isLoading ||

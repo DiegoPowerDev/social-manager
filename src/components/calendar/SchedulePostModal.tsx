@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { collection, getDocs, addDoc, Timestamp } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  addDoc,
+  Timestamp,
+  query,
+  where,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,8 +25,11 @@ import {
 import { Loader2, ImagePlus, Video, X } from "lucide-react";
 import { AICaptionGenerator } from "@/components/social/AICaptionGenerator";
 import { AIImageGenerator } from "@/components/social/AIImageGenerator";
+import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { PostPreview } from "../social/PostPreview";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 interface SocialAccount {
   id: string;
@@ -60,29 +70,31 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
   const [saving, setSaving] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const companyId = useAuthStore((s) => s.companyId);
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !companyId) return;
 
     const load = async () => {
       try {
         setLoadingAccounts(true);
-        const snapshot = await getDocs(collection(db, "socialAccounts"));
+        const q = query(
+          collection(db, "socialAccounts"),
+          where("companyId", "==", companyId),
+        );
+        const snapshot = await getDocs(q);
         const data = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         })) as SocialAccount[];
         setAccounts(data);
 
-        if (data.find((a) => a.platform === "facebook"))
-          setSelectedFacebook(true);
-        if (data.find((a) => a.platform === "instagram"))
-          setSelectedInstagram(true);
-        if (data.find((a) => a.platform === "linkedin"))
-          setSelectedLinkedIn(true);
+        setSelectedFacebook(!!data.find((a) => a.platform === "facebook"));
+        setSelectedInstagram(!!data.find((a) => a.platform === "instagram"));
+        setSelectedLinkedIn(!!data.find((a) => a.platform === "linkedin"));
       } catch (e) {
         console.error(e);
       } finally {
@@ -91,7 +103,7 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
     };
 
     load();
-  }, [open]);
+  }, [open, companyId]);
 
   // Reset al abrir
   useEffect(() => {
@@ -114,6 +126,7 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("platform", "scheduled");
+    if (companyId) formData.append("companyId", companyId);
 
     const res = await fetch("/api/upload", {
       method: "POST",
@@ -177,6 +190,11 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
   const handleSave = async () => {
     setError(null);
 
+    if (!companyId) {
+      setError("No hay empresa asociada");
+      return;
+    }
+
     if (!title.trim()) {
       setError("Escribe un título para el calendario");
       return;
@@ -216,6 +234,7 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
         imageUrl: imageUrl || null,
         videoUrl: videoUrl || null,
         link: link.trim() || null,
+        companyId: companyId,
         platforms: {
           facebook: selectedFacebook || false,
           instagram: selectedInstagram || false,
@@ -242,9 +261,9 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-background rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white/90  rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-white/40">
         {/* Header */}
-        <div className="sticky top-0 bg-background border-b px-6 py-4 flex items-center justify-between">
+        <div className="z-10 sticky top-0 bg-white border-b border-white/40 px-6 py-4 flex items-center justify-between rounded-t-2xl">
           <div>
             <h3 className="text-lg font-semibold">Programar publicación</h3>
             <p className="text-sm text-muted-foreground">
@@ -257,141 +276,34 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
         </div>
 
         <div className="p-6 space-y-5">
-          {/* Título */}
-          <div className="space-y-2">
-            <Label>Título (solo para el calendario)</Label>
-            <Input
-              placeholder="Ej: Post de Halloween"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              maxLength={80}
-              disabled={saving}
-            />
-          </div>
+          {/* Título + Hora */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Título (solo para el calendario)</Label>
+              <Input
+                placeholder="Ej: Post de Halloween"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                maxLength={80}
+                disabled={saving}
+                className="bg-white"
+              />
+            </div>
 
-          {/* Hora */}
-          <div className="space-y-2">
-            <Label>Hora de publicación</Label>
-            <Input
-              type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              disabled={saving}
-              className="w-40"
-            />
-            <p className="text-xs text-muted-foreground">
-              Zona horaria de tu navegador
-            </p>
-          </div>
-
-          {/* IA */}
-          <AICaptionGenerator
-            platform="general"
-            onGenerate={(caption) => setMessage(caption)}
-          />
-          <AIImageGenerator
-            onGenerate={(url) => {
-              setImageUrl(url);
-              setVideoUrl(null);
-            }}
-          />
-
-          {/* Texto */}
-          <div className="space-y-2">
-            <Label>Texto / Caption</Label>
-            <Textarea
-              placeholder="Contenido de la publicación..."
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={4}
-              disabled={saving}
-            />
-          </div>
-
-          {/* Media */}
-          <div className="space-y-3">
-            <Label>Media</Label>
-            {(imageUrl || videoUrl) && (
-              <div className="relative rounded-lg overflow-hidden border bg-muted/30">
-                {imageUrl && (
-                  <img
-                    src={imageUrl}
-                    alt="Preview"
-                    className="w-full max-h-48 object-contain"
-                  />
-                )}
-                {videoUrl && (
-                  <video src={videoUrl} controls className="w-full max-h-48" />
-                )}
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  className="absolute top-2 right-2 h-8 w-8 rounded-full"
-                  onClick={removeMedia}
-                  disabled={saving || uploadingMedia}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-
-            {!imageUrl && !videoUrl && (
-              <div className="flex gap-2">
-                <input
-                  type="file"
-                  accept="image/*"
-                  ref={imageInputRef}
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-                <input
-                  type="file"
-                  accept="video/*"
-                  ref={videoInputRef}
-                  onChange={handleVideoUpload}
-                  className="hidden"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => imageInputRef.current?.click()}
-                  disabled={saving || uploadingMedia}
-                >
-                  <ImagePlus className="h-4 w-4 mr-2" />
-                  Imagen
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => videoInputRef.current?.click()}
-                  disabled={saving || uploadingMedia}
-                >
-                  <Video className="h-4 w-4 mr-2" />
-                  Video
-                </Button>
-              </div>
-            )}
-            {uploadingMedia && (
-              <p className="text-sm text-muted-foreground flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Subiendo...
+            <div className="space-y-2">
+              <Label>Hora de publicación</Label>
+              <Input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                disabled={saving}
+                className="w-40 bg-white"
+              />
+              <p className="text-xs text-muted-foreground">
+                Zona horaria de tu navegador
               </p>
-            )}
+            </div>
           </div>
-
-          {/* Link */}
-          <div className="space-y-2">
-            <Label>Enlace (solo Facebook)</Label>
-            <Input
-              placeholder="https://..."
-              value={link}
-              onChange={(e) => setLink(e.target.value)}
-              disabled={saving}
-            />
-          </div>
-
           {/* Redes */}
           <div className="space-y-3">
             <Label>Redes</Label>
@@ -401,69 +313,74 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
               </p>
             ) : (
               <div className="space-y-3">
-                {facebookAccount && (
-                  <div className="flex items-center gap-3 p-3 border rounded-lg">
-                    <Checkbox
-                      id="fb"
-                      checked={selectedFacebook}
-                      onCheckedChange={(c) => setSelectedFacebook(c === true)}
-                      disabled={saving}
-                    />
-                    <Label htmlFor="fb" className="cursor-pointer">
-                      Facebook · {facebookAccount.name}
-                    </Label>
-                  </div>
-                )}
-
-                {instagramAccount && (
-                  <div className="space-y-2 p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
+                <div className="flex gap-2 justify-center">
+                  {facebookAccount && (
+                    <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg">
                       <Checkbox
-                        id="ig"
-                        checked={selectedInstagram}
-                        onCheckedChange={(c) =>
-                          setSelectedInstagram(c === true)
-                        }
+                        id="fb"
+                        checked={selectedFacebook}
+                        onCheckedChange={(c) => setSelectedFacebook(c === true)}
                         disabled={saving}
                       />
-                      <Label htmlFor="ig" className="cursor-pointer">
-                        Instagram · @{instagramAccount.username}
+                      <Label htmlFor="fb" className="cursor-pointer">
+                        Facebook
                       </Label>
                     </div>
-                    {selectedInstagram && (
-                      <div className="ml-7">
-                        <Select
-                          value={instagramMediaType}
-                          onValueChange={(v) => setInstagramMediaType(v as any)}
-                          disabled={saving}
-                        >
-                          <SelectTrigger className="h-8 w-40">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="FEED">Feed</SelectItem>
-                            <SelectItem value="REELS">Reel</SelectItem>
-                            <SelectItem value="STORIES">Historia</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                  </div>
-                )}
+                  )}
 
-                {linkedinAccount && (
-                  <div className="flex items-center gap-3 p-3 border rounded-lg">
-                    <Checkbox
-                      id="li"
-                      checked={selectedLinkedIn}
-                      onCheckedChange={(c) => setSelectedLinkedIn(c === true)}
-                      disabled={saving}
-                    />
-                    <Label htmlFor="li" className="cursor-pointer">
-                      LinkedIn · {linkedinAccount.name}
-                    </Label>
-                  </div>
-                )}
+                  {instagramAccount && (
+                    <div className="space-y-2 p-3 bg-white/60 rounded-lg flex items-center gap-4 justify-center">
+                      <div className="flex h-full justify-center items-center m-0 gap-3">
+                        <Checkbox
+                          id="ig"
+                          checked={selectedInstagram}
+                          onCheckedChange={(c) =>
+                            setSelectedInstagram(c === true)
+                          }
+                          disabled={saving}
+                        />
+                        <Label htmlFor="ig" className="cursor-pointer">
+                          Instagram
+                        </Label>
+                      </div>
+                      {selectedInstagram && (
+                        <div className="">
+                          <Select
+                            value={instagramMediaType}
+                            onValueChange={(v) =>
+                              setInstagramMediaType(v as any)
+                            }
+                            disabled={saving}
+                          >
+                            <SelectTrigger className="h-8 w-40 bg-white">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="FEED">Feed</SelectItem>
+                              <SelectItem value="REELS">Reel</SelectItem>
+                              <SelectItem value="STORIES">Historia</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {linkedinAccount && (
+                    <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg">
+                      <Checkbox
+                        id="li"
+                        checked={selectedLinkedIn}
+                        onCheckedChange={(c) => setSelectedLinkedIn(c === true)}
+                        disabled={saving}
+                      />
+                      <Label htmlFor="li" className="cursor-pointer">
+                        LinkedIn
+                      </Label>
+                    </div>
+                  )}
+                </div>
+
                 {/* Avisos según redes y tipo */}
                 <div className="space-y-2 text-xs">
                   {selectedInstagram && (
@@ -497,10 +414,7 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
                   {selectedLinkedIn && (
                     <div className="rounded-md border border-sky-200 bg-sky-50 text-sky-900 p-3">
                       <p className="font-medium">LinkedIn</p>
-                      <p>
-                        Soporta texto e imagen. El video aún no está habilitado
-                        en este flujo.
-                      </p>
+                      <p>Soporta texto, imagen y video.</p>
                     </div>
                   )}
 
@@ -514,6 +428,7 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
                     </div>
                   )}
                 </div>
+
                 {!facebookAccount && !instagramAccount && !linkedinAccount && (
                   <p className="text-sm text-muted-foreground">
                     No hay cuentas conectadas
@@ -522,15 +437,144 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
               </div>
             )}
           </div>
+          {/* Texto + AI Caption */}
+          <div className="flex justify-between gap-2 bg-white/60 rounded">
+            <AICaptionGenerator
+              platform="general"
+              onGenerate={(caption) => setMessage(caption)}
+            />
+            <Separator orientation="vertical" />
+            <div className="flex flex-col w-full gap-2 p-4">
+              <span>Texto / Caption</span>
+              <Textarea
+                placeholder="Contenido de la publicación..."
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                rows={4}
+                className="resize-none flex-1 bg-white"
+                disabled={saving}
+              />
+            </div>
+          </div>
+
+          {/* Media + AI Image */}
+          <div className="flex justify-between gap-2 bg-white/60 rounded">
+            <AIImageGenerator
+              onGenerate={(url) => {
+                setImageUrl(url);
+                setVideoUrl(null);
+              }}
+            />
+            <Separator orientation="vertical" />
+            <div className="flex w-full flex-col gap-2 p-4">
+              <span>Media</span>
+
+              <div className="flex items-center justify-center gap-2">
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={imageInputRef}
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+                <input
+                  type="file"
+                  accept="video/*"
+                  ref={videoInputRef}
+                  onChange={handleVideoUpload}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={saving || uploadingMedia || !!videoUrl}
+                >
+                  <ImagePlus className="h-4 w-4 mr-2" />
+                  Imagen
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => videoInputRef.current?.click()}
+                  disabled={saving || uploadingMedia || !!imageUrl}
+                >
+                  <Video className="h-4 w-4 mr-2" />
+                  Video
+                </Button>
+              </div>
+
+              <div className="flex-1 flex items-center justify-center">
+                {(imageUrl || videoUrl) && (
+                  <div className="relative rounded-lg overflow-hidden border bg-muted/30">
+                    {imageUrl && (
+                      <img
+                        src={imageUrl}
+                        alt="Preview"
+                        className="w-full max-h-48 object-contain"
+                      />
+                    )}
+                    {videoUrl && (
+                      <video
+                        src={videoUrl}
+                        controls
+                        className="w-full max-h-48"
+                      />
+                    )}
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="absolute top-2 right-2 h-8 w-8 rounded-full"
+                      onClick={removeMedia}
+                      disabled={saving || uploadingMedia}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {uploadingMedia && (
+                <p className="text-sm text-muted-foreground flex items-center gap-2 justify-center">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Subiendo...
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Link */}
+          <div className="space-y-2">
+            <Label>Enlace (solo Facebook)</Label>
+            <Input
+              placeholder="https://..."
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              disabled={saving}
+              className="bg-white"
+            />
+          </div>
 
           {error && <p className="text-sm text-red-500">{error}</p>}
-
+          <div>
+            <PostPreview
+              message={message}
+              imageUrl={imageUrl}
+              videoUrl={videoUrl}
+            />
+          </div>
           {/* Acciones */}
-          <div className="flex justify-end gap-2 pt-2 border-t">
+          <div className="flex justify-end gap-2 pt-4 border-t border-white/40">
             <Button variant="outline" onClick={onClose} disabled={saving}>
               Cancelar
             </Button>
-            <Button onClick={handleSave} disabled={saving || uploadingMedia}>
+            <Button
+              onClick={handleSave}
+              disabled={saving || uploadingMedia}
+              className="bg-gradient-to-r from-orange-400 to-yellow-500 hover:from-orange-500 hover:to-yellow-500 text-white shadow-lg shadow-orange-500/25"
+            >
               {saving ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

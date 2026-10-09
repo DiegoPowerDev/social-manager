@@ -24,7 +24,7 @@ export default function DashboardLayout({
   if (loading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
-        <LucideLoaderCircle className="animate-spin h-16 w-16 text-lime-300" />
+        <LucideLoaderCircle className="animate-spin h-16 w-16 text-yellow-200" />
       </div>
     );
   }
@@ -33,7 +33,7 @@ export default function DashboardLayout({
   if (!user) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
-        <LucideLoaderCircle className="animate-spin h-16 w-16 text-lime-600" />
+        <LucideLoaderCircle className="animate-spin h-16 w-16 text-yellow-200" />
       </div>
     );
   }
@@ -43,7 +43,7 @@ export default function DashboardLayout({
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto w-full">{children}</main>
       </div>
     </div>
   );

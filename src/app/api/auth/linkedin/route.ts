@@ -1,20 +1,41 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { adminDb } from "@/lib/firebase-admin";
 
-export async function GET() {
-  const clientId = process.env.LINKEDIN_CLIENT_ID!;
-  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/linkedin/callback`;
+export async function GET(req: NextRequest) {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const companyId = req.nextUrl.searchParams.get("companyId");
 
-  const scopes = ["openid", "profile", "email", "w_member_social"].join(" ");
+  if (!companyId) {
+    return NextResponse.redirect(`${baseUrl}/linkedin?error=no_company`);
+  }
 
-  const authUrl =
-    `https://www.linkedin.com/oauth/v2/authorization?` +
-    new URLSearchParams({
+  try {
+    const snap = await adminDb
+      .collection("platformCredentials")
+      .doc(`${companyId}_linkedin`)
+      .get();
+
+    if (!snap.exists) {
+      return NextResponse.redirect(`${baseUrl}/linkedin?error=no_credentials`);
+    }
+
+    const data = snap.data()!;
+    const clientId = data.clientId || data.appId;
+    const redirectUri = `${baseUrl}/api/auth/linkedin/callback`;
+
+    const params = new URLSearchParams({
       response_type: "code",
       client_id: clientId,
       redirect_uri: redirectUri,
-      scope: scopes,
-      state: "linkedin_auth", // puedes hacerlo más seguro después
+      state: companyId,
+      scope: "openid profile email w_member_social",
     });
 
-  return NextResponse.redirect(authUrl);
+    return NextResponse.redirect(
+      `https://www.linkedin.com/oauth/v2/authorization?${params}`,
+    );
+  } catch (e) {
+    console.error(e);
+    return NextResponse.redirect(`${baseUrl}/linkedin?error=auth_start`);
+  }
 }

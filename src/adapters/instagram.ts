@@ -156,5 +156,32 @@ export async function publishToInstagram(
     );
   }
 
-  return publishData;
+  const mediaId = publishData.id as string;
+
+  let permalink: string | null = null;
+
+  // Las historias a veces no tienen permalink público
+  if (mediaType !== "STORIES") {
+    try {
+      const infoRes = await fetch(
+        `${GRAPH_API}/${mediaId}?fields=permalink,shortcode&access_token=${accessToken}`,
+      );
+      const info = await infoRes.json();
+
+      permalink = info.permalink || null;
+
+      if (!permalink && info.shortcode) {
+        // Reels suelen ser /reel/, posts /p/
+        const path = mediaType === "REELS" ? "reel" : "p";
+        permalink = `https://www.instagram.com/${path}/${info.shortcode}/`;
+      }
+    } catch {
+      // no bloquear la publicación
+    }
+  }
+
+  return {
+    id: mediaId,
+    permalink,
+  };
 }

@@ -5,9 +5,123 @@ export async function publishToLinkedIn(options: {
   personId: string;
   text: string;
   imageUrl?: string;
+  videoUrl?: string;
 }) {
-  const { accessToken, personId, text, imageUrl } = options;
+  const { accessToken, personId, text, imageUrl, videoUrl } = options;
   const author = `urn:li:person:${personId}`;
+
+  // Prioridad: video > imagen > texto
+
+  // ===== VIDEO =====
+  if (videoUrl) {
+    // 1. Registrar upload
+    const registerRes = await fetch(
+      `${LINKEDIN_API}/v2/assets?action=registerUpload`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          "X-Restli-Protocol-Version": "2.0.0",
+        },
+        body: JSON.stringify({
+          registerUploadRequest: {
+            recipes: ["urn:li:digitalmediaRecipe:feedshare-video"],
+            owner: author,
+            serviceRelationships: [
+              {
+                relationshipType: "OWNER",
+                identifier: "urn:li:userGeneratedContent",
+              },
+            ],
+          },
+        }),
+      },
+    );
+
+    const registerData = await registerRes.json();
+    if (!registerRes.ok) {
+      throw new Error(
+        registerData.message || "Error al registrar video en LinkedIn",
+      );
+    }
+
+    const uploadUrl =
+      registerData.value.uploadMechanism[
+        "com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"
+      ].uploadUrl;
+    const asset = registerData.value.asset;
+
+    // 2. Descargar video de R2 y subir a LinkedIn
+    const videoRes = await fetch(videoUrl);
+    if (!videoRes.ok) throw new Error("No se pudo descargar el video");
+    const videoBuffer = await videoRes.arrayBuffer();
+
+    const uploadRes = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/octet-stream",
+      },
+      body: videoBuffer,
+    });
+
+    if (!uploadRes.ok) {
+      throw new Error("Error al subir el video a LinkedIn");
+    }
+
+    // 3. Crear post VIDEO
+    const postRes = await fetch(`${LINKEDIN_API}/v2/ugcPosts`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        "X-Restli-Protocol-Version": "2.0.0",
+      },
+      body: JSON.stringify({
+        author,
+        lifecycleState: "PUBLISHED",
+        specificContent: {
+          "com.linkedin.ugc.ShareContent": {
+            shareCommentary: { text },
+            shareMediaCategory: "VIDEO",
+            media: [
+              {
+                status: "READY",
+                media: asset,
+                title: { text: text?.slice(0, 200) || "Video" },
+              },
+            ],
+          },
+        },
+        visibility: {
+          "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC",
+        },
+      }),
+    });
+
+    const postData = await postRes.json().catch(() => ({}));
+    if (!postRes.ok) {
+      throw new Error(
+        postData.message ||
+          postData.error?.message ||
+          "Error al publicar video",
+      );
+    }
+    const restliId =
+      postRes.headers.get("x-restli-id") ||
+      postRes.headers.get("X-RestLi-Id") ||
+      postData.id ||
+      null;
+
+    return {
+      ...postData,
+      id: restliId,
+      permalink: restliId
+        ? `https://www.linkedin.com/feed/update/${restliId}/`
+        : null,
+    };
+  }
 
   // ===== SOLO TEXTO =====
   if (!imageUrl) {
@@ -41,7 +155,20 @@ export async function publishToLinkedIn(options: {
         data.message || data.error?.message || "Error al publicar en LinkedIn",
       );
     }
-    return data;
+
+    const restliId =
+      res.headers.get("x-restli-id") ||
+      res.headers.get("X-RestLi-Id") ||
+      data.id ||
+      null;
+
+    return {
+      ...data,
+      id: restliId,
+      permalink: restliId
+        ? `https://www.linkedin.com/feed/update/${restliId}/`
+        : null,
+    };
   }
 
   // ===== TEXTO + IMAGEN =====
@@ -141,5 +268,17 @@ export async function publishToLinkedIn(options: {
     );
   }
 
-  return postData;
+  const restliId =
+    postRes.headers.get("x-restli-id") ||
+    postRes.headers.get("X-RestLi-Id") ||
+    postData.id ||
+    null;
+
+  return {
+    ...postData,
+    id: restliId,
+    permalink: restliId
+      ? `https://www.linkedin.com/feed/update/${restliId}/`
+      : null,
+  };
 }

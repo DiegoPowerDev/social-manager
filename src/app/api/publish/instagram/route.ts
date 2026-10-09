@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { publishToInstagram } from "@/adapters/instagram";
-import { db } from "@/lib/firebase";
-import { collection, addDoc } from "firebase/firestore";
+import { adminDb } from "@/lib/firebase-admin";
+
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,6 +14,7 @@ export async function POST(req: NextRequest) {
       videoUrl,
       username,
       mediaType,
+      companyId,
     } = await req.json();
 
     if (!igUserId || !accessToken) {
@@ -20,6 +22,10 @@ export async function POST(req: NextRequest) {
         { error: "Faltan datos de la cuenta" },
         { status: 400 },
       );
+    }
+
+    if (!companyId) {
+      return NextResponse.json({ error: "Falta companyId" }, { status: 400 });
     }
 
     if (!imageUrl && !videoUrl) {
@@ -36,8 +42,8 @@ export async function POST(req: NextRequest) {
       mediaType: mediaType || "FEED",
     });
 
-    // Guardar en historial
-    await addDoc(collection(db, "publishedPosts"), {
+    await adminDb.collection("publishedPosts").add({
+      companyId,
       platform: "instagram",
       igUserId,
       username: username || "",
@@ -45,6 +51,7 @@ export async function POST(req: NextRequest) {
       imageUrl: imageUrl || null,
       videoUrl: videoUrl || null,
       instagramPostId: result.id || null,
+      permalink: result.permalink || null,
       publishedAt: new Date(),
       status: "published",
     });
@@ -52,6 +59,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       postId: result.id,
+      permalink: result.permalink,
     });
   } catch (error: any) {
     console.error("Error publicando en Instagram:", error);
