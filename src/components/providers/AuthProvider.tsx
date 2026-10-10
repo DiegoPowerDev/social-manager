@@ -11,7 +11,7 @@ import {
   getCompany,
   getMembership,
   PLAN_LIMITS,
-} from "@/lib/tenant"; // ← tenant, no tentant
+} from "@/lib/tenant";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setUser, setAppUser, setLoading, logout, setTenant } = useAuthStore();

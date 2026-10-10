@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Sparkles, ImagePlus, X } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { useAiUsage } from "@/app/hooks/useAiUsage";
 
 interface Props {
   onGenerate: (imageUrl: string) => void;
@@ -76,9 +77,10 @@ export function AIImageGenerator({ onGenerate }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
-
+  const { aiEnabled, imagesLeft, imagesUsed, imagesLimit, setFromApi } =
+    useAiUsage();
   const companyId = useAuthStore((s) => s.companyId);
-  const aiEnabled = useAuthStore((s) => s.aiEnabled);
+  const aiEnabledPlan = useAuthStore((s) => s.aiEnabled);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -103,10 +105,15 @@ export function AIImageGenerator({ onGenerate }: Props) {
   };
 
   const uploadReferenceToR2 = async (file: File): Promise<string> => {
+    if (!companyId) {
+      throw new Error(
+        "No hay empresa asociada. Recarga la página o vuelve a iniciar sesión.",
+      );
+    }
     const formData = new FormData();
     formData.append("file", file);
     formData.append("platform", "ai-reference");
-    formData.append("companyId", companyId || "");
+    formData.append("companyId", companyId);
 
     const res = await fetch("/api/upload", {
       method: "POST",
@@ -141,7 +148,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
       setError("No hay empresa asociada");
       return;
     }
-    if (!aiEnabled) {
+    if (!aiEnabledPlan) {
       setError("Tu plan no incluye IA");
       return;
     }
@@ -176,6 +183,12 @@ export function AIImageGenerator({ onGenerate }: Props) {
       }
 
       setGeneratedUrl(data.imageUrl);
+      if (data.usage) {
+        setFromApi({
+          aiCaptions: data.usage.aiCaptions,
+          aiImages: data.usage.aiImages,
+        });
+      }
     } catch (err: any) {
       setError(err.message || "Ocurrió un error al generar la imagen");
     } finally {
@@ -280,10 +293,20 @@ export function AIImageGenerator({ onGenerate }: Props) {
       </div>
 
       {error && <p className="text-sm text-red-500">{error}</p>}
-
+      <p className="text-xs text-muted-foreground text-center">
+        {aiEnabledPlan
+          ? `${imagesLeft} imágenes restantes este mes (${imagesUsed}/${imagesLimit})`
+          : "Tu plan no incluye IA"}
+      </p>
       <Button
         onClick={handleGenerate}
-        disabled={loading || !prompt.trim()}
+        disabled={
+          loading ||
+          !prompt.trim() ||
+          !aiEnabled ||
+          imagesLeft <= 0 ||
+          !companyId
+        }
         className="w-full bg-yellow-500/30 h-10 hover:bg-yellow-500/20"
         variant="secondary"
       >

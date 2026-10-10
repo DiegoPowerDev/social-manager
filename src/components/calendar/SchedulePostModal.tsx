@@ -123,10 +123,15 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
   const linkedinAccount = accounts.find((a) => a.platform === "linkedin");
 
   const uploadToR2 = async (file: File) => {
+    if (!companyId) {
+      throw new Error(
+        "No hay empresa asociada. Recarga la página o vuelve a iniciar sesión.",
+      );
+    }
     const formData = new FormData();
     formData.append("file", file);
     formData.append("platform", "scheduled");
-    if (companyId) formData.append("companyId", companyId);
+    formData.append("companyId", companyId);
 
     const res = await fetch("/api/upload", {
       method: "POST",
@@ -556,8 +561,6 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
               className="bg-white"
             />
           </div>
-
-          {error && <p className="text-sm text-red-500">{error}</p>}
           <div>
             <PostPreview
               message={message}
@@ -565,6 +568,7 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
               videoUrl={videoUrl}
             />
           </div>
+          {error && <p className="text-sm text-red-500">{error}</p>}
           {/* Acciones */}
           <div className="flex justify-end gap-2 pt-4 border-t border-white/40">
             <Button variant="outline" onClick={onClose} disabled={saving}>

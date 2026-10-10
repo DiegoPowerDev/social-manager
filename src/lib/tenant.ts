@@ -72,6 +72,8 @@ export async function createCompany(params: {
   });
 
   await setDoc(doc(db, "memberships", membershipId(uid, companyId)), {
+    email,
+    name: displayName || email,
     uid,
     companyId,
     role: "admin" as MemberRole,

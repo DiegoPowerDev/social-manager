@@ -76,7 +76,11 @@ export default function SettingsPage() {
   }, [companyId]);
 
   const uploadLogo = async (file: File) => {
-    if (!companyId) return;
+    if (!companyId) {
+      throw new Error(
+        "No hay empresa asociada. Recarga la página o vuelve a iniciar sesión.",
+      );
+    }
     const formData = new FormData();
     formData.append("file", file);
     formData.append("platform", "brand");

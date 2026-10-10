@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateImage } from "@/lib/ai";
-import { consumeAiCredit, getCompany } from "@/lib/tenant";
+import {
+  consumeAiCreditAdmin,
+  getCompanyAdmin,
+  getAiUsageAdmin,
+} from "@/lib/tenant-admin";
+import { PLAN_LIMITS } from "@/lib/tenant";
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,28 +22,57 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    try {
-      await consumeAiCredit(companyId, "image");
-    } catch (e: any) {
+    const company = await getCompanyAdmin(companyId);
+    if (!company) {
       return NextResponse.json(
-        { error: e.message || "Límite de IA alcanzado" },
+        { error: "Empresa no encontrada" },
+        { status: 404 },
+      );
+    }
+
+    if (company.features?.aiEnabled === false) {
+      return NextResponse.json(
+        { error: "Tu plan no incluye IA" },
         { status: 403 },
       );
     }
 
-    const company = await getCompany(companyId);
-    const brandInstructions = company?.aiInstructions || "";
+    const limits = company.limits || PLAN_LIMITS.free;
+    const usage = await getAiUsageAdmin(companyId);
+    const imagesLimit = limits.aiImagesPerMonth ?? 3;
+    const captionsLimit = limits.aiCaptionsPerMonth ?? 15;
 
+    if (usage.aiImages >= imagesLimit) {
+      return NextResponse.json(
+        {
+          error: `Límite de imágenes IA alcanzado (${imagesLimit}/mes). Mejora tu plan o espera al próximo mes.`,
+        },
+        { status: 403 },
+      );
+    }
+
+    const brandInstructions = company.aiInstructions || "";
     const finalPrompt = brandInstructions
-      ? `${prompt}\n\nBrand / style notes: ${brandInstructions}`
-      : prompt;
+      ? `${prompt.trim()}\n\nBrand / style notes: ${brandInstructions}`
+      : prompt.trim();
 
     const generatedImageUrl = await generateImage({
       prompt: finalPrompt,
-      imageUrl,
+      imageUrl, // opcional (edición)
     });
 
-    return NextResponse.json({ imageUrl: generatedImageUrl });
+    // Solo si la generación salió bien
+    await consumeAiCreditAdmin(companyId, "image");
+
+    return NextResponse.json({
+      imageUrl: generatedImageUrl,
+      usage: {
+        aiCaptions: usage.aiCaptions,
+        aiCaptionsLimit: captionsLimit,
+        aiImages: usage.aiImages + 1,
+        aiImagesLimit: imagesLimit,
+      },
+    });
   } catch (error: any) {
     console.error("Error generando imagen:", error);
     return NextResponse.json(

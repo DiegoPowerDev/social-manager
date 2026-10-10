@@ -13,6 +13,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import TitleComponent from "../layout/titleComponent";
 
 const credId = (companyId: string) => `${companyId}_linkedin`;
 
@@ -82,13 +83,11 @@ export function LinkedInConnectFlow({
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/linkedin/callback`;
 
   return (
-    <div className="flex-1 flex flex-col space-y-6 p-6 max-w-lg">
-      <div>
-        <h2 className="text-2xl font-bold">LinkedIn</h2>
-        <p className="text-muted-foreground mt-1">
-          Configura la app de LinkedIn de tu empresa y conecta el perfil
-        </p>
-      </div>
+    <div className="flex-1 flex flex-col space-y-6">
+      <TitleComponent
+        title="LinkedIn"
+        description="Configura la app de LinkedIn de tu empresa y conecta el perfil"
+      />
 
       {status && (
         <div
@@ -101,83 +100,84 @@ export function LinkedInConnectFlow({
           {status.text}
         </div>
       )}
+      <div className="w-full flex flex-col items-center gap-8">
+        <Card className="bg-white/70 w-xl">
+          <CardHeader>
+            <CardTitle>1. Credenciales LinkedIn</CardTitle>
+            <CardDescription>
+              Crea una app en{" "}
+              <a
+                href="https://www.linkedin.com/developers/apps"
+                target="_blank"
+                rel="noreferrer"
+                className="underline font-bold"
+              >
+                LinkedIn Developers
+              </a>
+              . Redirect URL:{" "}
+              <code className="text-xs break-all">{redirectUri}</code>
+              <br />
+              Scopes: <code>openid profile email w_member_social</code>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-1">
+              <Label>Client ID</Label>
+              <Input
+                value={clientId}
+                onChange={(e) => setClientId(e.target.value)}
+                disabled={!canConnect || saving}
+                className="bg-white"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Client Secret</Label>
+              <Input
+                type="password"
+                value={clientSecret}
+                onChange={(e) => setClientSecret(e.target.value)}
+                disabled={!canConnect || saving}
+                className="bg-white"
+              />
+            </div>
+            {canConnect && (
+              <Button onClick={saveCreds} disabled={saving}>
+                {saving ? "Guardando..." : "Guardar credenciales"}
+              </Button>
+            )}
+            {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+          </CardContent>
+        </Card>
 
-      <Card className="bg-white/70">
-        <CardHeader>
-          <CardTitle>1. Credenciales LinkedIn</CardTitle>
-          <CardDescription>
-            Crea una app en{" "}
-            <a
-              href="https://www.linkedin.com/developers/apps"
-              target="_blank"
-              rel="noreferrer"
-              className="underline font-bold"
+        <Card className="bg-white/70 w-xl">
+          <CardHeader>
+            <CardTitle>2. Conectar perfil</CardTitle>
+            <CardDescription>
+              Se publicará desde el perfil personal autorizado
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              disabled={!hasCreds || !canConnect}
+              onClick={() => {
+                window.location.href = `/api/auth/linkedin?companyId=${companyId}`;
+              }}
             >
-              LinkedIn Developers
-            </a>
-            . Redirect URL:{" "}
-            <code className="text-xs break-all">{redirectUri}</code>
-            <br />
-            Scopes: <code>openid profile email w_member_social</code>
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="space-y-1">
-            <Label>Client ID</Label>
-            <Input
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              disabled={!canConnect || saving}
-              className="bg-white"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>Client Secret</Label>
-            <Input
-              type="password"
-              value={clientSecret}
-              onChange={(e) => setClientSecret(e.target.value)}
-              disabled={!canConnect || saving}
-              className="bg-white"
-            />
-          </div>
-          {canConnect && (
-            <Button onClick={saveCreds} disabled={saving}>
-              {saving ? "Guardando..." : "Guardar credenciales"}
+              Conectar LinkedIn
             </Button>
-          )}
-          {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
-        </CardContent>
-      </Card>
-
-      <Card className="bg-white/70">
-        <CardHeader>
-          <CardTitle>2. Conectar perfil</CardTitle>
-          <CardDescription>
-            Se publicará desde el perfil personal autorizado
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button
-            disabled={!hasCreds || !canConnect}
-            onClick={() => {
-              window.location.href = `/api/auth/linkedin?companyId=${companyId}`;
-            }}
-          >
-            Conectar LinkedIn
-          </Button>
-          {!hasCreds && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Guarda las credenciales antes de conectar
-            </p>
-          )}
-          {!canConnect && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Solo un administrador puede conectar redes
-            </p>
-          )}
-        </CardContent>
-      </Card>
+            {!hasCreds && (
+              <p className="text-xs text-muted-foreground mt-2">
+                Guarda las credenciales antes de conectar
+              </p>
+            )}
+            {!canConnect && (
+              <p className="text-xs text-muted-foreground mt-2">
+                Solo un administrador puede conectar redes
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

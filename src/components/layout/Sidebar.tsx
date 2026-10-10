@@ -37,7 +37,7 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="flex h-screen w-64 flex-col border-r text-white bg-yellow-500/20  backdrop-blur-xs">
+    <aside className="flex h-screen w-64 flex-col  text-white bg-yellow-500/20  backdrop-blur-xs">
       {/* Logo / Nombre */}
       <div className="flex flex-col justify-center">
         <Link
@@ -84,7 +84,7 @@ export function Sidebar() {
           })}
         </nav>
 
-        <Separator className="my-4" />
+        <Separator className="my-4  bg-yellow-200/30" />
 
         <nav className="grid gap-1 px-3">
           {secondaryNav.map((item) => {
@@ -109,7 +109,7 @@ export function Sidebar() {
       </div>
 
       {/* Usuario / Logout */}
-      <div className="border-t p-4">
+      <div className=" p-4">
         <div className="mb-3 px-2">
           <p className="text-sm font-medium">{appUser?.name || "Usuario"}</p>
           <p className="text-xs  capitalize">
@@ -118,7 +118,7 @@ export function Sidebar() {
         </div>
         <Button
           variant="outline"
-          className="w-full justify-start gap-2 text-black hover:bg-black/10"
+          className="w-full gap-2 text-black hover:text-white hover:bg-black/10"
           size="sm"
           onClick={handleLogout}
         >

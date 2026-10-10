@@ -16,33 +16,41 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const platform = (formData.get("platform") as string) || "general";
-    const companyId = formData.get("companyId") as string | null;
+    const companyId = (formData.get("companyId") as string) || "";
 
     if (!file) {
-      return NextResponse.json(
-        { error: "No se envió ningún archivo" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "File missing" }, { status: 400 });
     }
-    if (file.size > 100 * 1024 * 1024) {
+
+    if (!companyId) {
+      return NextResponse.json({ error: "Falta companyId" }, { status: 400 });
+    }
+
+    // Límites básicos
+    const maxSize = 200 * 1024 * 1024; // 200MB
+    if (file.size > maxSize) {
       return NextResponse.json(
-        { error: "El archivo es demasiado grande (máximo 100MB)" },
+        { error: "Archivo demasiado grande (máx. 200MB)" },
         { status: 400 },
       );
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const extension = file.name.split(".").pop() || "jpg";
+    const originalName = file.name || "file";
+    const extension = originalName.includes(".")
+      ? originalName.split(".").pop()?.toLowerCase() || "bin"
+      : "bin";
 
-    const key = companyId
-      ? `companies/${companyId}/${platform}/${Date.now()}-${nanoid(8)}.${extension}`
-      : `${platform}/${Date.now()}-${nanoid(8)}.${extension}`;
+    const safePlatform = platform.replace(/[^a-z0-9-_]/gi, "") || "general";
+    // Aislamiento por empresa
+    const key = `companies/${companyId}/${safePlatform}/${Date.now()}-${nanoid(8)}.${extension}`;
+
     await s3Client.send(
       new PutObjectCommand({
         Bucket: process.env.R2_BUCKET_NAME!,
         Key: key,
         Body: buffer,
-        ContentType: file.type || "image/jpeg",
+        ContentType: file.type || "application/octet-stream",
       }),
     );
 
@@ -51,11 +59,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       publicUrl,
       key,
+      contentType: file.type,
     });
   } catch (error: any) {
-    console.error("Error subiendo a R2:", error);
+    console.error("R2 Upload Error:", error);
     return NextResponse.json(
-      { error: "Error al subir el archivo" },
+      { error: error.message || "Error uploading to R2" },
       { status: 500 },
     );
   }

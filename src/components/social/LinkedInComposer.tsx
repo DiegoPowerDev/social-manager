@@ -15,6 +15,7 @@ import { ImagePlus, Video, X, Loader2 } from "lucide-react";
 import { AICaptionGenerator } from "@/components/social/AICaptionGenerator";
 import { AIImageGenerator } from "@/components/social/AIImageGenerator";
 import { Separator } from "@/components/ui/separator";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 interface Props {
   accountName: string;
@@ -44,14 +45,21 @@ export function LinkedInComposer({
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
 
+  const companyId = useAuthStore((s) => s.companyId);
+
   const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
   const MAX_VIDEO_SIZE = 200 * 1024 * 1024; // LinkedIn single upload ~200MB
 
   const uploadToR2 = async (file: File) => {
+    if (!companyId) {
+      throw new Error(
+        "No hay empresa asociada. Recarga la página o vuelve a iniciar sesión.",
+      );
+    }
     const formData = new FormData();
     formData.append("file", file);
     formData.append("platform", "linkedin");
-
+    formData.append("companyId", companyId);
     const res = await fetch("/api/upload", {
       method: "POST",
       body: formData,

@@ -36,6 +36,7 @@ import { AIImageGenerator } from "@/components/social/AIImageGenerator";
 import { Separator } from "@/components/ui/separator";
 import { PostPreview } from "@/components/social/PostPreview";
 import { useAuthStore } from "@/stores/useAuthStore";
+import TitleComponent from "@/components/layout/titleComponent";
 
 interface SocialAccount {
   id: string;
@@ -121,10 +122,15 @@ export default function BulkPublishPage() {
   const linkedinAccount = accounts.find((a) => a.platform === "linkedin");
 
   const uploadToR2 = async (file: File) => {
+    if (!companyId) {
+      throw new Error(
+        "No hay empresa asociada. Recarga la página o vuelve a iniciar sesión.",
+      );
+    }
     const formData = new FormData();
     formData.append("file", file);
     formData.append("platform", "bulk");
-    if (companyId) formData.append("companyId", companyId);
+    formData.append("companyId", companyId);
     const res = await fetch("/api/upload", {
       method: "POST",
       body: formData,
@@ -343,12 +349,17 @@ export default function BulkPublishPage() {
 
   if (accounts.length === 0) {
     return (
-      <div className="max-w-md space-y-4">
-        <h2 className="text-2xl font-bold">Publicar en varias redes</h2>
-        <p className="text-muted-foreground">
-          No tienes ninguna red conectada. Conecta Facebook, Instagram o
-          LinkedIn primero.
-        </p>
+      <div className="flex-1  flex  flex-col h-full w-full">
+        <TitleComponent
+          title="Publicar en varias redes"
+          description="No tienes ninguna red conectada. Conecta Facebook, Instagram o
+          LinkedIn primero."
+        />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-white">
+            ¡No pierdas tiempo, empieza a añadir tus redes!
+          </div>
+        </div>
       </div>
     );
   }
@@ -361,12 +372,10 @@ export default function BulkPublishPage() {
 
   return (
     <div className="">
-      <div className="p-6 bg-yellow-500/20 ">
-        <h2 className="text-2xl font-bold">Publicar en varias redes</h2>
-        <p className="text-muted-foreground mt-1">
-          Crea el contenido una vez y publícalo en todas las redes seleccionadas
-        </p>
-      </div>
+      <TitleComponent
+        title="Publicar en varias redes"
+        description="Crea el contenido una vez y publícalo en todas las redes seleccionadas"
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
         {/* Contenido */}

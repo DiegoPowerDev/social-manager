@@ -22,6 +22,7 @@ import { ImagePlus, Video, X, Loader2 } from "lucide-react";
 import { AICaptionGenerator } from "@/components/social/AICaptionGenerator";
 import { AIImageGenerator } from "@/components/social/AIImageGenerator";
 import { Separator } from "../ui/separator";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 interface Props {
   username: string;
@@ -56,6 +57,8 @@ export function InstagramComposer({
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
 
+  const companyId = useAuthStore((s) => s.companyId);
+
   const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
   const MAX_IMAGE_SIZE = 8 * 1024 * 1024;
 
@@ -73,10 +76,15 @@ export function InstagramComposer({
 
     try {
       setUploading(true);
+      if (!companyId) {
+        throw new Error(
+          "No hay empresa asociada. Recarga la página o vuelve a iniciar sesión.",
+        );
+      }
       const formData = new FormData();
       formData.append("file", file);
       formData.append("platform", "instagram");
-
+      formData.append("companyId", companyId);
       const res = await fetch("/api/upload", {
         method: "POST",
         body: formData,

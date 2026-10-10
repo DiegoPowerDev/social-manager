@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateCaption } from "@/lib/ai";
-import { consumeAiCredit, getCompany } from "@/lib/tenant";
+import {
+  consumeAiCreditAdmin,
+  getCompanyAdmin,
+  getAiUsageAdmin,
+} from "@/lib/tenant-admin"; // o donde tengas las funciones Admin
+import { PLAN_LIMITS } from "@/lib/tenant";
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,7 +14,6 @@ export async function POST(req: NextRequest) {
     if (!companyId) {
       return NextResponse.json({ error: "Falta companyId" }, { status: 400 });
     }
-
     if (!topic || topic.trim().length < 3) {
       return NextResponse.json(
         { error: "Escribe al menos un tema o idea" },
@@ -17,27 +21,53 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Cupo de IA (lanza error si se acabó o el plan no tiene IA)
-    try {
-      await consumeAiCredit(companyId, "caption");
-    } catch (e: any) {
+    const company = await getCompanyAdmin(companyId);
+    if (!company) {
       return NextResponse.json(
-        { error: e.message || "Límite de IA alcanzado" },
+        { error: "Empresa no encontrada" },
+        { status: 404 },
+      );
+    }
+    if (company.features?.aiEnabled === false) {
+      return NextResponse.json(
+        { error: "Tu plan no incluye IA" },
         { status: 403 },
       );
     }
 
-    const company = await getCompany(companyId);
-    const brandInstructions = company?.aiInstructions || "";
+    const limits = company.limits || PLAN_LIMITS.free;
+    const usage = await getAiUsageAdmin(companyId);
+    const limit = limits.aiCaptionsPerMonth ?? 15;
+
+    if (usage.aiCaptions >= limit) {
+      return NextResponse.json(
+        {
+          error: `Límite de captions alcanzado (${limit}/mes). Mejora tu plan o espera al próximo mes.`,
+        },
+        { status: 403 },
+      );
+    }
 
     const caption = await generateCaption({
       topic,
       platform,
       tone,
-      brandInstructions,
+      brandInstructions: company.aiInstructions || "",
     });
 
-    return NextResponse.json({ caption });
+    await consumeAiCreditAdmin(companyId, "caption");
+
+    const used = usage.aiCaptions + 1;
+
+    return NextResponse.json({
+      caption,
+      usage: {
+        aiCaptions: used,
+        aiCaptionsLimit: limit,
+        aiImages: usage.aiImages,
+        aiImagesLimit: limits.aiImagesPerMonth ?? 3,
+      },
+    });
   } catch (error: any) {
     console.error("Error generando caption:", error);
     return NextResponse.json(

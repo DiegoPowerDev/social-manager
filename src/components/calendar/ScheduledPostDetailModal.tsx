@@ -98,11 +98,15 @@ export function ScheduledPostDetailModal({
   }, [post, open]);
 
   const uploadToR2 = async (file: File) => {
+    if (!companyId) {
+      throw new Error(
+        "No hay empresa asociada. Recarga la página o vuelve a iniciar sesión.",
+      );
+    }
     const formData = new FormData();
-
     formData.append("file", file);
     formData.append("platform", "scheduled");
-    if (companyId) formData.append("companyId", companyId);
+    formData.append("companyId", companyId);
     const res = await fetch("/api/upload", {
       method: "POST",
       body: formData,

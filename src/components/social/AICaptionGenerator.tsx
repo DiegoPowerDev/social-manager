@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Sparkles } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { useAiUsage } from "@/app/hooks/useAiUsage";
 interface Props {
   platform?: "facebook" | "instagram" | "general";
   onGenerate: (caption: string) => void;
@@ -26,8 +27,10 @@ export function AICaptionGenerator({
   const [tone, setTone] = useState("profesional y cercano");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { aiEnabled, captionsLeft, captionsUsed, captionsLimit, setFromApi } =
+    useAiUsage();
   const companyId = useAuthStore((s) => s.companyId);
-  const aiEnabled = useAuthStore((s) => s.aiEnabled);
+  const aiEnabledPlan = useAuthStore((s) => s.aiEnabled);
 
   const handleGenerate = async () => {
     if (!topic.trim()) {
@@ -38,7 +41,7 @@ export function AICaptionGenerator({
       setError("No hay empresa asociada");
       return;
     }
-    if (!aiEnabled) {
+    if (!aiEnabledPlan) {
       setError("Tu plan no incluye IA");
       return;
     }
@@ -70,6 +73,12 @@ export function AICaptionGenerator({
       }
 
       onGenerate(data.caption);
+      if (data.usage) {
+        setFromApi({
+          aiCaptions: data.usage.aiCaptions,
+          aiImages: data.usage.aiImages,
+        });
+      }
       setTopic(""); // limpiamos el input después de generar
     } catch (err: any) {
       setError(err.message || "Ocurrió un error");
@@ -125,10 +134,20 @@ export function AICaptionGenerator({
       </div>
 
       {error && <p className="text-sm text-red-500">{error}</p>}
-
+      <p className="text-xs text-muted-foreground text-center">
+        {aiEnabledPlan
+          ? `${captionsLeft} captions restantes este mes (${captionsUsed}/${captionsLimit})`
+          : "Tu plan no incluye IA"}
+      </p>
       <Button
         onClick={handleGenerate}
-        disabled={loading || !topic.trim()}
+        disabled={
+          loading ||
+          !topic.trim() ||
+          !aiEnabled ||
+          captionsLeft <= 0 ||
+          !companyId
+        }
         className="w-full bg-yellow-500/30 h-10 hover:bg-yellow-500/20"
         variant="secondary"
       >

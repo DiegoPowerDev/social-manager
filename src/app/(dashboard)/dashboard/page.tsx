@@ -45,6 +45,7 @@ import {
   Legend,
 } from "recharts";
 import { useAuthStore } from "@/stores/useAuthStore";
+import TitleComponent from "@/components/layout/titleComponent";
 
 interface PublishedPost {
   id: string;
@@ -264,13 +265,11 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <div className="p-6 bg-yellow-500/20">
-        <h2 className="text-2xl font-bold">Dashboard</h2>
-        <p className="text-muted-foreground mt-1">
-          Actividad de publicaciones — haz clic en barras o sectores para
-          filtrar
-        </p>
-      </div>
+      <TitleComponent
+        title="Dashboard"
+        description="Actividad de publicaciones — haz clic en barras o sectores para
+          filtrar"
+      />
 
       <div className="p-6 space-y-6">
         {/* Filtros */}

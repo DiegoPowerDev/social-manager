@@ -32,6 +32,7 @@ import { es } from "date-fns/locale";
 import Image from "next/image";
 import { ScheduledPostDetailModal } from "@/components/calendar/ScheduledPostDetailModal";
 import { useAuthStore } from "@/stores/useAuthStore";
+import TitleComponent from "@/components/layout/titleComponent";
 
 interface ScheduledPost {
   id: string;
@@ -177,14 +178,10 @@ export default function CalendarPage() {
 
   return (
     <div className="">
-      <div className="flex items-center justify-between p-6">
-        <div>
-          <h2 className="text-2xl font-bold">Calendario</h2>
-          <p className="text-muted-foreground mt-1">
-            Programa publicaciones por día y hora
-          </p>
-        </div>
-      </div>
+      <TitleComponent
+        title="Calendario"
+        description="Programa publicaciones por día y hora"
+      />
 
       <div className="w-full h-full px-6">
         <div className="flex items-center justify-between">

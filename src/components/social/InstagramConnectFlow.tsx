@@ -13,6 +13,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import TitleComponent from "../layout/titleComponent";
 
 const credId = (companyId: string) => `${companyId}_instagram`;
 
@@ -72,13 +73,11 @@ export function InstagramConnectFlow({
   };
 
   return (
-    <div className="flex-1 flex flex-col space-y-6 p-6 max-w-lg">
-      <div>
-        <h2 className="text-2xl font-bold">Instagram</h2>
-        <p className="text-muted-foreground mt-1">
-          Configura la app de Meta de tu empresa y conecta la cuenta
-        </p>
-      </div>
+    <div className="flex-1 flex flex-col space-y-6">
+      <TitleComponent
+        title="Instagram"
+        description="Configura la app de Meta de tu empresa y conecta la cuenta"
+      />
 
       {status && (
         <div
@@ -91,84 +90,85 @@ export function InstagramConnectFlow({
           {status.text}
         </div>
       )}
+      <div className="flex flex-col w-full items-center gap-8">
+        <Card className="bg-white/70 w-xl">
+          <CardHeader>
+            <CardTitle>1. Credenciales Meta</CardTitle>
+            <CardDescription>
+              App ID y App Secret de{" "}
+              <a
+                href="https://developers.facebook.com"
+                target="_blank"
+                rel="noreferrer"
+                className="underline font-bold"
+              >
+                Meta for Developers
+              </a>
+              . Redirect URI:{" "}
+              <code className="text-xs">
+                {process.env.NEXT_PUBLIC_APP_URL}
+                /api/auth/instagram/callback
+              </code>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-1">
+              <Label>App ID</Label>
+              <Input
+                value={appId}
+                onChange={(e) => setAppId(e.target.value)}
+                disabled={!canConnect || saving}
+                className="bg-white"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>App Secret</Label>
+              <Input
+                type="password"
+                value={appSecret}
+                onChange={(e) => setAppSecret(e.target.value)}
+                disabled={!canConnect || saving}
+                className="bg-white"
+              />
+            </div>
+            {canConnect && (
+              <Button onClick={saveCreds} disabled={saving}>
+                {saving ? "Guardando..." : "Guardar credenciales"}
+              </Button>
+            )}
+            {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+          </CardContent>
+        </Card>
 
-      <Card className="bg-white/70">
-        <CardHeader>
-          <CardTitle>1. Credenciales Meta</CardTitle>
-          <CardDescription>
-            App ID y App Secret de{" "}
-            <a
-              href="https://developers.facebook.com"
-              target="_blank"
-              rel="noreferrer"
-              className="underline font-bold"
+        <Card className="bg-white/70 w-xl">
+          <CardHeader>
+            <CardTitle>2. Conectar cuenta</CardTitle>
+            <CardDescription>
+              Instagram Business/Creator vinculada a una Página de Facebook
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              disabled={!hasCreds || !canConnect}
+              onClick={() => {
+                window.location.href = `/api/auth/instagram?companyId=${companyId}`;
+              }}
             >
-              Meta for Developers
-            </a>
-            . Redirect URI:{" "}
-            <code className="text-xs">
-              {process.env.NEXT_PUBLIC_APP_URL}
-              /api/auth/instagram/callback
-            </code>
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="space-y-1">
-            <Label>App ID</Label>
-            <Input
-              value={appId}
-              onChange={(e) => setAppId(e.target.value)}
-              disabled={!canConnect || saving}
-              className="bg-white"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>App Secret</Label>
-            <Input
-              type="password"
-              value={appSecret}
-              onChange={(e) => setAppSecret(e.target.value)}
-              disabled={!canConnect || saving}
-              className="bg-white"
-            />
-          </div>
-          {canConnect && (
-            <Button onClick={saveCreds} disabled={saving}>
-              {saving ? "Guardando..." : "Guardar credenciales"}
+              Conectar Instagram
             </Button>
-          )}
-          {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
-        </CardContent>
-      </Card>
-
-      <Card className="bg-white/70">
-        <CardHeader>
-          <CardTitle>2. Conectar cuenta</CardTitle>
-          <CardDescription>
-            Instagram Business/Creator vinculada a una Página de Facebook
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button
-            disabled={!hasCreds || !canConnect}
-            onClick={() => {
-              window.location.href = `/api/auth/instagram?companyId=${companyId}`;
-            }}
-          >
-            Conectar Instagram
-          </Button>
-          {!hasCreds && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Guarda las credenciales antes de conectar
-            </p>
-          )}
-          {!canConnect && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Solo un administrador puede conectar redes
-            </p>
-          )}
-        </CardContent>
-      </Card>
+            {!hasCreds && (
+              <p className="text-xs text-muted-foreground mt-2">
+                Guarda las credenciales antes de conectar
+              </p>
+            )}
+            {!canConnect && (
+              <p className="text-xs text-muted-foreground mt-2">
+                Solo un administrador puede conectar redes
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
