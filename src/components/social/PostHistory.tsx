@@ -99,8 +99,12 @@ export function PostHistory({ pageId, platform = "facebook" }: Props) {
   };
 
   useEffect(() => {
-    if (pageId) fetchPosts();
-  }, [pageId, platform]);
+    if (companyId) fetchPosts();
+    else {
+      setPosts([]);
+      setLoading(false);
+    }
+  }, [pageId, platform, companyId]);
 
   if (loading) {
     return (

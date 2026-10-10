@@ -8,21 +8,26 @@ export async function generateCaption(options: {
   platform?: "facebook" | "instagram" | "general";
   tone?: string;
   language?: string;
+  brandInstructions?: string;
 }) {
   const {
     topic,
     platform = "general",
     tone = "profesional y cercano",
     language = "español",
+    brandInstructions = "",
   } = options;
 
   const model = genAI.getGenerativeModel({
     model: "gemini-3.1-flash-lite",
   });
+  const brandBlock = brandInstructions
+    ? `\nInstrucciones de marca (obligatorias):\n${brandInstructions}\n`
+    : "";
 
   const prompt = `
 Eres un experto en copywriting para redes sociales.
-
+${brandBlock}
 Genera un caption atractivo para ${platform} sobre el siguiente tema:
 "${topic}"
 

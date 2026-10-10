@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2, Sparkles, ImagePlus, X } from "lucide-react";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 interface Props {
   onGenerate: (imageUrl: string) => void;
@@ -76,6 +77,9 @@ export function AIImageGenerator({ onGenerate }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
 
+  const companyId = useAuthStore((s) => s.companyId);
+  const aiEnabled = useAuthStore((s) => s.aiEnabled);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleReferenceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -102,6 +106,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("platform", "ai-reference");
+    formData.append("companyId", companyId || "");
 
     const res = await fetch("/api/upload", {
       method: "POST",
@@ -132,6 +137,14 @@ export function AIImageGenerator({ onGenerate }: Props) {
       setError("Escribe un prompt descriptivo");
       return;
     }
+    if (!companyId) {
+      setError("No hay empresa asociada");
+      return;
+    }
+    if (!aiEnabled) {
+      setError("Tu plan no incluye IA");
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -152,6 +165,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
         body: JSON.stringify({
           prompt: finalPrompt,
           imageUrl: referenceImageUrl,
+          companyId,
         }),
       });
 

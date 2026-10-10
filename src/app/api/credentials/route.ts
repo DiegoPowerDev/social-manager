@@ -1,22 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { adminDb } from "@/lib/firebase-admin";
 
 export async function POST(req: NextRequest) {
   try {
-    const { platform, appId, appSecret } = await req.json();
+    const { platform, appId, appSecret, clientId, clientSecret, companyId } =
+      await req.json();
 
-    if (!platform || !appId || !appSecret) {
-      return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
+    if (!platform || !companyId) {
+      return NextResponse.json(
+        { error: "Faltan platform o companyId" },
+        { status: 400 },
+      );
     }
 
-    // Guardamos las credenciales
-    await setDoc(doc(db, "platformCredentials", platform), {
+    const docId = `${companyId}_${platform}`;
+    const payload: Record<string, unknown> = {
+      companyId,
       platform,
-      appId,
-      appSecret,
-      createdAt: new Date(),
       updatedAt: new Date(),
+      createdAt: new Date(),
+    };
+
+    if (platform === "linkedin") {
+      if (!clientId || !clientSecret) {
+        return NextResponse.json(
+          { error: "Faltan clientId/clientSecret" },
+          { status: 400 },
+        );
+      }
+      payload.clientId = clientId;
+      payload.clientSecret = clientSecret;
+    } else {
+      if (!appId || !appSecret) {
+        return NextResponse.json(
+          { error: "Faltan appId/appSecret" },
+          { status: 400 },
+        );
+      }
+      payload.appId = appId;
+      payload.appSecret = appSecret;
+    }
+
+    await adminDb.collection("platformCredentials").doc(docId).set(payload, {
+      merge: true,
     });
 
     return NextResponse.json({ success: true });

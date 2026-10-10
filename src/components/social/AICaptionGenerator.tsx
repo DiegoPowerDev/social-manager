@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2, Sparkles } from "lucide-react";
-
+import { useAuthStore } from "@/stores/useAuthStore";
 interface Props {
   platform?: "facebook" | "instagram" | "general";
   onGenerate: (caption: string) => void;
@@ -26,8 +26,23 @@ export function AICaptionGenerator({
   const [tone, setTone] = useState("profesional y cercano");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const companyId = useAuthStore((s) => s.companyId);
+  const aiEnabled = useAuthStore((s) => s.aiEnabled);
 
   const handleGenerate = async () => {
+    if (!topic.trim()) {
+      setError("Escribe un tema o idea");
+      return;
+    }
+    if (!companyId) {
+      setError("No hay empresa asociada");
+      return;
+    }
+    if (!aiEnabled) {
+      setError("Tu plan no incluye IA");
+      return;
+    }
+
     if (!topic.trim()) {
       setError("Escribe un tema o idea");
       return;
@@ -44,6 +59,7 @@ export function AICaptionGenerator({
           topic,
           platform,
           tone,
+          companyId,
         }),
       });
 
