@@ -18,6 +18,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
+      <head>
+        <meta
+          name="google-site-verification"
+          content="abSLIjYehY7UNNtTck9OZ0lKx9FvXoWr4XvLnOBVs1M"
+        />
+      </head>
       <body
         style={{ backgroundImage: `url("./background.webp")` }}
         className={cn(inter.className, "bg-cover bg-no-repeat ")}
