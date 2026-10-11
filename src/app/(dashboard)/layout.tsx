@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { LucideLoaderCircle } from "lucide-react";
+import { AuthProvider } from "@/components/providers/AuthProvider";
 
 export default function DashboardLayout({
   children,
@@ -43,7 +44,9 @@ export default function DashboardLayout({
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <main className="flex-1 overflow-y-auto w-full">{children}</main>
+        <main className="flex-1 overflow-y-auto w-full">
+          <AuthProvider>{children}</AuthProvider>
+        </main>
       </div>
     </div>
   );

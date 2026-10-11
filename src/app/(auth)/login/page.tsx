@@ -29,7 +29,7 @@ export default function LoginPage() {
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      router.push("/");
+      router.push("/dashboard");
     } catch (err: any) {
       setError("Correo o contraseña incorrectos");
     } finally {

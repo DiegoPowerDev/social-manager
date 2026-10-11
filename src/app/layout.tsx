@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { AuthProvider } from "@/components/providers/AuthProvider";
+
 import { cn } from "cn";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -28,7 +28,7 @@ export default function RootLayout({
         style={{ backgroundImage: `url("./background.webp")` }}
         className={cn(inter.className, "bg-cover bg-no-repeat ")}
       >
-        <AuthProvider>{children}</AuthProvider>
+        {children}
       </body>
     </html>
   );
