@@ -6,24 +6,20 @@ export async function GET(req: NextRequest) {
   const companyId = req.nextUrl.searchParams.get("state");
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
+  const clientId = process.env.YOUTUBE_CLIENT_ID;
+  const clientSecret = process.env.YOUTUBE_CLIENT_SECRET;
+
   if (!code) {
     return NextResponse.redirect(`${baseUrl}/youtube?error=no_code`);
   }
   if (!companyId) {
     return NextResponse.redirect(`${baseUrl}/youtube?error=no_company`);
   }
+  if (!clientId || !clientSecret) {
+    return NextResponse.redirect(`${baseUrl}/youtube?error=no_credentials`);
+  }
 
   try {
-    const snap = await adminDb
-      .collection("platformCredentials")
-      .doc(`${companyId}_youtube`)
-      .get();
-
-    if (!snap.exists) {
-      return NextResponse.redirect(`${baseUrl}/youtube?error=no_credentials`);
-    }
-
-    const { clientId, clientSecret } = snap.data()!;
     const redirectUri = `${baseUrl}/api/auth/youtube/callback`;
 
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
@@ -48,9 +44,8 @@ export async function GET(req: NextRequest) {
     const refreshToken = (tokenData.refresh_token as string) || null;
     const expiresIn = (tokenData.expires_in as number) || 3600;
 
-    // Canal del usuario
     const chRes = await fetch(
-      "https://www.googleapis.com/youtube/v3/channels?part=snippet,contentDetails&mine=true",
+      "https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true",
       { headers: { Authorization: `Bearer ${accessToken}` } },
     );
     const chData = await chRes.json();
@@ -63,33 +58,24 @@ export async function GET(req: NextRequest) {
     const channel = chData.items[0];
     const channelId = channel.id as string;
 
+    const payload: Record<string, unknown> = {
+      companyId,
+      platform: "youtube",
+      channelId,
+      channelTitle: channel.snippet?.title || "YouTube",
+      name: channel.snippet?.title || "YouTube",
+      accessToken,
+      expiresAt: new Date(Date.now() + expiresIn * 1000),
+      connectedAt: new Date(),
+    };
+    if (refreshToken) {
+      payload.refreshToken = refreshToken;
+    }
+
     await adminDb
       .collection("socialAccounts")
       .doc(channelId)
-      .set(
-        {
-          companyId,
-          platform: "youtube",
-          channelId,
-          channelTitle: channel.snippet?.title || "YouTube",
-          name: channel.snippet?.title || "YouTube",
-          accessToken,
-          refreshToken,
-          expiresAt: new Date(Date.now() + expiresIn * 1000),
-          connectedAt: new Date(),
-        },
-        { merge: true },
-      );
-
-    // Si Google no devolvió refresh_token (reconexión), no pisar el anterior
-    if (!refreshToken) {
-      const existing = await adminDb
-        .collection("socialAccounts")
-        .doc(channelId)
-        .get();
-      // merge ya no borra refreshToken si no lo mandamos en un update parcial;
-      // con set merge, si refreshToken es null podrías borrar: mejor:
-    }
+      .set(payload, { merge: true });
 
     return NextResponse.redirect(`${baseUrl}/youtube?success=true`);
   } catch (error) {

@@ -66,23 +66,38 @@ export function YouTubeComposer({
       );
     }
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("platform", "youtube");
-    formData.append("companyId", companyId);
-
-    const res = await fetch("/api/upload", {
+    // 1) URL firmada (JSON pequeño)
+    const signRes = await fetch("/api/upload/sign", {
       method: "POST",
-      body: formData,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        companyId,
+        platform: "youtube",
+        contentType: file.type || "video/mp4",
+        fileName: file.name,
+      }),
     });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || "Error al subir el video");
+    if (!signRes.ok) {
+      const err = await signRes.json().catch(() => ({}));
+      throw new Error(err.error || "Error al preparar la subida");
     }
 
-    const data = await res.json();
-    return data.publicUrl as string;
+    const { uploadUrl, publicUrl } = await signRes.json();
+
+    const putRes = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": file.type || "video/mp4",
+      },
+      body: file,
+    });
+
+    if (!putRes.ok) {
+      throw new Error("Error al subir el video al almacenamiento");
+    }
+
+    return publicUrl as string;
   };
 
   const handleVideoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {

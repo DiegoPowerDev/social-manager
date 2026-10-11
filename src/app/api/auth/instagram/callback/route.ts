@@ -3,30 +3,20 @@ import { adminDb } from "@/lib/firebase-admin";
 
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code");
-  const companyId = req.nextUrl.searchParams.get("state"); // companyId
+  const companyId = req.nextUrl.searchParams.get("state");
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appId = process.env.META_APP_ID;
+  const appSecret = process.env.META_APP_SECRET;
 
-  if (!code) {
-    return NextResponse.redirect(`${baseUrl}/instagram?error=no_code`);
-  }
-  if (!companyId) {
-    return NextResponse.redirect(`${baseUrl}/instagram?error=no_company`);
+  if (!code || !companyId || !appId || !appSecret) {
+    return NextResponse.redirect(
+      `${baseUrl}/instagram?error=${!code ? "no_code" : "no_company"}`,
+    );
   }
 
   try {
-    const credentialsSnap = await adminDb
-      .collection("platformCredentials")
-      .doc(`${companyId}_instagram`)
-      .get();
-
-    if (!credentialsSnap.exists) {
-      return NextResponse.redirect(`${baseUrl}/instagram?error=no_credentials`);
-    }
-
-    const { appId, appSecret } = credentialsSnap.data()!;
     const redirectUri = `${baseUrl}/api/auth/instagram/callback`;
 
-    // 1. Code → token
     const tokenRes = await fetch(
       `https://graph.facebook.com/v21.0/oauth/access_token?` +
         new URLSearchParams({
@@ -37,64 +27,60 @@ export async function GET(req: NextRequest) {
         }),
     );
     const tokenData = await tokenRes.json();
-
-    if (tokenData.error || !tokenData.access_token) {
-      console.error("Error token:", tokenData.error);
+    if (!tokenData.access_token) {
       return NextResponse.redirect(`${baseUrl}/instagram?error=token_error`);
     }
 
-    const userAccessToken = tokenData.access_token as string;
+    let userToken = tokenData.access_token as string;
 
-    // 2. Pages + IG business
+    const longRes = await fetch(
+      `https://graph.facebook.com/v21.0/oauth/access_token?` +
+        new URLSearchParams({
+          grant_type: "fb_exchange_token",
+          client_id: appId,
+          client_secret: appSecret,
+          fb_exchange_token: userToken,
+        }),
+    );
+    const longData = await longRes.json();
+    userToken = longData.access_token || userToken;
+    const expiresIn = longData.expires_in || 60 * 24 * 60 * 60;
+
     const pagesRes = await fetch(
-      `https://graph.facebook.com/v21.0/me/accounts?fields=id,name,access_token,instagram_business_account&access_token=${userAccessToken}`,
+      `https://graph.facebook.com/v21.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,username}&access_token=${userToken}`,
     );
     const pagesData = await pagesRes.json();
 
-    if (!pagesData.data?.length) {
-      return NextResponse.redirect(`${baseUrl}/instagram?error=no_pages`);
+    const page = pagesData.data?.find(
+      (p: any) => p.instagram_business_account?.id,
+    );
+    if (!page) {
+      return NextResponse.redirect(`${baseUrl}/instagram?error=no_ig`);
     }
 
-    const pageWithIG = pagesData.data.find(
-      (page: any) => page.instagram_business_account,
-    );
+    const ig = page.instagram_business_account;
 
-    if (!pageWithIG) {
-      return NextResponse.redirect(`${baseUrl}/instagram?error=no_instagram`);
-    }
-
-    const igAccountId = pageWithIG.instagram_business_account.id as string;
-    const pageAccessToken = pageWithIG.access_token as string;
-
-    // 3. Info IG
-    const igRes = await fetch(
-      `https://graph.facebook.com/v21.0/${igAccountId}?fields=id,username,name,profile_picture_url&access_token=${pageAccessToken}`,
-    );
-    const igData = await igRes.json();
-
-    // 4. Guardar con companyId
     await adminDb
       .collection("socialAccounts")
-      .doc(igAccountId)
+      .doc(ig.id)
       .set(
         {
           companyId,
           platform: "instagram",
-          name: igData.name || igData.username,
-          username: igData.username,
-          igUserId: igAccountId,
-          pageId: pageWithIG.id,
-          accessToken: pageAccessToken,
-          profilePicture: igData.profile_picture_url || null,
+          igUserId: ig.id,
+          username: ig.username || "",
+          name: ig.username || page.name,
+          pageId: page.id,
+          accessToken: page.access_token,
           connectedAt: new Date(),
-          expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+          expiresAt: new Date(Date.now() + expiresIn * 1000),
         },
         { merge: true },
       );
 
     return NextResponse.redirect(`${baseUrl}/instagram?success=true`);
-  } catch (error) {
-    console.error("Error en callback de Instagram:", error);
+  } catch (e) {
+    console.error(e);
     return NextResponse.redirect(
       `${baseUrl}/instagram?error=connection_failed`,
     );

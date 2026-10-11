@@ -5,6 +5,8 @@ export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code");
   const companyId = req.nextUrl.searchParams.get("state");
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appId = process.env.META_APP_ID;
+  const appSecret = process.env.META_APP_SECRET;
 
   if (!code) {
     return NextResponse.redirect(`${baseUrl}/facebook?error=no_code`);
@@ -12,18 +14,11 @@ export async function GET(req: NextRequest) {
   if (!companyId) {
     return NextResponse.redirect(`${baseUrl}/facebook?error=no_company`);
   }
+  if (!appId || !appSecret) {
+    return NextResponse.redirect(`${baseUrl}/facebook?error=no_credentials`);
+  }
 
   try {
-    const credentialsSnap = await adminDb
-      .collection("platformCredentials")
-      .doc(`${companyId}_facebook`)
-      .get();
-
-    if (!credentialsSnap.exists) {
-      return NextResponse.redirect(`${baseUrl}/facebook?error=no_credentials`);
-    }
-
-    const { appId, appSecret } = credentialsSnap.data()!;
     const redirectUri = `${baseUrl}/api/auth/facebook/callback`;
 
     const tokenRes = await fetch(
@@ -38,14 +33,28 @@ export async function GET(req: NextRequest) {
     const tokenData = await tokenRes.json();
 
     if (tokenData.error || !tokenData.access_token) {
-      console.error("Error obteniendo token:", tokenData.error);
+      console.error("FB token error:", tokenData.error);
       return NextResponse.redirect(`${baseUrl}/facebook?error=token_error`);
     }
 
     const userAccessToken = tokenData.access_token as string;
 
+    // Token de larga duración (aprox. 60 días)
+    const longRes = await fetch(
+      `https://graph.facebook.com/v21.0/oauth/access_token?` +
+        new URLSearchParams({
+          grant_type: "fb_exchange_token",
+          client_id: appId,
+          client_secret: appSecret,
+          fb_exchange_token: userAccessToken,
+        }),
+    );
+    const longData = await longRes.json();
+    const longUserToken = longData.access_token || userAccessToken;
+    const expiresIn = longData.expires_in || 60 * 24 * 60 * 60;
+
     const pagesRes = await fetch(
-      `https://graph.facebook.com/v21.0/me/accounts?fields=id,name,access_token&access_token=${userAccessToken}`,
+      `https://graph.facebook.com/v21.0/me/accounts?fields=id,name,access_token&access_token=${longUserToken}`,
     );
     const pagesData = await pagesRes.json();
 
@@ -66,14 +75,14 @@ export async function GET(req: NextRequest) {
           pageId: page.id,
           accessToken: page.access_token,
           connectedAt: new Date(),
-          expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+          expiresAt: new Date(Date.now() + expiresIn * 1000),
         },
         { merge: true },
       );
 
     return NextResponse.redirect(`${baseUrl}/facebook?success=true`);
   } catch (error) {
-    console.error("Error en callback de Facebook:", error);
+    console.error("FB callback error:", error);
     return NextResponse.redirect(`${baseUrl}/facebook?error=connection_failed`);
   }
 }

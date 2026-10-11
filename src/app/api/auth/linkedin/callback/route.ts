@@ -6,26 +6,20 @@ export async function GET(req: NextRequest) {
   const companyId = req.nextUrl.searchParams.get("state");
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
+  const clientId = process.env.LINKEDIN_CLIENT_ID;
+  const clientSecret = process.env.LINKEDIN_CLIENT_SECRET;
+
   if (!code) {
     return NextResponse.redirect(`${baseUrl}/linkedin?error=no_code`);
   }
   if (!companyId) {
     return NextResponse.redirect(`${baseUrl}/linkedin?error=no_company`);
   }
+  if (!clientId || !clientSecret) {
+    return NextResponse.redirect(`${baseUrl}/linkedin?error=no_credentials`);
+  }
 
   try {
-    const snap = await adminDb
-      .collection("platformCredentials")
-      .doc(`${companyId}_linkedin`)
-      .get();
-
-    if (!snap.exists) {
-      return NextResponse.redirect(`${baseUrl}/linkedin?error=no_credentials`);
-    }
-
-    const data = snap.data()!;
-    const clientId = data.clientId || data.appId;
-    const clientSecret = data.clientSecret || data.appSecret;
     const redirectUri = `${baseUrl}/api/auth/linkedin/callback`;
 
     const tokenRes = await fetch(
@@ -51,6 +45,7 @@ export async function GET(req: NextRequest) {
 
     const accessToken = tokenData.access_token as string;
     const expiresIn = (tokenData.expires_in as number) || 60 * 24 * 60 * 60;
+    const refreshToken = (tokenData.refresh_token as string) || null;
 
     const profileRes = await fetch("https://api.linkedin.com/v2/userinfo", {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -68,27 +63,28 @@ export async function GET(req: NextRequest) {
       [profile.given_name, profile.family_name].filter(Boolean).join(" ") ||
       "LinkedIn User";
 
+    const payload: Record<string, unknown> = {
+      companyId,
+      platform: "linkedin",
+      personId,
+      name,
+      email: profile.email || null,
+      accessToken,
+      expiresAt: new Date(Date.now() + expiresIn * 1000),
+      connectedAt: new Date(),
+    };
+    if (refreshToken) {
+      payload.refreshToken = refreshToken;
+    }
+
     await adminDb
       .collection("socialAccounts")
       .doc(personId)
-      .set(
-        {
-          companyId,
-          platform: "linkedin",
-          personId,
-          name,
-          email: profile.email || null,
-          accessToken,
-          refreshToken: tokenData.refresh_token || null,
-          expiresAt: new Date(Date.now() + expiresIn * 1000),
-          connectedAt: new Date(),
-        },
-        { merge: true },
-      );
+      .set(payload, { merge: true });
 
     return NextResponse.redirect(`${baseUrl}/linkedin?success=true`);
   } catch (error) {
-    console.error("Error callback LinkedIn:", error);
+    console.error("LinkedIn callback error:", error);
     return NextResponse.redirect(`${baseUrl}/linkedin?error=connection_failed`);
   }
 }

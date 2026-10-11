@@ -7,26 +7,22 @@ export async function getValidYouTubeAccessToken(options: {
   refreshToken?: string | null;
   expiresAt?: Date | string | null;
 }) {
-  const { companyId, accountDocId, refreshToken } = options;
+  const { accountDocId, refreshToken } = options;
   let accessToken = options.accessToken;
 
   const expiresAt = options.expiresAt
     ? new Date(options.expiresAt).getTime()
     : 0;
-  const stillValid = expiresAt > Date.now() + 60_000; // 1 min margen
+  const stillValid = expiresAt > Date.now() + 60_000;
 
   if (stillValid) return accessToken;
-  if (!refreshToken) {
-    throw new Error("TOKEN_EXPIRED");
+  if (!refreshToken) throw new Error("TOKEN_EXPIRED");
+
+  const clientId = process.env.YOUTUBE_CLIENT_ID;
+  const clientSecret = process.env.YOUTUBE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error("Credenciales de YouTube no configuradas en el servidor");
   }
-
-  const credSnap = await adminDb
-    .collection("platformCredentials")
-    .doc(`${companyId}_youtube`)
-    .get();
-  if (!credSnap.exists) throw new Error("No hay credenciales de YouTube");
-
-  const { clientId, clientSecret } = credSnap.data()!;
 
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
