@@ -2,14 +2,14 @@
 
 import { useEffect } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { AppUser } from "@/types";
 import {
-  createCompany,
   getCompany,
   getMembership,
+  getUserMemberships,
   PLAN_LIMITS,
 } from "@/lib/tenant";
 
@@ -36,6 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
 
         if (!userDoc.exists()) {
+          // Eliminado de la plataforma o nunca provisionado
           console.error("No existe users/" + firebaseUser.uid);
           await signOut(auth);
           logout();
@@ -55,15 +56,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         let activeCompanyId = data.activeCompanyId as string | undefined;
 
         if (!activeCompanyId) {
-          try {
-            activeCompanyId = await createCompany({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email || "",
-              displayName: data.name || firebaseUser.displayName || undefined,
-              companyName: "",
-            });
-          } catch (e) {
-            console.error("createCompany error:", e);
+          const memberships = await getUserMemberships(firebaseUser.uid);
+          if (memberships.length > 0) {
+            activeCompanyId = (memberships[0] as any).companyId as string;
+            await setDoc(
+              doc(db, "users", firebaseUser.uid),
+              { activeCompanyId },
+              { merge: true },
+            );
+          } else {
+            // Sin empresa: no crear una automáticamente
             setTenant({
               companyId: null,
               companyName: null,
@@ -80,7 +82,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ]);
 
         if (!membership || !company) {
-          console.warn("Sin membership o company", activeCompanyId);
           setTenant({
             companyId: null,
             companyName: null,
@@ -107,7 +108,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
       } catch (error) {
         console.error("Error en AuthProvider:", error);
-        // No hacer setUser(null) aquí → evita bounce a /login
       } finally {
         setLoading(false);
       }
