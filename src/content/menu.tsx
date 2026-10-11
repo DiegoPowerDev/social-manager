@@ -56,6 +56,20 @@ export const mainNav: Menu[] = [
     ),
   },
   {
+    title: "youtube",
+    href: "/youtube ",
+    icon: "",
+    image: (
+      <Image
+        className="bg-white rounded"
+        height={20}
+        width={20}
+        src="./youtube.svg"
+        alt="Youtube logo"
+      />
+    ),
+  },
+  {
     title: "Publicar en masa",
     href: "/publish",
     icon: Send,

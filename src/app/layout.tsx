@@ -3,7 +3,6 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { cn } from "cn";
-import EmberParticles from "@/components/animations/EmberParticles";
 
 const inter = Inter({ subsets: ["latin"] });
 
