@@ -51,7 +51,7 @@ export function FacebookConnectFlow({
             <Button
               disabled={!canConnect}
               onClick={() => {
-                window.location.href = `/api/auth/instagram?companyId=${companyId}`;
+                window.location.href = `/api/auth/facebook?companyId=${companyId}`;
               }}
             >
               Conectar Facebook
