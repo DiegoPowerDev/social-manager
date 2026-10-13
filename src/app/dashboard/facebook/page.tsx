@@ -187,33 +187,33 @@ export default function FacebookPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between p-6 bg-yellow-500/20 ">
-        <div className="p-6 bg-zinc-950/50 backdrop-blur text-white">
-          <h2 className="text-3xl font-bold ">Facebook</h2>
-          <p className="text-muted-foreground mt-1">
-            Publicando como{" "}
-            <span className="font-medium text-foreground">{account.name}</span>
-          </p>
-        </div>
 
-        <div className="flex items-center gap-2">
-          {(() => {
-            const s = getTokenStatus(account.expiresAt);
-            if (s === "expired")
-              return <Badge variant="destructive">Token expirado</Badge>;
-            if (s === "expiring_soon")
-              return (
-                <Badge className="bg-amber-500 hover:bg-amber-500">
-                  Por vencer
-                </Badge>
-              );
-            return <Badge variant="secondary">Conectado</Badge>;
-          })()}
-          <Button variant="outline" size="sm" onClick={handleDisconnect}>
-            Desconectar
-          </Button>
-        </div>
+      <div className="p-6 bg-zinc-950/50 backdrop-blur text-white">
+        <h2 className="text-3xl font-bold ">Facebook</h2>
+        <p className="text-muted-foreground mt-1">
+          Publicando como{" "}
+          <span className="font-medium text-foreground">{account.name}</span>
+        </p>
       </div>
+
+      <div className="flex items-center gap-2">
+        {(() => {
+          const s = getTokenStatus(account.expiresAt);
+          if (s === "expired")
+            return <Badge variant="destructive">Token expirado</Badge>;
+          if (s === "expiring_soon")
+            return (
+              <Badge className="bg-amber-500 hover:bg-amber-500">
+                Por vencer
+              </Badge>
+            );
+          return <Badge variant="secondary">Conectado</Badge>;
+        })()}
+        <Button variant="outline" size="sm" onClick={handleDisconnect}>
+          Desconectar
+        </Button>
+      </div>
+
       {(() => {
         const tokenStatus = getTokenStatus(account.expiresAt);
         if (tokenStatus === "ok") return null;

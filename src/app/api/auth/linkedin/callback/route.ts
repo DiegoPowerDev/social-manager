@@ -10,13 +10,17 @@ export async function GET(req: NextRequest) {
   const clientSecret = process.env.LINKEDIN_CLIENT_SECRET;
 
   if (!code) {
-    return NextResponse.redirect(`${baseUrl}/linkedin?error=no_code`);
+    return NextResponse.redirect(`${baseUrl}/dashboard/linkedin?error=no_code`);
   }
   if (!companyId) {
-    return NextResponse.redirect(`${baseUrl}/linkedin?error=no_company`);
+    return NextResponse.redirect(
+      `${baseUrl}/dashboard/linkedin?error=no_company`,
+    );
   }
   if (!clientId || !clientSecret) {
-    return NextResponse.redirect(`${baseUrl}/linkedin?error=no_credentials`);
+    return NextResponse.redirect(
+      `${baseUrl}/dashboard/linkedin?error=no_credentials`,
+    );
   }
 
   try {
@@ -40,7 +44,9 @@ export async function GET(req: NextRequest) {
     const tokenData = await tokenRes.json();
     if (!tokenRes.ok || !tokenData.access_token) {
       console.error("LinkedIn token error:", tokenData);
-      return NextResponse.redirect(`${baseUrl}/linkedin?error=token_error`);
+      return NextResponse.redirect(
+        `${baseUrl}/dashboard/linkedin?error=token_error`,
+      );
     }
 
     const accessToken = tokenData.access_token as string;
@@ -54,7 +60,9 @@ export async function GET(req: NextRequest) {
 
     if (!profileRes.ok || !profile.sub) {
       console.error("LinkedIn profile error:", profile);
-      return NextResponse.redirect(`${baseUrl}/linkedin?error=profile_error`);
+      return NextResponse.redirect(
+        `${baseUrl}/dashboard/linkedin?error=profile_error`,
+      );
     }
 
     const personId = profile.sub as string;
@@ -82,9 +90,11 @@ export async function GET(req: NextRequest) {
       .doc(personId)
       .set(payload, { merge: true });
 
-    return NextResponse.redirect(`${baseUrl}/linkedin?success=true`);
+    return NextResponse.redirect(`${baseUrl}/dashboard/linkedin?success=true`);
   } catch (error) {
     console.error("LinkedIn callback error:", error);
-    return NextResponse.redirect(`${baseUrl}/linkedin?error=connection_failed`);
+    return NextResponse.redirect(
+      `${baseUrl}/dashboard/linkedin?error=connection_failed`,
+    );
   }
 }

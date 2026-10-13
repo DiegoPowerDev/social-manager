@@ -11,10 +11,14 @@ export async function GET(req: NextRequest) {
   const clientId = process.env.YOUTUBE_CLIENT_ID;
 
   if (!companyId) {
-    return NextResponse.redirect(`${baseUrl}/youtube?error=no_company`);
+    return NextResponse.redirect(
+      `${baseUrl}/dashboard/youtube?error=no_company`,
+    );
   }
   if (!clientId) {
-    return NextResponse.redirect(`${baseUrl}/youtube?error=no_credentials`);
+    return NextResponse.redirect(
+      `${baseUrl}/dashboard/youtube?error=no_credentials`,
+    );
   }
 
   const redirectUri = `${baseUrl}/api/auth/youtube/callback`;

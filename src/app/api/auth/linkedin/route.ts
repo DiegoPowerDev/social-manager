@@ -6,10 +6,14 @@ export async function GET(req: NextRequest) {
   const clientId = process.env.LINKEDIN_CLIENT_ID;
 
   if (!companyId) {
-    return NextResponse.redirect(`${baseUrl}/linkedin?error=no_company`);
+    return NextResponse.redirect(
+      `${baseUrl}/dashboard/linkedin?error=no_company`,
+    );
   }
   if (!clientId) {
-    return NextResponse.redirect(`${baseUrl}/linkedin?error=no_credentials`);
+    return NextResponse.redirect(
+      `${baseUrl}/dashboard/linkedin?error=no_credentials`,
+    );
   }
 
   const redirectUri = `${baseUrl}/api/auth/linkedin/callback`;

@@ -217,16 +217,17 @@ export default function MediaLibraryPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
+        <div className="p-6  text-white">
           <h1 className="text-2xl font-bold">Media Library</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm">
             Archivos de tu empresa para reutilizar en publicaciones
           </p>
         </div>
         {canEdit && (
-          <>
+          <div>
             <input
               ref={inputRef}
               type="file"
@@ -251,7 +252,7 @@ export default function MediaLibraryPage() {
                 </>
               )}
             </Button>
-          </>
+          </div>
         )}
       </div>
 
@@ -260,88 +261,90 @@ export default function MediaLibraryPage() {
           {error}
         </p>
       )}
-
-      <Card className="bg-white/70">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Archivos</CardTitle>
-          <CardDescription>
-            {items.length} elemento{items.length !== 1 ? "s" : ""}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex justify-center py-16">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : items.length === 0 ? (
-            <p className="text-center text-muted-foreground py-16 text-sm">
-              Aún no hay archivos. Sube una imagen o video para empezar.
-            </p>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {items.map((item) => (
-                <div
-                  key={item.id}
-                  className="group relative rounded-xl border bg-white overflow-hidden"
-                >
-                  <div className="aspect-square bg-muted flex items-center justify-center">
-                    {item.type === "image" ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={item.url}
-                        alt={item.fileName}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                        <Video className="h-8 w-8" />
-                        <span className="text-xs px-2 truncate max-w-full">
-                          {item.fileName}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-2 flex items-center justify-between gap-1">
-                    <p
-                      className="text-xs truncate flex-1"
-                      title={item.fileName}
-                    >
-                      {item.fileName}
-                    </p>
-                    <div className="flex shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => downloadFile(item)}
-                        disabled={downloadingId === item.id}
-                        title="Descargar"
+      <div className="flex justify-center p-6">
+        <Card className="bg-white/70">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Archivos</CardTitle>
+            <CardDescription>
+              {items.length} elemento{items.length !== 1 ? "s" : ""}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="flex justify-center py-16">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : items.length === 0 ? (
+              <p className="text-center text-muted-foreground py-16 text-sm">
+                Aún no hay archivos. Sube una imagen o video para empezar.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {items.map((item) => (
+                  <div
+                    key={item.id}
+                    className="group relative rounded-xl border bg-white overflow-hidden"
+                  >
+                    <div className="aspect-square bg-muted flex items-center justify-center">
+                      {item.type === "image" ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={item.url}
+                          alt={item.fileName}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                          <Video className="h-8 w-8" />
+                          <span className="text-xs px-2 truncate max-w-full">
+                            {item.fileName}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-2 flex flex-col items-center justify-between gap-1">
+                      <p
+                        className="text-xs truncate flex-1"
+                        title={item.fileName}
                       >
-                        {downloadingId === item.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Download className="h-3.5 w-3.5" />
-                        )}
-                      </Button>
-                      {canEdit && (
+                        {item.fileName}
+                      </p>
+                      <div className="flex shrink-0">
+                        {/* solo funciona en producción */}
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 text-red-500"
-                          onClick={() => handleDelete(item.id)}
-                          title="Eliminar"
+                          className="h-7 w-7"
+                          onClick={() => downloadFile(item)}
+                          disabled={downloadingId === item.id}
+                          title="Descargar"
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          {downloadingId === item.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Download className="h-3.5 w-3.5" />
+                          )}
                         </Button>
-                      )}
+                        {canEdit && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-red-500"
+                            onClick={() => handleDelete(item.id)}
+                            title="Eliminar"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

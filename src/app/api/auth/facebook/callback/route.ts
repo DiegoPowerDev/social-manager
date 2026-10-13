@@ -9,13 +9,17 @@ export async function GET(req: NextRequest) {
   const appSecret = process.env.META_APP_SECRET;
 
   if (!code) {
-    return NextResponse.redirect(`${baseUrl}/facebook?error=no_code`);
+    return NextResponse.redirect(`${baseUrl}/dashboard/facebook?error=no_code`);
   }
   if (!companyId) {
-    return NextResponse.redirect(`${baseUrl}/facebook?error=no_company`);
+    return NextResponse.redirect(
+      `${baseUrl}/dashboard/facebook?error=no_company`,
+    );
   }
   if (!appId || !appSecret) {
-    return NextResponse.redirect(`${baseUrl}/facebook?error=no_credentials`);
+    return NextResponse.redirect(
+      `${baseUrl}/dashboard/facebook?error=no_credentials`,
+    );
   }
 
   try {
@@ -34,7 +38,9 @@ export async function GET(req: NextRequest) {
 
     if (tokenData.error || !tokenData.access_token) {
       console.error("FB token error:", tokenData.error);
-      return NextResponse.redirect(`${baseUrl}/facebook?error=token_error`);
+      return NextResponse.redirect(
+        `${baseUrl}/dashboard/facebook?error=token_error`,
+      );
     }
 
     const userAccessToken = tokenData.access_token as string;
@@ -59,7 +65,9 @@ export async function GET(req: NextRequest) {
     const pagesData = await pagesRes.json();
 
     if (!pagesData.data?.length) {
-      return NextResponse.redirect(`${baseUrl}/facebook?error=no_pages`);
+      return NextResponse.redirect(
+        `${baseUrl}/dashboard/facebook?error=no_pages`,
+      );
     }
 
     const page = pagesData.data[0];
@@ -80,9 +88,11 @@ export async function GET(req: NextRequest) {
         { merge: true },
       );
 
-    return NextResponse.redirect(`${baseUrl}/facebook?success=true`);
+    return NextResponse.redirect(`${baseUrl}/dashboard/facebook?success=true`);
   } catch (error) {
     console.error("FB callback error:", error);
-    return NextResponse.redirect(`${baseUrl}/facebook?error=connection_failed`);
+    return NextResponse.redirect(
+      `${baseUrl}/dashboard/facebook?error=connection_failed`,
+    );
   }
 }

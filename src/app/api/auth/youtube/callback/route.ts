@@ -10,13 +10,17 @@ export async function GET(req: NextRequest) {
   const clientSecret = process.env.YOUTUBE_CLIENT_SECRET;
 
   if (!code) {
-    return NextResponse.redirect(`${baseUrl}/youtube?error=no_code`);
+    return NextResponse.redirect(`${baseUrl}/dashboard/youtube?error=no_code`);
   }
   if (!companyId) {
-    return NextResponse.redirect(`${baseUrl}/youtube?error=no_company`);
+    return NextResponse.redirect(
+      `${baseUrl}/dashboard/youtube?error=no_company`,
+    );
   }
   if (!clientId || !clientSecret) {
-    return NextResponse.redirect(`${baseUrl}/youtube?error=no_credentials`);
+    return NextResponse.redirect(
+      `${baseUrl}/dashboard/youtube?error=no_credentials`,
+    );
   }
 
   try {
@@ -37,7 +41,9 @@ export async function GET(req: NextRequest) {
     const tokenData = await tokenRes.json();
     if (!tokenRes.ok || !tokenData.access_token) {
       console.error("YouTube token error:", tokenData);
-      return NextResponse.redirect(`${baseUrl}/youtube?error=token_error`);
+      return NextResponse.redirect(
+        `${baseUrl}/dashboard/youtube?error=token_error`,
+      );
     }
 
     const accessToken = tokenData.access_token as string;
@@ -52,7 +58,9 @@ export async function GET(req: NextRequest) {
 
     if (!chRes.ok || !chData.items?.length) {
       console.error("YouTube channel error:", chData);
-      return NextResponse.redirect(`${baseUrl}/youtube?error=no_channel`);
+      return NextResponse.redirect(
+        `${baseUrl}/dashboard/youtube?error=no_channel`,
+      );
     }
 
     const channel = chData.items[0];
@@ -77,9 +85,11 @@ export async function GET(req: NextRequest) {
       .doc(channelId)
       .set(payload, { merge: true });
 
-    return NextResponse.redirect(`${baseUrl}/youtube?success=true`);
+    return NextResponse.redirect(`${baseUrl}/dashboard/youtube?success=true`);
   } catch (error) {
     console.error("YouTube callback error:", error);
-    return NextResponse.redirect(`${baseUrl}/youtube?error=connection_failed`);
+    return NextResponse.redirect(
+      `${baseUrl}/dashboard/youtube?error=connection_failed`,
+    );
   }
 }

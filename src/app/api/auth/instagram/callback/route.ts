@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
 
   if (!code || !companyId || !appId || !appSecret) {
     return NextResponse.redirect(
-      `${baseUrl}/instagram?error=${!code ? "no_code" : "no_company"}`,
+      `${baseUrl}/dashboard/instagram?error=${!code ? "no_code" : "no_company"}`,
     );
   }
 
@@ -28,7 +28,9 @@ export async function GET(req: NextRequest) {
     );
     const tokenData = await tokenRes.json();
     if (!tokenData.access_token) {
-      return NextResponse.redirect(`${baseUrl}/instagram?error=token_error`);
+      return NextResponse.redirect(
+        `${baseUrl}/dashboard/instagram?error=token_error`,
+      );
     }
 
     let userToken = tokenData.access_token as string;
@@ -55,7 +57,9 @@ export async function GET(req: NextRequest) {
       (p: any) => p.instagram_business_account?.id,
     );
     if (!page) {
-      return NextResponse.redirect(`${baseUrl}/instagram?error=no_ig`);
+      return NextResponse.redirect(
+        `${baseUrl}/dashboard/instagram?error=no_ig`,
+      );
     }
 
     const ig = page.instagram_business_account;
@@ -78,11 +82,11 @@ export async function GET(req: NextRequest) {
         { merge: true },
       );
 
-    return NextResponse.redirect(`${baseUrl}/instagram?success=true`);
+    return NextResponse.redirect(`${baseUrl}/dashboard/instagram?success=true`);
   } catch (e) {
     console.error(e);
     return NextResponse.redirect(
-      `${baseUrl}/instagram?error=connection_failed`,
+      `${baseUrl}/dashboard/instagram?error=connection_failed`,
     );
   }
 }

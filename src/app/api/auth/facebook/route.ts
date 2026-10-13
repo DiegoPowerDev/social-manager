@@ -6,10 +6,14 @@ export async function GET(req: NextRequest) {
   const appId = process.env.META_APP_ID;
 
   if (!companyId) {
-    return NextResponse.redirect(`${baseUrl}/facebook?error=no_company`);
+    return NextResponse.redirect(
+      `${baseUrl}/dashboard/facebook?error=no_company`,
+    );
   }
   if (!appId) {
-    return NextResponse.redirect(`${baseUrl}/facebook?error=no_credentials`);
+    return NextResponse.redirect(
+      `${baseUrl}/dashboard/facebook?error=no_credentials`,
+    );
   }
 
   const redirectUri = `${baseUrl}/api/auth/facebook/callback`;
