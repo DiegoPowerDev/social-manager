@@ -19,7 +19,7 @@ export function PostPreview({
   videoUrl,
 }: Props) {
   return (
-    <Card className="h-fit sticky top-6 bg-white text-foreground">
+    <Card className="h-fit sticky top-6 bg-zinc-950/60 text-white">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="">Vista previa</CardTitle>
@@ -43,7 +43,7 @@ export function PostPreview({
                 <p className="text-sm font-medium leading-none">
                   {platform === "instagram" ? `@${accountName}` : accountName}
                 </p>
-                <p className="text-xs text-muted-foreground">Ahora</p>
+                <p className="text-xs text-white/60">Ahora</p>
               </div>
             </div>
           )}
@@ -55,7 +55,7 @@ export function PostPreview({
                 <img
                   src={imageUrl}
                   alt="Preview"
-                  className="w-full max-h-64 object-cover"
+                  className="w-full max-h-64 object-contain"
                 />
               )}
               {videoUrl && !imageUrl && (
@@ -71,7 +71,7 @@ export function PostPreview({
                 {message}
               </p>
             ) : (
-              <p className="text-sm text-muted-foreground italic">
+              <p className="text-sm text-white/60 italic">
                 El texto del post aparecerá aquí...
               </p>
             )}

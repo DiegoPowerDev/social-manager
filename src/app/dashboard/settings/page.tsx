@@ -185,7 +185,7 @@ export default function SettingsPage() {
 
       <div className="p-6 max-w-2xl space-y-6">
         {!name.trim() && (
-          <div className="p-3 rounded-md border border-amber-200 bg-amber-50 text-amber-900 text-sm">
+          <div className="p-3 rounded-md border border-amber-400 bg-black text-amber-400 text-sm">
             Completa el nombre de tu empresa para personalizar la app.
           </div>
         )}
@@ -202,28 +202,30 @@ export default function SettingsPage() {
           </div>
         )}
 
-        <Card className="bg-white/70">
+        <Card className="bg-zinc-950/60">
           <CardHeader>
-            <CardTitle>Empresa</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-white">Empresa</CardTitle>
+            <CardDescription className="text-white/50">
               Nombre y logo que verás en el panel
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="company-name">Nombre</Label>
+              <Label className="text-white" htmlFor="company-name">
+                Nombre
+              </Label>
               <Input
                 id="company-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Ej. Acme Marketing"
                 disabled={!canEdit || saving}
-                className="bg-white"
+                className="bg-white/80  "
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Logo</Label>
+              <Label className="text-white">Logo</Label>
               <div className="flex items-center gap-4">
                 <div className="h-16 w-16 rounded-md border bg-muted flex items-center justify-center overflow-hidden shrink-0">
                   {logoUrl ? (
@@ -275,15 +277,17 @@ export default function SettingsPage() {
                   )}
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">PNG/JPG, máx. 2MB</p>
+              <p className="text-xs text-white/50">PNG/JPG, máx. 2MB</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white/70">
+        <Card className="bg-zinc-950/60">
           <CardHeader>
-            <CardTitle>Instrucciones para la IA</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-white">
+              Instrucciones para la IA
+            </CardTitle>
+            <CardDescription className="text-white/50">
               Se usarán al generar captions e imágenes (si tu plan incluye IA)
             </CardDescription>
           </CardHeader>
@@ -294,18 +298,16 @@ export default function SettingsPage() {
               placeholder="Ej. Somos una marca de tecnología B2B. Tono profesional y cercano..."
               rows={6}
               disabled={!canEdit || saving}
-              className="bg-white resize-none"
+              className="bg-yellow-100 resize-none"
             />
             {aiEnabled ? (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-white/50">
                 Uso este mes: {usage.aiCaptions}/{aiCaptionsLimit} captions ·{" "}
                 {usage.aiImages}/{aiImagesLimit} imágenes
                 {plan ? ` · Plan: ${plan}` : ""}
               </p>
             ) : (
-              <p className="text-xs text-muted-foreground">
-                Tu plan no incluye IA.
-              </p>
+              <p className="text-xs text-white/50">Tu plan no incluye IA.</p>
             )}
           </CardContent>
         </Card>

@@ -224,7 +224,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
         <Label htmlFor="image-prompt">Describe la imagen</Label>
         <Textarea
           id="image-prompt"
-          className="resize-none bg-white"
+          className="resize-none  bg-white/80 text-black"
           placeholder="Ej: Interior moderno del salón de esta casa, luz natural, mismos materiales..."
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
@@ -240,7 +240,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
           onValueChange={(s) => setStyle(s as any)}
           disabled={loading}
         >
-          <SelectTrigger className="bg-white">
+          <SelectTrigger className="bg-white/80 text-black">
             <SelectValue placeholder="Selecciona un estilo" />
           </SelectTrigger>
           <SelectContent>
@@ -255,7 +255,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
 
       <div className="space-y-2">
         <Label>Imágenes de referencia (opcional, máx. {MAX_REFS})</Label>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-white/60">
           Ej: fachada + materiales + estilo. La IA usará estas fotos como guía.
         </p>
 
@@ -263,7 +263,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
           {refs.map((ref, i) => (
             <div
               key={ref.preview}
-              className="relative w-20 h-20 rounded-md overflow-hidden border"
+              className="relative w-20 h-20 rounded-md overflow-hidden border-white/80"
             >
               <img
                 src={ref.preview}
@@ -277,7 +277,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
                 onClick={() => removeReference(i)}
                 disabled={loading}
               >
-                <X className="h-3 w-3" />
+                <X className="h-3 w-3 " />
               </Button>
             </div>
           ))}
@@ -297,12 +297,12 @@ export function AIImageGenerator({ onGenerate }: Props) {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-20 w-20 flex flex-col gap-1"
+                className="h-20 w-20 flex flex-col gap-1 hover:opacity-80"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={loading}
               >
-                <ImagePlus className="h-5 w-5" />
-                <span className="text-[10px]">Añadir</span>
+                <ImagePlus className="h-5 w-5" color="black" />
+                <span className="text-[10px] text-black">Añadir</span>
               </Button>
             </>
           )}
@@ -310,7 +310,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
       </div>
 
       {error && <p className="text-sm text-red-500">{error}</p>}
-      <p className="text-xs text-muted-foreground text-center">
+      <p className="text-xs text-white/60 text-center">
         {aiEnabledPlan
           ? `${imagesLeft} imágenes restantes este mes (${imagesUsed}/${imagesLimit})`
           : "Tu plan no incluye IA"}
@@ -325,7 +325,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
           imagesLeft <= 0 ||
           !companyId
         }
-        className="w-full bg-yellow-500/30 h-10 hover:bg-yellow-500/20"
+        className="w-full bg-gradient-to-r from-orange-400 to-yellow-500 h-10 text-white"
         variant="secondary"
       >
         {loading ? (

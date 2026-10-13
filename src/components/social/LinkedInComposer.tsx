@@ -177,19 +177,21 @@ export function LinkedInComposer({
   const hasMedia = !!(imageUrl || videoUrl);
 
   return (
-    <Card className="bg-white/70">
+    <Card className="bg-zinc-950/60 ">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Nueva publicación</CardTitle>
-            <CardDescription>Publicando como {accountName}</CardDescription>
+            <CardTitle className="text-white">Nueva publicación</CardTitle>
+            <CardDescription className="text-white/60">
+              Publicando como {accountName}
+            </CardDescription>
           </div>
           <Badge variant="secondary">LinkedIn</Badge>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-5">
-        <div className="flex justify-between gap-2 bg-white/60 rounded">
+        <div className="flex justify-between gap-2 bg-zinc-950/50 text-white rounded">
           <AICaptionGenerator
             platform="general"
             onGenerate={(caption) => onTextChange(caption)}
@@ -202,7 +204,7 @@ export function LinkedInComposer({
               value={text}
               onChange={(e) => onTextChange(e.target.value)}
               rows={5}
-              className="resize-none flex-1 bg-white"
+              className="resize-none flex-1 bg-white/80 text-black"
               disabled={isLoading}
             />
             <div className="flex justify-end">
@@ -217,7 +219,7 @@ export function LinkedInComposer({
           </div>
         </div>
 
-        <div className="flex justify-between gap-2 bg-white/60 rounded">
+        <div className="flex justify-between gap-2 bg-zinc-950/50 text-white rounded">
           <AIImageGenerator
             onGenerate={(url) => {
               onImageChange(url);
@@ -251,6 +253,7 @@ export function LinkedInComposer({
                 type="button"
                 variant="outline"
                 size="sm"
+                className="text-black"
                 onClick={() => imageInputRef.current?.click()}
                 disabled={isLoading}
               >
@@ -260,6 +263,7 @@ export function LinkedInComposer({
               <Button
                 type="button"
                 variant="outline"
+                className="text-black"
                 size="sm"
                 onClick={() => videoInputRef.current?.click()}
                 disabled={isLoading}

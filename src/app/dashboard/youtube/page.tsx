@@ -174,12 +174,12 @@ export default function YouTubePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between p-6 bg-yellow-500/20">
-        <div>
-          <h2 className="text-2xl font-bold">YouTube</h2>
-          <p className="text-muted-foreground mt-1">
+      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
+        <div className="p-6  text-white">
+          <h1 className="text-2xl font-bold">YouTube</h1>
+          <p className="text-sm">
             Canal:{" "}
-            <span className="font-medium text-foreground">
+            <span className="font-bold text-white">
               {account.channelTitle || account.name}
             </span>
           </p>

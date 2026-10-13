@@ -201,19 +201,21 @@ export function InstagramComposer({
   const isLoading = loading || uploading;
 
   return (
-    <Card className="bg-white/70">
+    <Card className="bg-zinc-950/50">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Nueva publicación</CardTitle>
-            <CardDescription>@{username} · Instagram</CardDescription>
+            <CardTitle className="text-white">Nueva publicación</CardTitle>
+            <CardDescription className="text-white/60">
+              @{username} · Instagram
+            </CardDescription>
           </div>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-5">
         <div className="space-y-2">
-          <Label>Tipo de publicación</Label>
+          <Label className="text-white">Tipo de publicación</Label>
           <Select
             value={mediaType}
             onValueChange={(value) =>
@@ -230,7 +232,7 @@ export function InstagramComposer({
               <SelectItem value="STORIES">Historia</SelectItem>
             </SelectContent>
           </Select>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-white/60">
             {mediaType === "REELS" &&
               "Los Reels requieren un video vertical (recomendado 9:16)"}
             {mediaType === "STORIES" &&
@@ -240,7 +242,7 @@ export function InstagramComposer({
         </div>
 
         {mediaType !== "STORIES" && (
-          <div className="flex justify-between gap-2 bg-white/60 rounded">
+          <div className="flex justify-between gap-2 bg-zinc-950/50 text-white rounded">
             <AICaptionGenerator
               platform="instagram"
               onGenerate={(generated) => onCaptionChange(generated)}
@@ -253,14 +255,14 @@ export function InstagramComposer({
                 value={caption}
                 onChange={(e) => onCaptionChange(e.target.value)}
                 rows={4}
-                className="resize-none flex-1 bg-white"
+                className="resize-none flex-1 bg-white/80 text-black"
                 disabled={isLoading}
               />
             </div>
           </div>
         )}
 
-        <div className="flex justify-between gap-2 bg-white/60 rounded">
+        <div className="flex justify-between gap-2 bg-zinc-950/50 text-white rounded">
           <AIImageGenerator
             onGenerate={(url) => {
               if (mediaType === "REELS") return;
@@ -294,9 +296,10 @@ export function InstagramComposer({
                 variant="outline"
                 size="sm"
                 onClick={() => imageInputRef.current?.click()}
+                className="text-black"
                 disabled={!!videoUrl || isLoading || mediaType === "REELS"}
               >
-                <ImagePlus className="h-4 w-4 mr-2" />
+                <ImagePlus className="h-4 w-4 mr-2 " />
                 Imagen
               </Button>
 
@@ -304,6 +307,7 @@ export function InstagramComposer({
                 type="button"
                 variant="outline"
                 size="sm"
+                className="text-black"
                 onClick={() => videoInputRef.current?.click()}
                 disabled={!!imageUrl || isLoading}
               >

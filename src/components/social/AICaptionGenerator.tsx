@@ -100,7 +100,7 @@ export function AICaptionGenerator({
           id="topic"
           placeholder="Ej: Lanzamiento de nuevo producto, tips de productividad..."
           value={topic}
-          className="bg-white"
+          className="bg-white/80 text-black"
           onChange={(e) => setTopic(e.target.value)}
           disabled={loading}
         />
@@ -113,7 +113,7 @@ export function AICaptionGenerator({
           onValueChange={(v) => setTone(v as any)}
           disabled={loading}
         >
-          <SelectTrigger className="bg-white">
+          <SelectTrigger className="bg-white/80 text-black">
             <SelectValue placeholder="Selecciona un tono" />
           </SelectTrigger>
           <SelectContent>
@@ -134,7 +134,7 @@ export function AICaptionGenerator({
       </div>
 
       {error && <p className="text-sm text-red-500">{error}</p>}
-      <p className="text-xs text-muted-foreground text-center">
+      <p className="text-xs text-white/60 text-center">
         {aiEnabledPlan
           ? `${captionsLeft} captions restantes este mes (${captionsUsed}/${captionsLimit})`
           : "Tu plan no incluye IA"}
@@ -148,7 +148,7 @@ export function AICaptionGenerator({
           captionsLeft <= 0 ||
           !companyId
         }
-        className="w-full bg-yellow-500/30 h-10 hover:bg-yellow-500/20"
+        className="w-full bg-gradient-to-r from-orange-400 to-yellow-500 h-10 text-white"
         variant="secondary"
       >
         {loading ? (

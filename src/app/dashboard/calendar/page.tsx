@@ -178,7 +178,7 @@ export default function CalendarPage() {
 
   return (
     <div className="">
-      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
+      <div className="flex items-center justify-between bg-zinc-950/60 backdrop-blur">
         <div className="p-6  text-white">
           <h1 className="text-2xl font-bold">Calendario</h1>
           <p className=" text-sm">Programa publicaciones por día y hora</p>
@@ -226,11 +226,11 @@ export default function CalendarPage() {
         </div>
 
         <div className="rounded-lg overflow-hidden">
-          <div className="grid grid-cols-7 border-b bg-muted/40">
+          <div className="grid grid-cols-7 border-b bg-zinc-950/60">
             {WEEKDAYS.map((day) => (
               <div
                 key={day}
-                className="p-2 text-center text-xs font-medium text-muted-foreground"
+                className="p-2 text-center text-xs font-medium text-white"
               >
                 {day}
               </div>
@@ -250,10 +250,8 @@ export default function CalendarPage() {
               return (
                 <div
                   key={key}
-                  className={`border-b border-r p-1.5 flex flex-col gap-1 min-h-[120px] ${
-                    isToday
-                      ? "bg-yellow-500/20"
-                      : "bg-white text-muted-foreground"
+                  className={`border-b border-r border-white/20 p-1.5 flex flex-col gap-1 min-h-[120px] ${
+                    isToday ? "bg-yellow-500/20" : "bg-zinc-950/60 text-white"
                   }`}
                 >
                   <div className="flex items-center justify-between">

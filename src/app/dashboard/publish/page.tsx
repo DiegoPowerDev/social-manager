@@ -412,32 +412,35 @@ export default function BulkPublishPage() {
 
   return (
     <div className="">
-      <div className="p-6 bg-zinc-950/50 backdrop-blur text-white">
-        <h2 className="text-3xl font-bold ">Publicar en varias redes</h2>
-        <p className=" mt-1">
-          Crea el contenido una vez y publícalo en todas las redes seleccionadas
-        </p>
+      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
+        <div className="p-6  text-white">
+          <h1 className="text-2xl font-bold">Publicar en varias redes</h1>
+          <p className="text-sm">
+            Crea el contenido una vez y publícalo en todas las redes
+            seleccionadas
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
         {/* Contenido */}
         <div className="lg:col-span-2 space-y-5">
-          <Card className="bg-white/70">
+          <Card className="bg-zinc-950/50 ">
             <CardHeader>
-              <CardTitle>Contenido</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-white">Contenido</CardTitle>
+              <CardDescription className="text-white/60">
                 Este contenido se adaptará a cada red
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              <Card>
+              <Card className="bg-zinc-950/60 text-white">
                 <CardHeader>
                   <CardTitle>Redes</CardTitle>
                   <CardDescription>Selecciona dónde publicar</CardDescription>
                 </CardHeader>
-                <CardContent className="grid grid-cols-3">
+                <CardContent className="grid grid-cols-3 bg-zinc-950/60">
                   {facebookAccount && (
-                    <div className="flex items-start space-x-3 p-3 rounded-lg bg-white/60">
+                    <div className="flex items-start space-x-3 p-3 rounded-lg ">
                       <Checkbox
                         id="fb"
                         checked={selectedFacebook}
@@ -461,7 +464,7 @@ export default function BulkPublishPage() {
                   )}
 
                   {instagramAccount && (
-                    <div className="space-y-3 p-3 rounded-lg bg-white/60">
+                    <div className="space-y-3 p-3 rounded-lg ">
                       <div className="flex items-start space-x-3">
                         <Checkbox
                           id="ig"
@@ -496,7 +499,7 @@ export default function BulkPublishPage() {
                             }
                             disabled={publishing}
                           >
-                            <SelectTrigger className="h-8 bg-white">
+                            <SelectTrigger className="h-8 bg-black">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -511,7 +514,7 @@ export default function BulkPublishPage() {
                   )}
 
                   {linkedinAccount && (
-                    <div className="flex items-start space-x-3 p-3 rounded-lg bg-white/60">
+                    <div className="flex items-start space-x-3 p-3 rounded-lg ">
                       <Checkbox
                         id="li"
                         checked={selectedLinkedIn}
@@ -540,7 +543,8 @@ export default function BulkPublishPage() {
               </Card>
               {/* Texto + AI Caption */}
               {!(selectedInstagram && instagramMediaType === "STORIES") && (
-                <div className="flex justify-between gap-2 bg-white/60 rounded">
+                <div className="flex justify-between gap-2 bg-zinc-950/50 text-white rounded">
+                  {" "}
                   <AICaptionGenerator
                     platform="general"
                     onGenerate={(caption) => setMessage(caption)}
@@ -553,7 +557,7 @@ export default function BulkPublishPage() {
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
                       rows={5}
-                      className="resize-none flex-1 bg-white"
+                      className="resize-none flex-1 bg-white/80 text-black"
                       disabled={publishing || uploadingMedia}
                     />
                   </div>
@@ -561,14 +565,14 @@ export default function BulkPublishPage() {
               )}
 
               {selectedInstagram && instagramMediaType === "STORIES" && (
-                <p className="text-sm text-muted-foreground bg-white/60 p-3 rounded">
+                <p className="text-sm text-black bg-white/60 p-3 rounded">
                   Las Historias de Instagram no permiten texto a través de la
                   API.
                 </p>
               )}
 
               {/* Media + AI Image */}
-              <div className="flex justify-between gap-2 bg-white/60 rounded">
+              <div className="flex justify-between gap-2 bg-zinc-950/50 text-white rounded">
                 <AIImageGenerator
                   onGenerate={(url) => {
                     setImageUrl(url);
@@ -601,6 +605,7 @@ export default function BulkPublishPage() {
                       type="button"
                       variant="outline"
                       size="sm"
+                      className="text-black"
                       onClick={() => imageInputRef.current?.click()}
                       disabled={publishing || uploadingMedia || !!videoUrl}
                     >
@@ -612,6 +617,7 @@ export default function BulkPublishPage() {
                       type="button"
                       variant="outline"
                       size="sm"
+                      className="text-black"
                       onClick={() => videoInputRef.current?.click()}
                       disabled={publishing || uploadingMedia || !!imageUrl}
                     >
@@ -622,6 +628,7 @@ export default function BulkPublishPage() {
                       type="button"
                       variant="secondary"
                       size="sm"
+                      className="text-black"
                       onClick={() => setLibraryOpen(true)}
                       disabled={publishing || uploadingMedia}
                     >
@@ -675,13 +682,15 @@ export default function BulkPublishPage() {
               )}
               {/* Enlace */}
               <div className="space-y-2">
-                <Label>Enlace (solo Facebook)</Label>
+                <Label className="text-white font-bold">
+                  Enlace (solo Facebook)
+                </Label>
                 <Input
                   placeholder="https://ejemplo.com"
                   value={link}
                   onChange={(e) => setLink(e.target.value)}
                   disabled={publishing || uploadingMedia}
-                  className="bg-white"
+                  className="bg-white/80 text-black"
                 />
               </div>
             </CardContent>

@@ -180,54 +180,54 @@ export default function TeamPage() {
         )}
 
         {isAdmin && (
-          <Card className="bg-white/70">
+          <Card className="bg-zinc-950/50">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-white">
                 <UserPlus className="h-5 w-5" />
                 Añadir miembro
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-white/50">
                 Crea acceso con email y contraseña. Ellos entrarán por el login.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Nombre</Label>
+                <Label className="text-white">Nombre</Label>
                 <Input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="bg-white"
+                  className="bg-white/80 text-black"
                   disabled={saving}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Email</Label>
+                <Label className="text-white">Email</Label>
                 <Input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="bg-white"
+                  className="bg-white/80 text-black"
                   disabled={saving}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Contraseña temporal</Label>
+                <Label className="text-white">Contraseña temporal</Label>
                 <Input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="bg-white"
+                  className="bg-white/80 text-black"
                   disabled={saving}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Rol</Label>
+                <Label className="text-white">Rol</Label>
                 <Select
                   value={role}
                   onValueChange={(v) => setRole(v as any)}
                   disabled={saving}
                 >
-                  <SelectTrigger className="bg-white">
+                  <SelectTrigger className="bg-white/80 text-black">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -254,10 +254,10 @@ export default function TeamPage() {
           </Card>
         )}
 
-        <Card className="bg-white/70">
+        <Card className="bg-zinc-950/50">
           <CardHeader>
-            <CardTitle>Miembros</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-white">Miembros</CardTitle>
+            <CardDescription className="text-white/50">
               {members.length} persona{members.length !== 1 ? "s" : ""}
             </CardDescription>
           </CardHeader>

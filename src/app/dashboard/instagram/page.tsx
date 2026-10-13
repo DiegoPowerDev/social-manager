@@ -202,10 +202,10 @@ export default function InstagramPage() {
   return (
     <div className="">
       {/* Header */}
-      <div className="flex items-center justify-between bg-yellow-500/20 p-6">
-        <div>
-          <h2 className="text-2xl font-bold">Instagram</h2>
-          <p className=" mt-1">
+      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
+        <div className="p-6  text-white">
+          <h1 className="text-2xl font-bold">Instagram</h1>
+          <p className="text-sm">
             Publicando como{" "}
             <span className="font-medium ">@{account.username}</span>
           </p>

@@ -35,7 +35,7 @@ export default function HomeHeader() {
           >
             Iniciar sesión
           </Link>
-          <a href="#pricing">
+          <a href="/plans">
             <Button
               size="lg"
               className=" bg-gradient-to-r from-orange-400 to-yellow-500 hover:from-orange-500 hover:to-yellow-500 text-white px-2"

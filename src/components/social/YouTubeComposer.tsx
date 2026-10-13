@@ -179,7 +179,7 @@ export function YouTubeComposer({
   const isTitleOver = titleCount > 100;
 
   return (
-    <Card className="bg-white/70 max-w-3xl">
+    <Card className="bg-zinc-950/60 ">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>

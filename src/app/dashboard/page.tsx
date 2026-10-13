@@ -46,6 +46,7 @@ import {
 } from "recharts";
 import { useAuthStore } from "@/stores/useAuthStore";
 import TitleComponent from "@/components/layout/titleComponent";
+import { cn } from "@/lib/utils";
 
 interface PublishedPost {
   id: string;
@@ -74,7 +75,7 @@ type PlatformFilter = "all" | "facebook" | "instagram" | "linkedin";
 const PLATFORM_COLORS: Record<string, string> = {
   facebook: "#1877F2",
   instagram: "#E4405F",
-  linkedin: "#0A66C2",
+  linkedin: "#2E77FF",
   other: "#94a3b8",
 };
 
@@ -277,21 +278,20 @@ export default function DashboardPage() {
 
       <div className="p-6 space-y-6">
         {/* Filtros */}
-        <Card className="bg-white/70">
+        <Card className="bg-zinc-950/60 ">
           <CardContent className="pt-4 flex flex-wrap items-center gap-3">
-            <span className="text-sm font-medium text-muted-foreground">
-              Periodo:
-            </span>
+            <span className="text-sm font-medium text-white">Periodo:</span>
             {(["7", "14", "30", "90"] as RangeKey[]).map((r) => (
               <Button
                 key={r}
                 size="sm"
                 variant={range === r ? "default" : "outline"}
-                className={
+                className={cn(
+                  "border-none border-0",
                   range === r
-                    ? "bg-gradient-to-r from-orange-400 to-yellow-500 text-white border-0"
-                    : ""
-                }
+                    ? "bg-gradient-to-r from-orange-400 to-yellow-500 text-white outline-none"
+                    : "bg-black text-white",
+                )}
                 onClick={() => {
                   setRange(r);
                   setSelectedDay(null);
@@ -301,9 +301,7 @@ export default function DashboardPage() {
               </Button>
             ))}
 
-            <span className="text-sm font-medium text-muted-foreground ml-2">
-              Red:
-            </span>
+            <span className="text-sm font-medium  text-white ml-2">Red:</span>
             {(
               [
                 ["all", "Todas"],
@@ -316,11 +314,12 @@ export default function DashboardPage() {
                 key={key}
                 size="sm"
                 variant={platformFilter === key ? "default" : "outline"}
-                className={
+                className={cn(
+                  "border-none border-0",
                   platformFilter === key
                     ? "bg-gradient-to-r from-orange-400 to-yellow-500 text-white border-0"
-                    : ""
-                }
+                    : "bg-black text-white",
+                )}
                 onClick={() => {
                   setPlatformFilter(key);
                   setSelectedDay(null);
@@ -362,49 +361,55 @@ export default function DashboardPage() {
 
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="bg-white/70">
+          <Card className="bg-zinc-950/60 text-white">
             <CardHeader className="pb-2">
-              <CardDescription>Publicados</CardDescription>
+              <CardDescription className="text-white">
+                Publicados
+              </CardDescription>
               <CardTitle className="text-3xl">{stats.totalPublished}</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-xs text-muted-foreground">
-                En el periodo filtrado
-              </p>
+              <p className="text-xs text-white">En el periodo filtrado</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-white/70">
+          <Card className="bg-zinc-950/60 ">
             <CardHeader className="pb-2">
-              <CardDescription>Programados</CardDescription>
+              <CardDescription className="text-white">
+                Programados
+              </CardDescription>
               <CardTitle className="text-3xl text-sky-600">
                 {stats.scheduledCount}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-xs text-muted-foreground">Pendientes</p>
+              <p className="text-xs text-white">Pendientes</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-white/70">
+          <Card className="bg-zinc-950/60 ">
             <CardHeader className="pb-2">
-              <CardDescription>Fallidos</CardDescription>
+              <CardDescription className="text-white">Fallidos</CardDescription>
               <CardTitle className="text-3xl text-red-600">
                 {stats.failedCount}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-xs text-muted-foreground">Calendario</p>
+              <p className="text-xs text-white">Calendario</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-white/70">
+          <Card className="bg-zinc-950/60 ">
             <CardHeader className="pb-2">
-              <CardDescription>Día con más posts</CardDescription>
-              <CardTitle className="text-xl">{stats.bestDay.full}</CardTitle>
+              <CardDescription className="text-white">
+                Día con más posts
+              </CardDescription>
+              <CardTitle className="text-xl text-white font-bold">
+                {stats.bestDay.full}
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-white">
                 {stats.bestDay.posts} publicación
                 {stats.bestDay.posts !== 1 ? "es" : ""}
               </p>
@@ -414,10 +419,12 @@ export default function DashboardPage() {
 
         {/* Gráficos */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="bg-white/70 lg:col-span-2">
+          <Card className="bg-zinc-950/60 lg:col-span-2">
             <CardHeader>
-              <CardTitle>Publicaciones por día</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-white">
+                Publicaciones por día
+              </CardTitle>
+              <CardDescription className="text-white">
                 Clic en una barra para ver los posts de ese día
               </CardDescription>
             </CardHeader>
@@ -428,10 +435,13 @@ export default function DashboardPage() {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis
                       dataKey="day"
-                      tick={{ fontSize: 11 }}
+                      tick={{ fontSize: 11, fill: "white" }}
                       interval="preserveStartEnd"
                     />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                    <YAxis
+                      allowDecimals={false}
+                      tick={{ fontSize: 11, fill: "white" }}
+                    />
                     <Tooltip
                       contentStyle={{
                         borderRadius: 8,
@@ -461,16 +471,16 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/70">
+          <Card className="bg-zinc-950/60 ">
             <CardHeader>
-              <CardTitle>Por red</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-white">Por red</CardTitle>
+              <CardDescription className="text-white">
                 Clic en un sector para filtrar por red
               </CardDescription>
             </CardHeader>
             <CardContent>
               {postsByPlatform.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-12">
+                <p className="text-sm text-white text-center py-12">
                   Aún no hay publicaciones
                 </p>
               ) : (
@@ -520,20 +530,20 @@ export default function DashboardPage() {
         </div>
 
         {/* Lista filtrada */}
-        <Card className="bg-white/70">
+        <Card className="bg-zinc-950/60 ">
           <CardHeader>
-            <CardTitle>
+            <CardTitle className="text-white">
               {selectedDay
                 ? `Posts del ${format(selectedDay, "d MMMM yyyy", { locale: es })}`
                 : "Publicaciones filtradas"}
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-white">
               {listPosts.length} resultado{listPosts.length !== 1 ? "s" : ""}
             </CardDescription>
           </CardHeader>
           <CardContent>
             {listPosts.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-white">
                 No hay publicaciones con estos filtros
               </p>
             ) : (
@@ -543,9 +553,9 @@ export default function DashboardPage() {
                   return (
                     <div
                       key={p.id}
-                      className="flex items-center gap-3 p-3 rounded-lg bg-white/60 text-sm"
+                      className="flex items-center gap-3 p-3 rounded-lg bg-zinc-950/60 text-sm"
                     >
-                      <div className="w-14 h-14 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
+                      <div className="w-14 h-14 rounded-md overflow-hidden bg-gradient-to-r from-orange-500 to-yellow-500  flex items-center justify-center shrink-0">
                         {p.imageUrl ? (
                           <img
                             src={p.imageUrl}
@@ -553,16 +563,16 @@ export default function DashboardPage() {
                             className="w-full h-full object-cover"
                           />
                         ) : p.videoUrl ? (
-                          <Video className="h-5 w-5 text-muted-foreground" />
+                          <Video className="h-5 w-5 text-white" />
                         ) : (
-                          <FileText className="h-5 w-5 text-muted-foreground" />
+                          <FileText className="h-5 w-5 text-white" />
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium truncate">
+                        <p className="font-bold truncate text-white">
                           {p.message || p.title || "Sin texto"}
                         </p>
-                        <p className="text-xs text-muted-foreground capitalize">
+                        <p className="text-xs text-white/80 capitalize">
                           {p.platform || "—"}
                           {p.publishedAt
                             ? ` · ${format(p.publishedAt, "d MMM HH:mm", { locale: es })}`
@@ -574,7 +584,7 @@ export default function DashboardPage() {
                           href={externalUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-muted-foreground hover:text-foreground shrink-0 p-1"
+                          className="text-white hover:text-foreground shrink-0 p-1"
                           title="Ver publicación"
                         >
                           <ExternalLink className="h-4 w-4" />

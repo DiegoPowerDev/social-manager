@@ -262,10 +262,10 @@ export default function MediaLibraryPage() {
         </p>
       )}
       <div className="flex-1 flex justify-center p-6">
-        <Card className="bg-white/70 w-full flex-1">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Archivos</CardTitle>
-            <CardDescription>
+        <Card className="bg-zinc-950/60 w-full flex-1">
+          <CardHeader className="pb-3 ">
+            <CardTitle className="text-white">Archivos</CardTitle>
+            <CardDescription className="text-white">
               {items.length} elemento{items.length !== 1 ? "s" : ""}
             </CardDescription>
           </CardHeader>
@@ -283,7 +283,7 @@ export default function MediaLibraryPage() {
                 {items.map((item) => (
                   <div
                     key={item.id}
-                    className="group relative rounded-xl border bg-white overflow-hidden"
+                    className="group relative rounded bg-white overflow-hidden"
                   >
                     <div className="aspect-square bg-muted flex items-center justify-center">
                       {item.type === "image" ? (

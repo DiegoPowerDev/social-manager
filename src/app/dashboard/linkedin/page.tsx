@@ -183,11 +183,11 @@ export default function LinkedInPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex text-white items-center justify-between p-6 bg-zinc-950/50 backdrop-blur">
-        <div>
-          <h2 className="text-2xl font-bold">LinkedIn</h2>
-          <p className=" mt-1">
+    <div className="">
+      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
+        <div className="p-6  text-white">
+          <h1 className="text-2xl font-bold">LinkedIn</h1>
+          <p className="text-sm">
             Publicando como <span className="font-medium">{account.name}</span>
           </p>
         </div>
