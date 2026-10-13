@@ -19,6 +19,9 @@ interface Props {
   onGenerate: (imageUrl: string) => void;
 }
 
+const MAX_REFS = 3;
+const MAX_REF_SIZE = 8 * 1024 * 1024;
+
 const STYLES = [
   {
     value: "realistic",
@@ -69,14 +72,16 @@ const STYLES = [
   },
 ];
 
+type RefItem = { file: File; preview: string };
+
 export function AIImageGenerator({ onGenerate }: Props) {
   const [prompt, setPrompt] = useState("");
   const [style, setStyle] = useState("realistic");
-  const [referenceFile, setReferenceFile] = useState<File | null>(null);
-  const [referencePreview, setReferencePreview] = useState<string | null>(null);
+  const [refs, setRefs] = useState<RefItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
+
   const { aiEnabled, imagesLeft, imagesUsed, imagesLimit, setFromApi } =
     useAiUsage();
   const companyId = useAuthStore((s) => s.companyId);
@@ -85,23 +90,33 @@ export function AIImageGenerator({ onGenerate }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleReferenceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
 
-    if (file.size > 8 * 1024 * 1024) {
-      setError("La imagen de referencia no puede superar los 8MB");
-      return;
+    setError(null);
+    const next: RefItem[] = [...refs];
+
+    for (const file of files) {
+      if (next.length >= MAX_REFS) break;
+      if (file.size > MAX_REF_SIZE) {
+        setError(`"${file.name}" supera 8MB`);
+        continue;
+      }
+      if (!file.type.startsWith("image/")) continue;
+      next.push({ file, preview: URL.createObjectURL(file) });
     }
 
-    setReferenceFile(file);
-    setReferencePreview(URL.createObjectURL(file));
-    setError(null);
+    setRefs(next);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const removeReference = () => {
-    setReferenceFile(null);
-    setReferencePreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+  const removeReference = (index: number) => {
+    setRefs((prev) => {
+      const copy = [...prev];
+      URL.revokeObjectURL(copy[index].preview);
+      copy.splice(index, 1);
+      return copy;
+    });
   };
 
   const uploadReferenceToR2 = async (file: File): Promise<string> => {
@@ -120,23 +135,26 @@ export function AIImageGenerator({ onGenerate }: Props) {
       body: formData,
     });
 
-    if (!res.ok) {
-      throw new Error("Error al subir la imagen de referencia");
-    }
+    if (!res.ok) throw new Error("Error al subir una imagen de referencia");
 
     const data = await res.json();
-    return data.publicUrl;
+    return data.publicUrl as string;
   };
 
   const buildFinalPrompt = () => {
     const selectedStyle = STYLES.find((s) => s.value === style);
-    if (!selectedStyle) return prompt;
+    const base = selectedStyle
+      ? `${prompt.trim()}, ${selectedStyle.suffix}`
+      : prompt.trim();
 
-    if (referenceFile) {
-      return `${prompt}, ${selectedStyle.suffix}`;
+    if (refs.length > 1) {
+      return (
+        `${base}. Use the reference images as visual guidance: ` +
+        `match architecture, materials, colors and style. ` +
+        `Generate the scene described in the prompt guided by those references.`
+      );
     }
-
-    return `${prompt}, ${selectedStyle.suffix}`;
+    return base;
   };
 
   const handleGenerate = async () => {
@@ -158,29 +176,24 @@ export function AIImageGenerator({ onGenerate }: Props) {
     setGeneratedUrl(null);
 
     try {
-      let referenceImageUrl: string | undefined;
-
-      if (referenceFile) {
-        referenceImageUrl = await uploadReferenceToR2(referenceFile);
+      const imageUrls: string[] = [];
+      for (const ref of refs) {
+        imageUrls.push(await uploadReferenceToR2(ref.file));
       }
-
-      const finalPrompt = buildFinalPrompt();
 
       const res = await fetch("/api/ai/generate-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: finalPrompt,
-          imageUrl: referenceImageUrl,
+          prompt: buildFinalPrompt(),
+          imageUrl: imageUrls[0], // compat
+          imageUrls, // multi
           companyId,
         }),
       });
 
       const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Error al generar la imagen");
-      }
+      if (!res.ok) throw new Error(data.error || "Error al generar la imagen");
 
       setGeneratedUrl(data.imageUrl);
       if (data.usage) {
@@ -197,25 +210,22 @@ export function AIImageGenerator({ onGenerate }: Props) {
   };
 
   const handleUseImage = () => {
-    if (generatedUrl) {
-      onGenerate(generatedUrl);
-    }
+    if (generatedUrl) onGenerate(generatedUrl);
   };
 
   return (
     <div className="space-y-4 p-4 w-full flex flex-col">
-      <div className=" flex items-center gap-2 text-sm font-medium">
+      <div className="flex items-center gap-2 text-sm font-medium">
         <Sparkles className="h-4 w-4 text-purple-500" />
         Generar imagen con IA
       </div>
 
-      {/* Prompt */}
       <div className="space-y-2">
         <Label htmlFor="image-prompt">Describe la imagen</Label>
         <Textarea
           id="image-prompt"
           className="resize-none bg-white"
-          placeholder="Ej: Un café latte sobre una mesa de madera con luz natural..."
+          placeholder="Ej: Interior moderno del salón de esta casa, luz natural, mismos materiales..."
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           rows={3}
@@ -223,16 +233,15 @@ export function AIImageGenerator({ onGenerate }: Props) {
         />
       </div>
 
-      {/* Estilo */}
       <div className="space-y-2">
         <Label>Estilo</Label>
         <Select
           value={style}
-          onValueChange={(v) => setStyle(v as any)}
+          onValueChange={(s) => setStyle(s as any)}
           disabled={loading}
         >
           <SelectTrigger className="bg-white">
-            <SelectValue className="w-40" placeholder="Selecciona un estilo" />
+            <SelectValue placeholder="Selecciona un estilo" />
           </SelectTrigger>
           <SelectContent>
             {STYLES.map((s) => (
@@ -244,52 +253,60 @@ export function AIImageGenerator({ onGenerate }: Props) {
         </Select>
       </div>
 
-      {/* Imagen de referencia */}
       <div className="space-y-2">
-        <Label>Imagen de referencia (opcional)</Label>
+        <Label>Imágenes de referencia (opcional, máx. {MAX_REFS})</Label>
         <p className="text-xs text-muted-foreground">
-          Sube una imagen si quieres que la IA la modifique.
+          Ej: fachada + materiales + estilo. La IA usará estas fotos como guía.
         </p>
 
-        {referencePreview ? (
-          <div className="relative w-28 h-28 rounded-md overflow-hidden border">
-            <img
-              src={referencePreview}
-              alt="Referencia"
-              className="w-full h-full object-cover"
-            />
-            <Button
-              variant="secondary"
-              size="icon"
-              className="absolute top-1 right-1 h-6 w-6 rounded-full"
-              onClick={removeReference}
-              disabled={loading}
+        <div className="flex flex-wrap gap-2">
+          {refs.map((ref, i) => (
+            <div
+              key={ref.preview}
+              className="relative w-20 h-20 rounded-md overflow-hidden border"
             >
-              <X className="h-3 w-3" />
-            </Button>
-          </div>
-        ) : (
-          <>
-            <input
-              type="file"
-              accept="image/*"
-              ref={fileInputRef}
-              onChange={handleReferenceChange}
-              className="hidden"
-              disabled={loading}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={loading}
-            >
-              <ImagePlus className="h-4 w-4 mr-2" />
-              Subir referencia
-            </Button>
-          </>
-        )}
+              <img
+                src={ref.preview}
+                alt={`Ref ${i + 1}`}
+                className="w-full h-full object-cover"
+              />
+              <Button
+                variant="secondary"
+                size="icon"
+                className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full"
+                onClick={() => removeReference(i)}
+                disabled={loading}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          ))}
+
+          {refs.length < MAX_REFS && (
+            <>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                ref={fileInputRef}
+                onChange={handleReferenceChange}
+                className="hidden"
+                disabled={loading}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-20 w-20 flex flex-col gap-1"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={loading}
+              >
+                <ImagePlus className="h-5 w-5" />
+                <span className="text-[10px]">Añadir</span>
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {error && <p className="text-sm text-red-500">{error}</p>}
@@ -298,6 +315,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
           ? `${imagesLeft} imágenes restantes este mes (${imagesUsed}/${imagesLimit})`
           : "Tu plan no incluye IA"}
       </p>
+
       <Button
         onClick={handleGenerate}
         disabled={
@@ -323,7 +341,6 @@ export function AIImageGenerator({ onGenerate }: Props) {
         )}
       </Button>
 
-      {/* Resultado */}
       {generatedUrl && (
         <div className="space-y-3 pt-2">
           <div className="rounded-lg overflow-hidden border">
@@ -333,7 +350,6 @@ export function AIImageGenerator({ onGenerate }: Props) {
               className="w-full max-h-72 object-contain"
             />
           </div>
-
           <Button onClick={handleUseImage} className="w-full">
             Usar esta imagen en el post
           </Button>

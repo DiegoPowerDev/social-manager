@@ -11,11 +11,13 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ImagePlus, Video, X, Loader2 } from "lucide-react";
+import { ImagePlus, Video, X, Loader2, FolderOpen } from "lucide-react";
 import { AICaptionGenerator } from "@/components/social/AICaptionGenerator";
 import { AIImageGenerator } from "@/components/social/AIImageGenerator";
+import { MediaLibraryPicker } from "@/components/social/MediaLibraryPicker";
 import { Separator } from "@/components/ui/separator";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { saveMediaToLibrary } from "@/lib/media";
 
 interface Props {
   accountName: string;
@@ -42,13 +44,15 @@ export function LinkedInComposer({
 }: Props) {
   const [uploading, setUploading] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
 
   const companyId = useAuthStore((s) => s.companyId);
+  const user = useAuthStore((s) => s.user);
 
   const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
-  const MAX_VIDEO_SIZE = 200 * 1024 * 1024; // LinkedIn single upload ~200MB
+  const MAX_VIDEO_SIZE = 200 * 1024 * 1024;
 
   const uploadToR2 = async (file: File) => {
     if (!companyId) {
@@ -71,7 +75,27 @@ export function LinkedInComposer({
     }
 
     const data = await res.json();
-    return data.publicUrl as string;
+    const publicUrl = data.publicUrl as string;
+
+    // Guardar en biblioteca de la empresa
+    if (user?.uid) {
+      try {
+        await saveMediaToLibrary({
+          companyId,
+          uid: user.uid,
+          url: publicUrl,
+          key: data.key,
+          fileName: file.name,
+          size: file.size,
+          mimeType: file.type || "application/octet-stream",
+          source: "upload",
+        });
+      } catch (e) {
+        console.warn("No se pudo guardar en biblioteca:", e);
+      }
+    }
+
+    return publicUrl;
   };
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -128,6 +152,17 @@ export function LinkedInComposer({
     if (videoInputRef.current) videoInputRef.current.value = "";
   };
 
+  const onLibrarySelect = (item: { url: string; type: "image" | "video" }) => {
+    setMediaError(null);
+    if (item.type === "video") {
+      onImageChange(null);
+      onVideoChange(item.url);
+    } else {
+      onVideoChange(null);
+      onImageChange(item.url);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!text.trim() && !imageUrl && !videoUrl) {
       setMediaError("Escribe un texto o agrega una imagen/video");
@@ -154,7 +189,6 @@ export function LinkedInComposer({
       </CardHeader>
 
       <CardContent className="space-y-5">
-        {/* Texto + AI Caption */}
         <div className="flex justify-between gap-2 bg-white/60 rounded">
           <AICaptionGenerator
             platform="general"
@@ -183,7 +217,6 @@ export function LinkedInComposer({
           </div>
         </div>
 
-        {/* Media + AI Image */}
         <div className="flex justify-between gap-2 bg-white/60 rounded">
           <AIImageGenerator
             onGenerate={(url) => {
@@ -197,7 +230,7 @@ export function LinkedInComposer({
             <p className="text-xs text-muted-foreground">
               Video: MP4 recomendado, máx. 200MB
             </p>
-            <div className="flex items-center justify-center gap-2">
+            <div className="flex flex-wrap items-center justify-center gap-2">
               <input
                 type="file"
                 accept="image/*"
@@ -233,6 +266,16 @@ export function LinkedInComposer({
               >
                 <Video className="h-4 w-4 mr-2" />
                 Video
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setLibraryOpen(true)}
+                disabled={isLoading}
+              >
+                <FolderOpen className="h-4 w-4 mr-2" />
+                Biblioteca
               </Button>
             </div>
 
@@ -272,12 +315,13 @@ export function LinkedInComposer({
             </div>
           </div>
         </div>
+
         {videoUrl && (
           <p className="text-sm text-muted-foreground bg-white/60 p-3 rounded">
             LinkedIn video: MP4 recomendado, máx. ~200 MB, hasta ~10 min.
           </p>
         )}
-        {/* Botón Publicar */}
+
         <div className="flex w-full items-center justify-center">
           <Button
             className="w-full max-w-xs h-12 text-base font-semibold rounded-xl bg-gradient-to-r from-orange-400 to-yellow-500 hover:from-orange-500 hover:to-yellow-500 text-white shadow-lg shadow-orange-500/25 transition-all"
@@ -297,6 +341,13 @@ export function LinkedInComposer({
 
         {mediaError && <p className="text-sm text-red-500">{mediaError}</p>}
       </CardContent>
+
+      <MediaLibraryPicker
+        open={libraryOpen}
+        onClose={() => setLibraryOpen(false)}
+        accept="all"
+        onSelect={onLibrarySelect}
+      />
     </Card>
   );
 }

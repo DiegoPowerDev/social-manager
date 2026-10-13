@@ -20,10 +20,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Video, X } from "lucide-react";
+import { Loader2, Video, X, FolderOpen } from "lucide-react";
 import { AICaptionGenerator } from "@/components/social/AICaptionGenerator";
+import { MediaLibraryPicker } from "@/components/social/MediaLibraryPicker";
 import { Separator } from "@/components/ui/separator";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { saveMediaToLibrary } from "@/lib/media";
 
 interface Props {
   channelName: string;
@@ -53,11 +55,13 @@ export function YouTubeComposer({
   onPublish,
 }: Props) {
   const companyId = useAuthStore((s) => s.companyId);
+  const user = useAuthStore((s) => s.user);
   const [uploading, setUploading] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const videoInputRef = useRef<HTMLInputElement>(null);
 
-  const MAX_VIDEO_SIZE = 256 * 1024 * 1024; // 256MB (ajusta según tu plan R2 / Vercel)
+  const MAX_VIDEO_SIZE = 256 * 1024 * 1024;
 
   const uploadToR2 = async (file: File) => {
     if (!companyId) {
@@ -66,7 +70,6 @@ export function YouTubeComposer({
       );
     }
 
-    // 1) URL firmada (JSON pequeño)
     const signRes = await fetch("/api/upload/sign", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -83,7 +86,7 @@ export function YouTubeComposer({
       throw new Error(err.error || "Error al preparar la subida");
     }
 
-    const { uploadUrl, publicUrl } = await signRes.json();
+    const { uploadUrl, publicUrl, key } = await signRes.json();
 
     const putRes = await fetch(uploadUrl, {
       method: "PUT",
@@ -95,6 +98,23 @@ export function YouTubeComposer({
 
     if (!putRes.ok) {
       throw new Error("Error al subir el video al almacenamiento");
+    }
+
+    if (user?.uid) {
+      try {
+        await saveMediaToLibrary({
+          companyId,
+          uid: user.uid,
+          url: publicUrl,
+          key,
+          fileName: file.name,
+          size: file.size,
+          mimeType: file.type || "video/mp4",
+          source: "upload",
+        });
+      } catch (e) {
+        console.warn("No se pudo guardar en biblioteca:", e);
+      }
     }
 
     return publicUrl as string;
@@ -124,6 +144,15 @@ export function YouTubeComposer({
       setUploading(false);
       if (videoInputRef.current) videoInputRef.current.value = "";
     }
+  };
+
+  const onLibrarySelect = (item: { url: string; type: "image" | "video" }) => {
+    setMediaError(null);
+    if (item.type !== "video") {
+      setMediaError("YouTube solo admite video");
+      return;
+    }
+    onVideoChange(item.url);
   };
 
   const removeVideo = () => {
@@ -162,7 +191,6 @@ export function YouTubeComposer({
       </CardHeader>
 
       <CardContent className="space-y-5">
-        {/* Título */}
         <div className="space-y-2">
           <Label htmlFor="yt-title">Título (obligatorio)</Label>
           <Input
@@ -183,7 +211,6 @@ export function YouTubeComposer({
           </p>
         </div>
 
-        {/* Descripción + IA */}
         <div className="flex justify-between gap-2 bg-white/60 rounded">
           <AICaptionGenerator
             platform="general"
@@ -204,7 +231,6 @@ export function YouTubeComposer({
           </div>
         </div>
 
-        {/* Privacidad */}
         <div className="space-y-2">
           <Label>Visibilidad</Label>
           <Select
@@ -225,12 +251,11 @@ export function YouTubeComposer({
           </Select>
         </div>
 
-        {/* Video */}
         <div className="space-y-3 p-4 bg-white/60 rounded">
           <Label>Video</Label>
           <p className="text-xs text-muted-foreground">
-            MP4 recomendado. Máx. ~256MB en este flujo (videos muy largos pueden
-            fallar por timeout del servidor).
+            MP4 recomendado. Máx. ~256MB en este flujo. También puedes elegir
+            uno de la biblioteca.
           </p>
 
           <input
@@ -243,16 +268,28 @@ export function YouTubeComposer({
           />
 
           {!videoUrl ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => videoInputRef.current?.click()}
-              disabled={isLoading}
-            >
-              <Video className="h-4 w-4 mr-2" />
-              Seleccionar video
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => videoInputRef.current?.click()}
+                disabled={isLoading}
+              >
+                <Video className="h-4 w-4 mr-2" />
+                Seleccionar video
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setLibraryOpen(true)}
+                disabled={isLoading}
+              >
+                <FolderOpen className="h-4 w-4 mr-2" />
+                Biblioteca
+              </Button>
+            </div>
           ) : (
             <div className="relative rounded-lg overflow-hidden border bg-muted/30">
               <video src={videoUrl} controls className="w-full max-h-64" />
@@ -301,6 +338,13 @@ export function YouTubeComposer({
           </Button>
         </div>
       </CardContent>
+
+      <MediaLibraryPicker
+        open={libraryOpen}
+        onClose={() => setLibraryOpen(false)}
+        accept="video"
+        onSelect={onLibrarySelect}
+      />
     </Card>
   );
 }

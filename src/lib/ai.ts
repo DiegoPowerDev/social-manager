@@ -56,19 +56,26 @@ fal.config({
 export async function generateImage(options: {
   prompt: string;
   imageUrl?: string;
+  imageUrls?: string[];
 }) {
-  const { prompt, imageUrl } = options;
+  const { prompt } = options;
 
-  // ===== EDICIÓN con Nano Banana 2 =====
-  if (imageUrl) {
+  const refs = options.imageUrls?.length
+    ? options.imageUrls
+    : options.imageUrl
+      ? [options.imageUrl]
+      : [];
+
+  // ===== EDICIÓN / multi-referencia con Nano Banana =====
+  if (refs.length > 0) {
     const result = await fal.subscribe("fal-ai/nano-banana-2.1/edit", {
       input: {
         prompt: prompt.trim(),
-        image_urls: [imageUrl], // array (importante)
+        image_urls: refs, // 1..N referencias
         num_images: 1,
         aspect_ratio: "auto",
         output_format: "jpeg",
-        resolution: "1K", // 1K es más barato; 2K/4K cuestan más
+        resolution: "1K",
         safety_tolerance: "4",
       },
     });
@@ -76,12 +83,12 @@ export async function generateImage(options: {
     return result.data.images[0].url;
   }
 
-  // ===== GENERACIÓN desde cero con Nano Banana 2 =====
+  // ===== GENERACIÓN desde cero =====
   const result = await fal.subscribe("fal-ai/nano-banana-2.1", {
     input: {
       prompt: prompt.trim(),
       num_images: 1,
-      aspect_ratio: "1:1", // bueno para redes
+      aspect_ratio: "1:1",
       output_format: "jpeg",
       resolution: "1K",
       safety_tolerance: "4",

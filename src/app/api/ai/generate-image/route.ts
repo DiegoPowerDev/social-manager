@@ -9,8 +9,7 @@ import { PLAN_LIMITS } from "@/lib/tenant";
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, imageUrl, companyId } = await req.json();
-
+    const { prompt, imageUrl, imageUrls, companyId } = await req.json();
     if (!companyId) {
       return NextResponse.json({ error: "Falta companyId" }, { status: 400 });
     }
@@ -56,9 +55,16 @@ export async function POST(req: NextRequest) {
       ? `${prompt.trim()}\n\nBrand / style notes: ${brandInstructions}`
       : prompt.trim();
 
+    const refs: string[] = Array.isArray(imageUrls)
+      ? imageUrls.filter((u: string) => typeof u === "string" && u.length > 0)
+      : imageUrl
+        ? [imageUrl]
+        : [];
+
     const generatedImageUrl = await generateImage({
-      prompt: finalPrompt,
-      imageUrl, // opcional (edición)
+      prompt,
+      imageUrl: refs[0],
+      imageUrls: refs,
     });
 
     // Solo si la generación salió bien

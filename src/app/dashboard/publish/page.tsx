@@ -2,6 +2,9 @@
 
 import { useEffect, useState, useRef } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
+import { FolderOpen } from "lucide-react";
+import { MediaLibraryPicker } from "@/components/social/MediaLibraryPicker";
+import { saveMediaToLibrary } from "@/lib/media";
 import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -58,6 +61,9 @@ interface PublishResult {
 export default function BulkPublishPage() {
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [loadingAccounts, setLoadingAccounts] = useState(true);
+
+  const user = useAuthStore((s) => s.user);
+  const [libraryOpen, setLibraryOpen] = useState(false);
 
   const companyId = useAuthStore((s) => s.companyId);
   const memberRole = useAuthStore((s) => s.memberRole);
@@ -142,7 +148,36 @@ export default function BulkPublishPage() {
     }
 
     const data = await res.json();
-    return data.publicUrl as string;
+    const publicUrl = data.publicUrl as string;
+
+    if (user?.uid) {
+      try {
+        await saveMediaToLibrary({
+          companyId,
+          uid: user.uid,
+          url: publicUrl,
+          key: data.key,
+          fileName: file.name,
+          size: file.size,
+          mimeType: file.type || "application/octet-stream",
+          source: "upload",
+        });
+      } catch (e) {
+        console.warn("No se pudo guardar en biblioteca:", e);
+      }
+    }
+
+    return publicUrl;
+  };
+
+  const onLibrarySelect = (item: { url: string; type: "image" | "video" }) => {
+    if (item.type === "video") {
+      setImageUrl(null);
+      setVideoUrl(item.url);
+    } else {
+      setVideoUrl(null);
+      setImageUrl(item.url);
+    }
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -578,6 +613,16 @@ export default function BulkPublishPage() {
                       <Video className="h-4 w-4 mr-2" />
                       Video
                     </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setLibraryOpen(true)}
+                      disabled={publishing || uploadingMedia}
+                    >
+                      <FolderOpen className="h-4 w-4 mr-2" />
+                      Biblioteca
+                    </Button>
                   </div>
 
                   <div className="flex-1 flex items-center justify-center">
@@ -709,6 +754,14 @@ export default function BulkPublishPage() {
           )}
         </div>
       </div>
+      <MediaLibraryPicker
+        open={libraryOpen}
+        onClose={() => setLibraryOpen(false)}
+        accept={
+          selectedInstagram && instagramMediaType === "REELS" ? "video" : "all"
+        }
+        onSelect={onLibrarySelect}
+      />
     </div>
   );
 }

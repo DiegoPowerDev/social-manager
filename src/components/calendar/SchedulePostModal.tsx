@@ -22,7 +22,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, ImagePlus, Video, X } from "lucide-react";
+
+import { Loader2, ImagePlus, Video, X, FolderOpen } from "lucide-react";
+import { MediaLibraryPicker } from "@/components/social/MediaLibraryPicker";
+import { saveMediaToLibrary } from "@/lib/media";
 import { AICaptionGenerator } from "@/components/social/AICaptionGenerator";
 import { AIImageGenerator } from "@/components/social/AIImageGenerator";
 import { Separator } from "@/components/ui/separator";
@@ -71,6 +74,8 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const companyId = useAuthStore((s) => s.companyId);
+  const user = useAuthStore((s) => s.user);
+  const [libraryOpen, setLibraryOpen] = useState(false);
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -144,7 +149,36 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
     }
 
     const data = await res.json();
-    return data.publicUrl as string;
+    const publicUrl = data.publicUrl as string;
+
+    if (user?.uid) {
+      try {
+        await saveMediaToLibrary({
+          companyId,
+          uid: user.uid,
+          url: publicUrl,
+          key: data.key,
+          fileName: file.name,
+          size: file.size,
+          mimeType: file.type || "application/octet-stream",
+          source: "upload",
+        });
+      } catch (e) {
+        console.warn("No se pudo guardar en biblioteca:", e);
+      }
+    }
+
+    return publicUrl;
+  };
+  const onLibrarySelect = (item: { url: string; type: "image" | "video" }) => {
+    setError(null);
+    if (item.type === "video") {
+      setImageUrl(null);
+      setVideoUrl(item.url);
+    } else {
+      setVideoUrl(null);
+      setImageUrl(item.url);
+    }
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -509,6 +543,16 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
                   <Video className="h-4 w-4 mr-2" />
                   Video
                 </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setLibraryOpen(true)}
+                  disabled={saving || uploadingMedia}
+                >
+                  <FolderOpen className="h-4 w-4 mr-2" />
+                  Biblioteca
+                </Button>
               </div>
 
               <div className="flex-1 flex items-center justify-center">
@@ -591,6 +635,14 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
           </div>
         </div>
       </div>
+      <MediaLibraryPicker
+        open={libraryOpen}
+        onClose={() => setLibraryOpen(false)}
+        accept={
+          selectedInstagram && instagramMediaType === "REELS" ? "video" : "all"
+        }
+        onSelect={onLibrarySelect}
+      />
     </div>
   );
 }
