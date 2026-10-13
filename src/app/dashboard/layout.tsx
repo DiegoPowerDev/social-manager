@@ -22,34 +22,34 @@ export default function DashboardLayout({
     }
   }, [user, loading, router]);
 
-  // Mientras carga la autenticación
-  if (loading) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center">
-        <LucideLoaderCircle className="animate-spin h-16 w-16 text-yellow-200" />
-      </div>
-    );
-  }
-
-  // Si no hay usuario, no renderizamos nada (mientras redirige)
-  if (!user) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center">
-        <LucideLoaderCircle className="animate-spin h-16 w-16 text-yellow-200" />
-      </div>
-    );
-  }
-
   // Usuario autenticado → mostramos el dashboard
   return (
     <div
       style={{ backgroundImage: `url("/background.webp")` }}
       className={cn("bg-cover bg-no-repeat flex h-screen overflow-hidden")}
     >
-      <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <main className="flex-1 overflow-y-auto w-full">{children}</main>
-      </div>
+      {loading ? (
+        <div className="flex h-screen w-full items-center justify-center">
+          <LucideLoaderCircle className="animate-spin h-16 w-16 text-yellow-200" />
+        </div>
+      ) : (
+        <>
+          {!user ? (
+            <div className="flex h-screen w-full items-center justify-center">
+              <LucideLoaderCircle className="animate-spin h-16 w-16 text-yellow-200" />
+            </div>
+          ) : (
+            <>
+              <Sidebar />
+              <div className="flex flex-1 flex-col overflow-hidden">
+                <main className="flex-1 overflow-y-auto w-full">
+                  {children}
+                </main>
+              </div>
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 }

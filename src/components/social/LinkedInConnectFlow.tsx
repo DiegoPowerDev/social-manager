@@ -19,12 +19,14 @@ export function LinkedInConnectFlow({
   status: { type: "success" | "error"; text: string } | null;
 }) {
   return (
-    <div className="flex-1 flex flex-col space-y-6 w-full">
-      <div className="p-6 bg-zinc-950/50 backdrop-blur text-white">
-        <h2 className="text-2xl font-bold">LinkedIn</h2>
-        <p className="text-muted-foreground mt-1">
-          Conecta el perfil de LinkedIn desde el que publicarás
-        </p>
+    <div className="h-full flex flex-col space-y-12 w-full">
+      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
+        <div className="p-6  text-white">
+          <h1 className="text-2xl font-bold">LinkedIn</h1>
+          <p className=" text-sm">
+            Conecta el perfil de LinkedIn desde el que publicarás
+          </p>
+        </div>
       </div>
 
       {status && (
@@ -38,7 +40,7 @@ export function LinkedInConnectFlow({
           {status.text}
         </div>
       )}
-      <div className="w-full flex justify-center items-center">
+      <div className="w-full flex justify-center">
         <Card className="bg-white/70 w-80 ">
           <CardHeader>
             <CardTitle>Conectar perfil</CardTitle>

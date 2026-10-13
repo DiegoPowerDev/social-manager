@@ -178,10 +178,13 @@ export default function CalendarPage() {
 
   return (
     <div className="">
-      <div className="p-6 bg-zinc-950/50 backdrop-blur text-white">
-        <h2 className="text-3xl font-bold ">Calendario</h2>
-        <p className=" mt-1">Programa publicaciones por día y hora</p>
+      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
+        <div className="p-6  text-white">
+          <h1 className="text-2xl font-bold">Calendario</h1>
+          <p className=" text-sm">Programa publicaciones por día y hora</p>
+        </div>
       </div>
+
       <div className="w-full h-full px-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

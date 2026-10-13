@@ -19,10 +19,14 @@ export function InstagramConnectFlow({
   status: { type: "success" | "error"; text: string } | null;
 }) {
   return (
-    <div className="flex-1 flex flex-col space-y-6 w-full">
-      <div className="p-6 bg-zinc-950/50 backdrop-blur text-white">
-        <h2 className="text-2xl font-bold">Instagram</h2>
-        <p className=" mt-1">Conecta la Página de Instagram de tu empresa</p>
+    <div className="space-y-12  ">
+      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
+        <div className="p-6  text-white">
+          <h1 className="text-2xl font-bold">Instagram</h1>
+          <p className=" text-sm">
+            Conecta la Página de Instagram de tu empresa
+          </p>
+        </div>
       </div>
       {status && (
         <div
@@ -35,7 +39,7 @@ export function InstagramConnectFlow({
           {status.text}
         </div>
       )}
-      <div className="w-full flex justify-center items-center">
+      <div className="w-full flex justify-center">
         <Card className="bg-white/70 w-80 ">
           <CardHeader>
             <CardTitle>Conectar página</CardTitle>

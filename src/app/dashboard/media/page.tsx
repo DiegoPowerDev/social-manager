@@ -217,9 +217,9 @@ export default function MediaLibraryPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
+      <div className="flex  items-center justify-between bg-zinc-950/50 backdrop-blur">
         <div className="p-6  text-white">
           <h1 className="text-2xl font-bold">Media Library</h1>
           <p className="text-sm">
@@ -261,8 +261,8 @@ export default function MediaLibraryPage() {
           {error}
         </p>
       )}
-      <div className="flex justify-center p-6">
-        <Card className="bg-white/70">
+      <div className="flex-1 flex justify-center p-6">
+        <Card className="bg-white/70 w-full flex-1">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Archivos</CardTitle>
             <CardDescription>
@@ -271,7 +271,7 @@ export default function MediaLibraryPage() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="flex justify-center py-16">
+              <div className="flex-1 w-full flex justify-center py-16">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             ) : items.length === 0 ? (

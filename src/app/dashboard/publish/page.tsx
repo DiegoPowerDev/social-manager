@@ -385,11 +385,16 @@ export default function BulkPublishPage() {
   if (accounts.length === 0) {
     return (
       <div className="flex-1  flex  flex-col h-full w-full">
-        <TitleComponent
-          title="Publicar en varias redes"
-          description="No tienes ninguna red conectada. Conecta Facebook, Instagram o
-          LinkedIn primero."
-        />
+        <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
+          <div className="p-6  text-white">
+            <h1 className="text-2xl font-bold">Publicar en varias redes</h1>
+            <p className=" text-sm">
+              No tienes ninguna red conectada. Conecta Facebook, Instagram o
+              LinkedIn primero.
+            </p>
+          </div>
+        </div>
+
         <div className="flex-1 flex items-center justify-center">
           <div className="text-white">
             ¡No pierdas tiempo, empieza a añadir tus redes!
