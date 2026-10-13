@@ -92,7 +92,6 @@ export default function HomePage() {
       style={{ backgroundImage: `url("/home-background.webp")` }}
       className={cn("bg-cover bg-no-repeat min-h-screen ")}
     >
-      {/* Header */}
       <HomeHeader />
 
       {/* Banner / Hero */}
