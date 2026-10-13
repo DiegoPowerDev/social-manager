@@ -1,4 +1,12 @@
-import { BarChart, Calendar, LucideIcon, Send, Settings } from "lucide-react";
+import {
+  BarChart,
+  Calendar,
+  ImageIcon,
+  LucideIcon,
+  Send,
+  Settings,
+  Users,
+} from "lucide-react";
 import Image from "next/image";
 import { ReactElement } from "react";
 
@@ -17,63 +25,76 @@ export const mainNav: Menu[] = [
   },
   {
     title: "Instagram",
-    href: "/instagram",
+    href: "/dashboard/instagram",
     icon: "",
     image: (
       <Image
         height={20}
         width={20}
-        src="./instagram-icon.svg"
+        src="/instagram-icon.svg"
         alt="Instagram logo"
       />
     ),
   },
   {
     title: "Facebook",
-    href: "/facebook",
+    href: "/dashboard/facebook",
     icon: "",
     image: (
       <Image
         height={20}
         width={20}
-        src="./facebook-icon.svg"
+        src="/facebook-icon.svg"
         alt="facebook logo"
       />
     ),
   },
   {
     title: "LinkedIn",
-    href: "/linkedin",
+    href: "/dashboard/linkedin",
     icon: "",
     image: (
       <Image
         className="bg-white rounded"
         height={20}
         width={20}
-        src="./linkedin.svg"
+        src="/linkedin.svg"
         alt="Linkedin logo"
       />
     ),
   },
   {
     title: "youtube",
-    href: "/youtube ",
+    href: "/dashboard/youtube ",
     icon: "",
     image: (
       <Image
         className="bg-white rounded"
         height={20}
         width={20}
-        src="./youtube.svg"
+        src="/youtube.svg"
         alt="Youtube logo"
       />
     ),
   },
   {
     title: "Publicar en masa",
-    href: "/publish",
+    href: "/dashboard/publish",
     icon: Send,
   },
-  { title: "Calendario", href: "/calendar", icon: Calendar },
-  { title: "Configuración", href: "/settings", icon: Settings },
+  { title: "Calendario", href: "/dashboard/calendar", icon: Calendar },
+  { title: "Configuración", href: "/dashboard/settings", icon: Settings },
+];
+
+export const secondaryNav = [
+  {
+    title: "Media Library",
+    href: "/dashboard/media",
+    icon: ImageIcon,
+  },
+  {
+    title: "Equipo",
+    href: "/dashboard/team",
+    icon: Users,
+  },
 ];

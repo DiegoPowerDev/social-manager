@@ -19,12 +19,10 @@ export function InstagramConnectFlow({
   status: { type: "success" | "error"; text: string } | null;
 }) {
   return (
-    <div className="flex-1 flex flex-col space-y-6 p-6 max-w-lg">
-      <div>
-        <h2 className="text-2xl font-bold">Facebook</h2>
-        <p className="text-muted-foreground mt-1">
-          Conecta la Página de Facebook de tu empresa
-        </p>
+    <div className="flex-1 flex flex-col space-y-6 w-full">
+      <div className="p-6 bg-zinc-950/50 backdrop-blur text-white">
+        <h2 className="text-2xl font-bold">Instagram</h2>
+        <p className=" mt-1">Conecta la Página de Instagram de tu empresa</p>
       </div>
       {status && (
         <div
@@ -37,29 +35,31 @@ export function InstagramConnectFlow({
           {status.text}
         </div>
       )}
-      <Card className="bg-white/70">
-        <CardHeader>
-          <CardTitle>Conectar página</CardTitle>
-          <CardDescription>
-            Usa una cuenta con rol de administrador en la Página.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button
-            disabled={!canConnect}
-            onClick={() => {
-              window.location.href = `/api/auth/instagram?companyId=${companyId}`;
-            }}
-          >
-            Conectar Facebook
-          </Button>
-          {!canConnect && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Solo un administrador puede conectar redes
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      <div className="w-full flex justify-center items-center">
+        <Card className="bg-white/70 w-80 ">
+          <CardHeader>
+            <CardTitle>Conectar página</CardTitle>
+            <CardDescription>
+              Usa una cuenta con rol de administrador en la Página.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex justify-center">
+            <Button
+              disabled={!canConnect}
+              onClick={() => {
+                window.location.href = `/api/auth/instagram?companyId=${companyId}`;
+              }}
+            >
+              Conectar Instagram
+            </Button>
+            {!canConnect && (
+              <p className="text-xs text-muted-foreground mt-2">
+                Solo un administrador puede conectar redes
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

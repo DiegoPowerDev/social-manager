@@ -157,9 +157,9 @@ export default function TeamPage() {
 
   return (
     <div>
-      <div className="p-6 bg-yellow-500/20">
+      <div className="p-6 bg-zinc-950/50 backdrop-blur text-white">
         <h2 className="text-2xl font-bold">Equipo</h2>
-        <p className="text-muted-foreground mt-1">
+        <p className="mt-1">
           Gestiona quién puede usar la plataforma en tu empresa
         </p>
       </div>

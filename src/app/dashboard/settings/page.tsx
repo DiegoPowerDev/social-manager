@@ -174,11 +174,9 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <div className="p-6 bg-yellow-500/20">
-        <h2 className="text-2xl font-bold">Configuración</h2>
-        <p className="text-muted-foreground mt-1">
-          Datos de tu empresa e instrucciones para la IA
-        </p>
+      <div className="p-6 bg-zinc-950/50 backdrop-blur text-white">
+        <h2 className="text-3xl font-bold ">Configuración</h2>
+        <p className=" mt-1">Datos de tu empresa e instrucciones para la IA</p>
       </div>
 
       <div className="p-6 max-w-2xl space-y-6">

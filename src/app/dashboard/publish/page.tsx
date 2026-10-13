@@ -372,10 +372,12 @@ export default function BulkPublishPage() {
 
   return (
     <div className="">
-      <TitleComponent
-        title="Publicar en varias redes"
-        description="Crea el contenido una vez y publícalo en todas las redes seleccionadas"
-      />
+      <div className="p-6 bg-zinc-950/50 backdrop-blur text-white">
+        <h2 className="text-3xl font-bold ">Publicar en varias redes</h2>
+        <p className=" mt-1">
+          Crea el contenido una vez y publícalo en todas las redes seleccionadas
+        </p>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
         {/* Contenido */}

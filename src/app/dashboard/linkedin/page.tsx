@@ -1,7 +1,7 @@
 "use client";
 
-import { getTokenStatus, tokenStatusLabel } from "@/lib/tokenStatus";
 import { useEffect, useState } from "react";
+import { getTokenStatus, tokenStatusLabel } from "@/lib/tokenStatus";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   collection,
@@ -12,7 +12,8 @@ import {
   doc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { FacebookComposer } from "@/components/social/FacebookComposer";
+import { LinkedInComposer } from "@/components/social/LinkedInComposer";
+import { LinkedInConnectFlow } from "@/components/social/LinkedInConnectFlow";
 import { PostHistory } from "@/components/social/PostHistory";
 import { PostPreview } from "@/components/social/PostPreview";
 import { Button } from "@/components/ui/button";
@@ -20,17 +21,17 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LucideLoaderCircle } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { FacebookConnectFlow } from "@/components/social/FacebookConnectFlow";
+import { cn } from "@/lib/utils";
 
-export default function FacebookPage() {
+export default function LinkedInPage() {
   const [activeTab, setActiveTab] = useState("create");
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
+  const companyId = useAuthStore((s) => s.companyId);
   const memberRole = useAuthStore((s) => s.memberRole);
   const canEdit = memberRole === "admin" || memberRole === "editor";
   const canConnect = memberRole === "admin";
-
-  const searchParams = useSearchParams();
-  const router = useRouter();
 
   const [account, setAccount] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -39,22 +40,19 @@ export default function FacebookPage() {
     type: "success" | "error";
     text: string;
   } | null>(null);
-  const companyId = useAuthStore((s) => s.companyId);
-  // Estado del post (controlado)
-  const [message, setMessage] = useState("");
+
+  const [text, setText] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [link, setLink] = useState("");
 
   const loadAccount = async () => {
     try {
-      if (!companyId) {
-        return;
-      }
+      if (!companyId) return;
+
       const q = query(
         collection(db, "socialAccounts"),
         where("companyId", "==", companyId),
-        where("platform", "==", "facebook"),
+        where("platform", "==", "linkedin"),
       );
       const snapshot = await getDocs(q);
 
@@ -89,35 +87,34 @@ export default function FacebookPage() {
     const error = searchParams.get("error");
 
     if (success === "true") {
-      setStatus({ type: "success", text: "Cuenta de Facebook conectada" });
+      setStatus({ type: "success", text: "Cuenta de LinkedIn conectada" });
       loadAccount();
-      router.replace("/facebook");
+      router.replace("/linkedin");
     }
 
     if (error) {
-      setStatus({ type: "error", text: "Error al conectar la cuenta" });
-      router.replace("/facebook");
+      setStatus({ type: "error", text: `Error al conectar: ${error}` });
+      router.replace("/linkedin");
     }
   }, [searchParams]);
 
   const handlePublish = async () => {
-    if (!account) return;
-    if (!message.trim() && !imageUrl && !videoUrl) return;
+    if (!account || !companyId || !canEdit) return;
+    if (!text.trim() && !imageUrl && !videoUrl) return;
 
     setLoading(true);
     setStatus(null);
 
     try {
-      const res = await fetch("/api/publish/facebook", {
+      const res = await fetch("/api/publish/linkedin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          pageId: account.pageId,
-          companyId,
+          personId: account.personId,
           accessToken: account.accessToken,
-          pageName: account.name,
-          message,
-          link: link || undefined,
+          name: account.name,
+          companyId,
+          text,
           imageUrl: imageUrl || undefined,
           videoUrl: videoUrl || undefined,
         }),
@@ -128,14 +125,11 @@ export default function FacebookPage() {
 
       setStatus({
         type: "success",
-        text: "Publicado correctamente en Facebook",
+        text: "Publicado correctamente en LinkedIn",
       });
-
-      // Limpiar solo después de publicar exitosamente
-      setMessage("");
+      setText("");
       setImageUrl(null);
       setVideoUrl(null);
-      setLink("");
     } catch (err: any) {
       const msg = err.message || "Error al publicar";
       if (
@@ -148,7 +142,7 @@ export default function FacebookPage() {
           text: "El token expiró o es inválido. Reconecta la cuenta.",
         });
       } else {
-        setStatus({ type: "error", text: err.message });
+        setStatus({ type: "error", text: msg });
       }
     } finally {
       setLoading(false);
@@ -156,7 +150,8 @@ export default function FacebookPage() {
   };
 
   const handleDisconnect = async () => {
-    if (!account || !confirm("¿Desconectar esta cuenta de Facebook?")) return;
+    if (!account || !canConnect) return;
+    if (!confirm("¿Desconectar esta cuenta de LinkedIn?")) return;
     await deleteDoc(doc(db, "socialAccounts", account.id));
     setAccount(null);
   };
@@ -168,15 +163,18 @@ export default function FacebookPage() {
       </div>
     );
   }
+
   if (!companyId) {
     return (
-      <div className="p-6 text-muted-foreground">No hay empresa asociada.</div>
+      <div className="p-6 text-muted-foreground">
+        No hay empresa asociada a tu cuenta.
+      </div>
     );
   }
 
   if (!account) {
     return (
-      <FacebookConnectFlow
+      <LinkedInConnectFlow
         companyId={companyId}
         canConnect={canConnect}
         status={status}
@@ -186,13 +184,11 @@ export default function FacebookPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between p-6 bg-yellow-500/20 ">
+      <div className="flex text-white items-center justify-between p-6 bg-zinc-950/50 backdrop-blur">
         <div>
-          <h2 className="text-2xl font-bold">Facebook</h2>
-          <p className="text-muted-foreground mt-1">
-            Publicando como{" "}
-            <span className="font-medium text-foreground">{account.name}</span>
+          <h2 className="text-2xl font-bold">LinkedIn</h2>
+          <p className=" mt-1">
+            Publicando como <span className="font-medium">{account.name}</span>
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -208,11 +204,17 @@ export default function FacebookPage() {
               );
             return <Badge variant="secondary">Conectado</Badge>;
           })()}
-          <Button variant="outline" size="sm" onClick={handleDisconnect}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDisconnect}
+            disabled={!canConnect}
+          >
             Desconectar
           </Button>
         </div>
       </div>
+
       {(() => {
         const tokenStatus = getTokenStatus(account.expiresAt);
         if (tokenStatus === "ok") return null;
@@ -233,23 +235,25 @@ export default function FacebookPage() {
                 </p>
               )}
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() =>
-                (window.location.href =
-                  "/api/auth/facebook?companyId=${companyId}")
-              }
-            >
-              Reconectar LinkedIn
-            </Button>
+            {canConnect && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  window.location.href = `/api/auth/linkedin?companyId=${companyId}`;
+                }}
+              >
+                Reconectar LinkedIn
+              </Button>
+            )}
           </div>
         );
       })()}
+
       <div className="w-full h-full p-6">
         {status && (
           <div
-            className={`p-3 rounded-md text-sm ${
+            className={`p-3 rounded-md text-sm mb-4 ${
               status.type === "success"
                 ? "bg-green-50 text-green-700 border border-green-200"
                 : "bg-red-50 text-red-700 border border-red-200"
@@ -260,49 +264,49 @@ export default function FacebookPage() {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-md grid-cols-2 bg-yellow-500/60 font-bold backdrop-blur-xs">
             <TabsTrigger value="create">Crear contenido</TabsTrigger>
             <TabsTrigger value="history">Historial</TabsTrigger>
           </TabsList>
         </Tabs>
 
-        {/* Crear - siempre montado, solo se oculta */}
-        <div className={activeTab === "create" ? "mt-6 block" : "hidden"}>
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <div className="xl:col-span-2">
-              <FacebookComposer
-                pageName={account.name}
-                loading={loading}
-                message={message}
-                onMessageChange={setMessage}
-                imageUrl={imageUrl}
-                onImageChange={setImageUrl}
-                videoUrl={videoUrl}
-                onVideoChange={setVideoUrl}
-                link={link}
-                companyId={companyId}
-                onLinkChange={setLink}
-                onPublish={handlePublish}
-              />
+        <div className={cn(activeTab === "create" ? "mt-6 block" : "hidden")}>
+          {!canEdit ? (
+            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded-md">
+              Tu rol es solo lectura. No puedes publicar ni desconectar.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              <div className="xl:col-span-2">
+                <LinkedInComposer
+                  accountName={account.name}
+                  loading={loading}
+                  text={text}
+                  onTextChange={setText}
+                  imageUrl={imageUrl}
+                  onImageChange={setImageUrl}
+                  videoUrl={videoUrl}
+                  onVideoChange={setVideoUrl}
+                  onPublish={handlePublish}
+                />
+              </div>
+              <div>
+                <PostPreview
+                  platform="linkedin"
+                  accountName={account.name}
+                  message={text}
+                  imageUrl={imageUrl}
+                  videoUrl={videoUrl}
+                />
+              </div>
             </div>
-
-            <div>
-              <PostPreview
-                platform="facebook"
-                accountName={account.name}
-                message={message}
-                imageUrl={imageUrl}
-                videoUrl={videoUrl}
-              />
-            </div>
-          </div>
+          )}
         </div>
 
-        {/* Historial - siempre montado, solo se oculta */}
         <div className={activeTab === "history" ? "mt-6 block" : "hidden"}>
           <PostHistory
-            pageId={account.pageId}
-            platform="facebook"
+            pageId={account.personId}
+            platform="linkedin"
             key={status?.type === "success" ? Date.now() : "history"}
           />
         </div>

@@ -14,6 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { cn } from "cn";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -38,7 +39,12 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/40 px-4">
+    <div
+      style={{ backgroundImage: `url("/background.webp")` }}
+      className={cn(
+        "bg-cover bg-no-repeat min-h-screen flex items-center justify-center bg-muted/40 px-4",
+      )}
+    >
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Social Publisher</CardTitle>

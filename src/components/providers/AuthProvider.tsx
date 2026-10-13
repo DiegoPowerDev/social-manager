@@ -27,6 +27,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             companyName: null,
             memberRole: null,
             companyLogo: null,
+            plan: null,
+            aiEnabled: false,
+            aiCaptionsLimit: 0,
+            aiImagesLimit: 0,
           });
           return;
         }
@@ -36,7 +40,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
 
         if (!userDoc.exists()) {
-          // Eliminado de la plataforma o nunca provisionado
           console.error("No existe users/" + firebaseUser.uid);
           await signOut(auth);
           logout();
@@ -65,12 +68,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               { merge: true },
             );
           } else {
-            // Sin empresa: no crear una automáticamente
             setTenant({
               companyId: null,
               companyName: null,
               memberRole: null,
               companyLogo: null,
+              plan: null,
+              aiEnabled: false,
+              aiCaptionsLimit: 0,
+              aiImagesLimit: 0,
             });
             return;
           }
@@ -87,6 +93,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             companyName: null,
             memberRole: null,
             companyLogo: null,
+            plan: null,
+            aiEnabled: false,
+            aiCaptionsLimit: 0,
+            aiImagesLimit: 0,
           });
           return;
         }

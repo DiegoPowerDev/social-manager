@@ -265,11 +265,13 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <TitleComponent
-        title="Dashboard"
-        description="Actividad de publicaciones — haz clic en barras o sectores para
-          filtrar"
-      />
+      <div className="p-6 bg-zinc-950/50 backdrop-blur text-white">
+        <h2 className="text-3xl font-bold ">Dashboard</h2>
+        <p className=" mt-1">
+          Actividad de publicaciones — haz clic en barras o sectores para
+          filtrar
+        </p>
+      </div>
 
       <div className="p-6 space-y-6">
         {/* Filtros */}

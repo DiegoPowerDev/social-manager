@@ -178,11 +178,10 @@ export default function CalendarPage() {
 
   return (
     <div className="">
-      <TitleComponent
-        title="Calendario"
-        description="Programa publicaciones por día y hora"
-      />
-
+      <div className="p-6 bg-zinc-950/50 backdrop-blur text-white">
+        <h2 className="text-3xl font-bold ">Calendario</h2>
+        <p className=" mt-1">Programa publicaciones por día y hora</p>
+      </div>
       <div className="w-full h-full px-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -259,7 +258,7 @@ export default function CalendarPage() {
                       {format(day, "d")}
                     </span>
                     {dayPosts.length !== 0 && (
-                      <span className="text-black/50 rounded-full border-2 select-none flex gap-2 items-center">
+                      <span className="text-black/50 select-none flex gap-2 items-center">
                         {dayPosts.length}
                         <Clock size={15} />
                       </span>

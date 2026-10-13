@@ -19,12 +19,10 @@ export function YouTubeConnectFlow({
   status: { type: "success" | "error"; text: string } | null;
 }) {
   return (
-    <div className="flex-1 flex flex-col space-y-6 p-6 max-w-lg">
-      <div>
+    <div className="flex-1 flex flex-col space-y-6 w-full">
+      <div className="p-6 bg-zinc-950/50 backdrop-blur text-white">
         <h2 className="text-2xl font-bold">YouTube</h2>
-        <p className="text-muted-foreground mt-1">
-          Conecta el canal de YouTube de tu empresa
-        </p>
+        <p className=" mt-1">Conecta el canal de YouTube de tu empresa</p>
       </div>
 
       {status && (
@@ -39,30 +37,32 @@ export function YouTubeConnectFlow({
         </div>
       )}
 
-      <Card className="bg-white/70">
-        <CardHeader>
-          <CardTitle>Conectar canal</CardTitle>
-          <CardDescription>
-            Inicia sesión con la cuenta de Google dueña del canal. Se publicarán
-            videos en ese canal.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Button
-            disabled={!canConnect}
-            onClick={() => {
-              window.location.href = `/api/auth/youtube?companyId=${companyId}`;
-            }}
-          >
-            Conectar YouTube
-          </Button>
-          {!canConnect && (
-            <p className="text-xs text-muted-foreground">
-              Solo un administrador puede conectar redes
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      <div className="w-full flex justify-center items-center">
+        <Card className="bg-white/70 w-80 ">
+          <CardHeader>
+            <CardTitle>Conectar canal</CardTitle>
+            <CardDescription>
+              Inicia sesión con la cuenta de Google dueña del canal. Se
+              publicarán videos en ese canal.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex justify-center">
+            <Button
+              disabled={!canConnect}
+              onClick={() => {
+                window.location.href = `/api/auth/youtube?companyId=${companyId}`;
+              }}
+            >
+              Conectar YouTube
+            </Button>
+            {!canConnect && (
+              <p className="text-xs text-muted-foreground">
+                Solo un administrador puede conectar redes
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

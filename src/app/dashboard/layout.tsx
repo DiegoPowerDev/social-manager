@@ -6,6 +6,7 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { LucideLoaderCircle } from "lucide-react";
 import { AuthProvider } from "@/components/providers/AuthProvider";
+import { cn } from "cn";
 
 export default function DashboardLayout({
   children,
@@ -41,12 +42,13 @@ export default function DashboardLayout({
 
   // Usuario autenticado → mostramos el dashboard
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div
+      style={{ backgroundImage: `url("/background.webp")` }}
+      className={cn("bg-cover bg-no-repeat flex h-screen overflow-hidden")}
+    >
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <main className="flex-1 overflow-y-auto w-full">
-          <AuthProvider>{children}</AuthProvider>
-        </main>
+        <main className="flex-1 overflow-y-auto w-full">{children}</main>
       </div>
     </div>
   );

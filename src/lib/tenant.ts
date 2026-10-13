@@ -15,19 +15,22 @@ import type { MemberRole } from "@/types";
 /** Límites por plan (ajusta cuando tengas Stripe) */
 export const PLAN_LIMITS = {
   free: {
-    aiEnabled: true,
-    aiCaptionsPerMonth: 15,
-    aiImagesPerMonth: 3,
+    aiEnabled: false,
+    aiCaptionsPerMonth: 0,
+    aiImagesPerMonth: 0,
+    platforms: [] as string[],
   },
-  monthly: {
+  basic: {
+    aiEnabled: false,
+    aiCaptionsPerMonth: 0,
+    aiImagesPerMonth: 0,
+    platforms: ["facebook", "instagram", "youtube"],
+  },
+  premium: {
     aiEnabled: true,
     aiCaptionsPerMonth: 100,
     aiImagesPerMonth: 30,
-  },
-  yearly: {
-    aiEnabled: true,
-    aiCaptionsPerMonth: 150,
-    aiImagesPerMonth: 50,
+    platforms: ["facebook", "instagram", "youtube", "linkedin", "tiktok"],
   },
 } as const;
 

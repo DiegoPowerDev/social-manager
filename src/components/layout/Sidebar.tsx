@@ -2,27 +2,15 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Image as ImageIcon, Users, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { mainNav } from "@/content/menu";
-
-const secondaryNav = [
-  {
-    title: "Media Library",
-    href: "/media",
-    icon: ImageIcon,
-  },
-  {
-    title: "Equipo",
-    href: "/team",
-    icon: Users,
-  },
-];
+import { mainNav, secondaryNav } from "@/content/menu";
+import Image from "next/image";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -42,12 +30,16 @@ export function Sidebar() {
       <div className="flex flex-col justify-center">
         <Link
           href="/"
-          className="flex items-center gap-2 p-3 font-semibold bg-black text-white"
+          className="flex items-center gap-2 justify-center font-semibold bg-white/70"
         >
-          <div className="flex h-8 w-8 rounded-md bg-primary text-primary-foreground items-center justify-center">
-            SP
-          </div>
-          <span className="">Social Publisher</span>
+          <Image
+            src="/logo-horizontal.webp"
+            loading="eager"
+            width={120}
+            height={220}
+            alt="logo"
+            className="object-contain rounded "
+          />
         </Link>
         <div className="flex items-center p-3 border-b gap-4 select-none">
           {companyLogo && (

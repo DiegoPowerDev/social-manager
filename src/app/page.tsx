@@ -1,130 +1,213 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { PricingSection } from "@/components/marketing/PricingSection";
+import { cn } from "cn";
+import HomeHeader from "@/components/layout/homeHeader";
+
+const features = [
+  {
+    title: "Todas tus redes en un solo lugar",
+    description:
+      "Publica en Facebook, Instagram, LinkedIn y YouTube sin cambiar de herramienta.",
+  },
+  {
+    title: "Calendario y programación",
+    description:
+      "Planifica el mes, edita posts programados y deja que se publiquen solos.",
+  },
+  {
+    title: "Publicación en masa",
+    description:
+      "Un mismo contenido a varias redes a la vez, con vista previa por plataforma.",
+  },
+  {
+    title: "IA para captions e imágenes",
+    description:
+      "Genera textos e imágenes con cupos según tu plan, adaptados a tu marca.",
+  },
+  {
+    title: "Equipo y roles",
+    description:
+      "Invita editores y viewers. Controla quién publica y quién solo consulta.",
+  },
+  {
+    title: "Historial y dashboard",
+    description:
+      "Revisa lo publicado, enlaces a cada post y actividad de tu equipo.",
+  },
+];
+
+const plans = [
+  {
+    name: "Free",
+    price: "€0",
+    period: "/mes",
+    description: "Para probar el flujo con tu equipo.",
+    features: [
+      "1 empresa",
+      "Redes principales",
+      "15 captions IA / mes",
+      "3 imágenes IA / mes",
+      "Calendario básico",
+    ],
+    cta: "Empezar",
+    highlighted: false,
+  },
+  {
+    name: "Monthly",
+    price: "€29",
+    period: "/mes",
+    description: "Para equipos que publican cada semana.",
+    features: [
+      "Todo lo de Free",
+      "100 captions IA / mes",
+      "30 imágenes IA / mes",
+      "Publicación en masa",
+      "Más asientos de equipo",
+    ],
+    cta: "Elegir Monthly",
+    highlighted: true,
+  },
+  {
+    name: "Yearly",
+    price: "€249",
+    period: "/año",
+    description: "Mejor precio si ya lo usas en serio.",
+    features: [
+      "Todo lo de Monthly",
+      "150 captions IA / mes",
+      "50 imágenes IA / mes",
+      "Prioridad de soporte",
+      "2 meses de ahorro vs mensual",
+    ],
+    cta: "Elegir Yearly",
+    highlighted: false,
+  },
+];
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white">
+    <main
+      style={{ backgroundImage: `url("/home-background.webp")` }}
+      className={cn("bg-cover bg-no-repeat min-h-screen ")}
+    >
       {/* Header */}
-      <header className="border-b bg-white/80 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-orange-400 to-yellow-500" />
-            <span className="font-bold text-xl">Trendly</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link href="/login">
-              <Button variant="ghost">Iniciar sesión</Button>
-            </Link>
-            <Link href="/login">
-              <Button className="bg-gradient-to-r from-orange-400 to-yellow-500 hover:from-orange-500 hover:to-yellow-500 text-white">
-                Comenzar
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
+      <HomeHeader />
 
-      {/* Hero */}
-      <section className="max-w-6xl mx-auto px-6 py-20 text-center">
-        <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-gray-900 mb-6">
-          Publica en todas tus redes sociales
-          <br />
-          <span className="bg-gradient-to-r from-orange-500 to-yellow-500 bg-clip-text text-transparent">
-            desde un solo lugar
-          </span>
-        </h1>
-        <p className="text-lg text-gray-600 max-w-2xl mx-auto mb-10">
-          Trendly es una plataforma para equipos de marketing que permite crear,
-          programar y publicar contenido de forma masiva en Instagram, Facebook
-          y LinkedIn de manera rápida y sencilla.
-        </p>
-        <div className="flex justify-center gap-4">
-          <Link href="/login">
-            <Button
-              size="lg"
-              className="bg-gradient-to-r from-orange-400 to-yellow-500 hover:from-orange-500 hover:to-yellow-500 text-white px-8"
+      {/* Banner / Hero */}
+      <section className="relative overflow-hidden border-b border-white/10">
+        {/* Espacio para banner: sustituye el div por <Image src="/banner.jpg" ... /> */}
+        <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/20 via-zinc-950 to-zinc-950" />
+        <div className="absolute inset-0 bg-[url('/banner.jpg')] bg-cover bg-center opacity-30" />
+        {/* Si no tienes banner.jpg, el gradient se ve igual; añade public/banner.jpg cuando quieras */}
+
+        <div className="relative mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
+          <p className="mb-3 text-sm font-medium text-yellow-500">
+            Publicación multi-red para equipos
+          </p>
+          <h1 className="max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
+            Crea, programa y publica en todas tus redes desde un solo lugar
+          </h1>
+          <p className="mt-5 max-w-xl text-lg text-zinc-300">
+            TrendlyStudio conecta Facebook, Instagram, LinkedIn y YouTube.
+            Calendario, publicación en masa e IA para captions e imágenes — con
+            roles para tu equipo.
+          </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link
+              href="/login"
+              className="rounded-xl bg-yellow-500 px-6 py-3 text-sm font-semibold text-black hover:bg-yellow-400"
             >
               Empezar ahora
-            </Button>
+            </Link>
+            <a
+              href="#features"
+              className="rounded-xl border border-white/20 px-6 py-3 text-sm font-medium text-zinc-200 hover:bg-white/5"
+            >
+              Ver características
+            </a>
+          </div>
+          <p className="mt-4 text-xs text-zinc-500">
+            Al conectar YouTube u otras redes solo usamos los permisos que
+            autorizas. Tú decides qué se publica.
+          </p>
+        </div>
+      </section>
+
+      {/* Características */}
+      <section id="features" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
+        <div className="max-w-2xl">
+          <h2 className="text-3xl font-bold tracking-tight">
+            Todo lo que necesitas para publicar con ritmo
+          </h2>
+          <p className="mt-3 text-zinc-400">
+            Diseñado para agencias y empresas que no quieren saltar entre cinco
+            apps distintas.
+          </p>
+        </div>
+        <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {features.map((f) => (
+            <div
+              key={f.title}
+              className="rounded-2xl border border-white/10 bg-white/5 p-6"
+            >
+              <div className="mb-3 h-1.5 w-8 rounded-full bg-yellow-500" />
+              <h3 className="font-semibold text-white">{f.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+                {f.description}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Planes */}
+      <PricingSection variant="light" />
+
+      {/* CTA final */}
+      <section className="px-4 py-16 sm:px-6   bg-black/50 text-white ">
+        <div className="rounded-2xl borderpx-8 py-12 text-center space-y-6">
+          <h2 className="text-2xl font-bold">¿Listo para ordenar tus redes?</h2>
+          <p className="mx-auto max-w-md text-zinc-400">
+            Entra con tu cuenta y conecta Facebook, Instagram, LinkedIn o
+            YouTube en minutos.
+          </p>
+          <Link
+            href="/login"
+            className="rounded-xl p-4 mt-2 bg-gradient-to-r from-orange-400 to-yellow-500 hover:from-orange-500 hover:to-yellow-500 text-white"
+          >
+            Comenzar
           </Link>
         </div>
       </section>
 
-      {/* Features */}
-      <section className="max-w-6xl mx-auto px-6 py-16">
-        <h2 className="text-2xl font-bold text-center mb-12">
-          ¿Qué puedes hacer con Trendly?
-        </h2>
-        <div className="grid md:grid-cols-3 gap-8">
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-orange-100">
-            <div className="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center mb-4 text-2xl">
-              📅
-            </div>
-            <h3 className="font-semibold text-lg mb-2">
-              Calendario de contenidos
-            </h3>
-            <p className="text-gray-600 text-sm">
-              Programa publicaciones con anticipación y visualiza todo tu
-              contenido en un calendario claro y organizado.
-            </p>
-          </div>
-
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-orange-100">
-            <div className="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center mb-4 text-2xl">
-              🚀
-            </div>
-            <h3 className="font-semibold text-lg mb-2">Publicación masiva</h3>
-            <p className="text-gray-600 text-sm">
-              Publica el mismo contenido en Instagram, Facebook y LinkedIn
-              simultáneamente con un solo clic.
-            </p>
-          </div>
-
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-orange-100">
-            <div className="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center mb-4 text-2xl">
-              🤖
-            </div>
-            <h3 className="font-semibold text-lg mb-2">Generación con IA</h3>
-            <p className="text-gray-600 text-sm">
-              Crea captions e imágenes automáticamente con inteligencia
-              artificial para agilizar tu flujo de trabajo.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Purpose - importante para Google */}
-      <section className="max-w-4xl mx-auto px-6 py-16 text-center">
-        <h2 className="text-2xl font-bold mb-4">Propósito de la aplicación</h2>
-        <p className="text-gray-600 leading-relaxed">
-          Trendly está diseñada para ayudar a equipos de marketing y creadores
-          de contenido a gestionar su presencia en redes sociales de forma
-          eficiente. La aplicación permite conectar cuentas de Instagram,
-          Facebook y LinkedIn, crear y programar publicaciones, generar
-          contenido con inteligencia artificial y publicar de forma masiva en
-          múltiples plataformas desde una única interfaz.
-        </p>
-      </section>
-
       {/* Footer */}
-      <footer className="border-t bg-white">
-        <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-500">
-          <p>
-            © {new Date().getFullYear()} Trendly. Todos los derechos reservados.
-          </p>
-          <div className="flex gap-6">
-            <Link href="/privacy" className="hover:text-gray-800">
-              Privacidad
+      <footer className="bg-black text-white py-10">
+        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div>
+            <p className="font-semibold">TrendlyStudio</p>
+            <p className="mt-1 text-sm text-zinc-300">
+              Publicación y programación para equipos de marketing.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-4 text-sm text-zinc-400">
+            <Link href="/privacy" className="hover:text-white">
+              Política de privacidad
             </Link>
-            <Link href="/terms" className="hover:text-gray-800">
-              Términos
+            <Link href="/terms" className="hover:text-white">
+              Términos del servicio
             </Link>
-            <Link href="/login" className="hover:text-gray-800">
+            <Link href="/login" className="hover:text-white">
               Iniciar sesión
             </Link>
           </div>
         </div>
+        <p className="mx-auto mt-8 max-w-6xl px-4 text-center text-xs text-zinc-400 sm:px-6">
+          © {new Date().getFullYear()} TrendlyStudio. Facebook, Instagram,
+          LinkedIn y YouTube son marcas de sus respectivos propietarios.
+        </p>
       </footer>
-    </div>
+    </main>
   );
 }
