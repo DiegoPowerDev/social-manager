@@ -4,6 +4,7 @@ import "./globals.css";
 
 import { cn } from "cn";
 import { AuthProvider } from "@/components/providers/AuthProvider";
+import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -28,6 +29,7 @@ export default function RootLayout({
       <body className={cn(inter.className)}>
         <AuthProvider>{children}</AuthProvider>
       </body>
+      <Analytics />
     </html>
   );
 }

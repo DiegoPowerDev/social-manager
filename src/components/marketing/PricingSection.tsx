@@ -167,11 +167,7 @@ export function PricingSection({
         </div>
 
         {!user && (
-          <p
-            className={`mt-8 text-center text-sm ${
-              isDark ? "text-zinc-500" : "text-slate-500"
-            }`}
-          >
+          <p className={`mt-8 text-center text-sm text-white`}>
             ¿Ya tienes cuenta?{" "}
             <Link href="/login" className="underline hover:no-underline">
               Inicia sesión

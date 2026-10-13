@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { PricingSection } from "@/components/marketing/PricingSection";
 import HomeHeader from "@/components/layout/homeHeader";
+import HomeFooter from "@/components/layout/homeFooter";
 
 export default function PlansPage() {
   return (
@@ -11,6 +11,7 @@ export default function PlansPage() {
         title="Elige tu plan"
         subtitle="Básico para FB, IG y YouTube. Premium desbloquea LinkedIn, TikTok e IA."
       />
+      <HomeFooter />
     </div>
   );
 }

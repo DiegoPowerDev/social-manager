@@ -6,7 +6,7 @@ export default function HomeHeader() {
   return (
     <header className="sticky top-0 z-50  bg-zinc-950/50 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-2">
+        <Link href={"/"} className="flex items-center gap-2">
           <Image
             src="/icono.webp"
             loading="eager"
@@ -18,15 +18,15 @@ export default function HomeHeader() {
           <div className="font-bold text-white">Trendly Studio</div>
         </Link>
         <nav className="hidden items-center gap-6 text-sm text-white md:flex">
-          <a href="#features" className="hover:text-yellow-400/90">
+          <a
+            href={`${process.env.NODE_ENV === "production" ? "https://trendly.studio/#features" : "http://localhost:3000/#features"}`}
+            className="hover:text-yellow-400/90"
+          >
             Características
           </a>
           <a href="/plans" className="hover:text-yellow-400/90">
             Planes
           </a>
-          <Link href="/privacy" className="hover:text-yellow-400/90">
-            Privacidad
-          </Link>
         </nav>
         <div className="flex items-center gap-2 sm:gap-3">
           <Link

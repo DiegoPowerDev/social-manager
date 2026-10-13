@@ -1,11 +1,14 @@
+import HomeFooter from "@/components/layout/homeFooter";
 import HomeHeader from "@/components/layout/homeHeader";
 
 export default function TermsPage() {
   return (
-    <main className="min-h-screen  ">
+    <main className="min-h-screen space-y-6">
       <HomeHeader />
-      <div className="max-w-3xl mx-auto px-6 py-12 prose prose-neutral text-white">
-        <h1>Términos del servicio</h1>
+      <div className="max-w-3xl mx-auto px-6 py-12 prose prose-neutral text-white  bg-zinc-950/50 flex flex-col rounded-xl">
+        <h1 className="text-center mb-4 font-bold text-xl">
+          Términos del servicio
+        </h1>
         <p>Última actualización: 11 de octubre de 2026</p>
 
         <p>
@@ -71,6 +74,7 @@ export default function TermsPage() {
           Consultas: <strong>diegopacherres15@gmail.com</strong>
         </p>
       </div>
+      <HomeFooter />
     </main>
   );
 }

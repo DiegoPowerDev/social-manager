@@ -52,7 +52,7 @@ export default function LoginPage() {
     <div
       style={{ backgroundImage: `url("/background.webp")` }}
       className={cn(
-        "bg-cover h-screen bg-no-repeat min-h-screen bg-muted/40 px-4",
+        "bg-cover h-screen bg-no-repeat min-h-screen bg-muted/40 px-4 flex flex-col",
       )}
     >
       <HomeHeader />
