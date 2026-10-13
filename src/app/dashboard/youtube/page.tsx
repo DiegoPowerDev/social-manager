@@ -88,11 +88,11 @@ export default function YouTubePage() {
     if (success === "true") {
       setStatus({ type: "success", text: "Canal de YouTube conectado" });
       loadAccount();
-      router.replace("/youtube");
+      router.replace("/dashboard/youtube");
     }
     if (error) {
       setStatus({ type: "error", text: `Error al conectar: ${error}` });
-      router.replace("/youtube");
+      router.replace("/dashboard/youtube");
     }
   }, [searchParams]);
 

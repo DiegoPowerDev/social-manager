@@ -105,12 +105,12 @@ export default function InstagramPage() {
     if (success === "true") {
       setStatus({ type: "success", text: "Cuenta de Instagram conectada" });
       loadAccount();
-      router.replace("/instagram");
+      router.replace("/dashboard/instagram");
     }
 
     if (error) {
       setStatus({ type: "error", text: "Error al conectar la cuenta" });
-      router.replace("/instagram");
+      router.replace("/dashboard/instagram");
     }
   }, [searchParams]);
 

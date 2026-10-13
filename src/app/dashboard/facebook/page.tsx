@@ -91,12 +91,12 @@ export default function FacebookPage() {
     if (success === "true") {
       setStatus({ type: "success", text: "Cuenta de Facebook conectada" });
       loadAccount();
-      router.replace("/facebook");
+      router.replace("/dashboard/facebook");
     }
 
     if (error) {
       setStatus({ type: "error", text: "Error al conectar la cuenta" });
-      router.replace("/facebook");
+      router.replace("/dashboard/facebook");
     }
   }, [searchParams]);
 

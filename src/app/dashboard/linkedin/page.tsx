@@ -89,12 +89,12 @@ export default function LinkedInPage() {
     if (success === "true") {
       setStatus({ type: "success", text: "Cuenta de LinkedIn conectada" });
       loadAccount();
-      router.replace("/linkedin");
+      router.replace("/dashboard/linkedin");
     }
 
     if (error) {
       setStatus({ type: "error", text: `Error al conectar: ${error}` });
-      router.replace("/linkedin");
+      router.replace("/dashboard/linkedin");
     }
   }, [searchParams]);
 
