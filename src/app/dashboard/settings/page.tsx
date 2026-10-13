@@ -220,7 +220,7 @@ export default function SettingsPage() {
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Ej. Acme Marketing"
                 disabled={!canEdit || saving}
-                className="bg-white/80  "
+                className="bg-white"
               />
             </div>
 
@@ -298,7 +298,7 @@ export default function SettingsPage() {
               placeholder="Ej. Somos una marca de tecnología B2B. Tono profesional y cercano..."
               rows={6}
               disabled={!canEdit || saving}
-              className="bg-yellow-100 resize-none"
+              className="bg-white text-black resize-none"
             />
             {aiEnabled ? (
               <p className="text-xs text-white/50">

@@ -557,7 +557,7 @@ export default function BulkPublishPage() {
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
                       rows={5}
-                      className="resize-none flex-1 bg-white/80 text-black"
+                      className="resize-none flex-1  text-black"
                       disabled={publishing || uploadingMedia}
                     />
                   </div>
@@ -690,7 +690,7 @@ export default function BulkPublishPage() {
                   value={link}
                   onChange={(e) => setLink(e.target.value)}
                   disabled={publishing || uploadingMedia}
-                  className="bg-white/80 text-black"
+                  className="bg-white text-black"
                 />
               </div>
             </CardContent>

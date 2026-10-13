@@ -213,7 +213,7 @@ export function FacebookComposer({
               value={message}
               onChange={(e) => onMessageChange(e.target.value)}
               rows={4}
-              className="resize-none flex-1 bg-white/80 text-black"
+              className="resize-none flex-1 bg-white text-black"
               disabled={isLoading}
             />
             <div className="flex justify-end">
@@ -335,7 +335,7 @@ export function FacebookComposer({
             value={link}
             onChange={(e) => onLinkChange(e.target.value)}
             disabled={isLoading}
-            className="bg-white/80 text-black"
+            className="bg-white text-black"
           />
         </div>
 

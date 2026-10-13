@@ -204,7 +204,7 @@ export function LinkedInComposer({
               value={text}
               onChange={(e) => onTextChange(e.target.value)}
               rows={5}
-              className="resize-none flex-1 bg-white/80 text-black"
+              className="resize-none flex-1 bg-white text-black"
               disabled={isLoading}
             />
             <div className="flex justify-end">

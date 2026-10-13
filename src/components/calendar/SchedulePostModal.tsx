@@ -299,18 +299,20 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white/90  rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-white/40">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50  p-4">
+      <div className="bg-zinc-950/60  rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-white/40">
         {/* Header */}
-        <div className="z-10 sticky top-0 bg-white border-b border-white/40 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+        <div className="z-10 sticky top-0 px-6 py-4 flex items-center bg-black  justify-between rounded-t-2xl">
           <div>
-            <h3 className="text-lg font-semibold">Programar publicación</h3>
-            <p className="text-sm text-muted-foreground">
+            <h3 className="text-lg font-semibold text-white">
+              Programar publicación
+            </h3>
+            <p className="text-sm text-white/50">
               {format(date, "EEEE d 'de' MMMM yyyy", { locale: es })}
             </p>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            Cerrar
+          <Button className="border-none outline-0" onClick={onClose}>
+            <X size={30} color="white" />
           </Button>
         </div>
 
@@ -338,7 +340,7 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
                 disabled={saving}
                 className="w-40 bg-white"
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-white/50">
                 Zona horaria de tu navegador
               </p>
             </div>
@@ -477,7 +479,7 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
             )}
           </div>
           {/* Texto + AI Caption */}
-          <div className="flex justify-between gap-2 bg-white/60 rounded">
+          <div className="flex justify-between gap-2 bg-zinc-950/50 text-white rounded">
             <AICaptionGenerator
               platform="general"
               onGenerate={(caption) => setMessage(caption)}
@@ -490,14 +492,14 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 rows={4}
-                className="resize-none flex-1 bg-white"
+                className="resize-none flex-1 bg-white text-black"
                 disabled={saving}
               />
             </div>
           </div>
 
           {/* Media + AI Image */}
-          <div className="flex justify-between gap-2 bg-white/60 rounded">
+          <div className="flex justify-between gap-2 bg-zinc-950/50 text-white rounded">
             <AIImageGenerator
               onGenerate={(url) => {
                 setImageUrl(url);
@@ -505,7 +507,7 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
               }}
             />
             <Separator orientation="vertical" />
-            <div className="flex w-full flex-col gap-2 p-4">
+            <div className="flex w-full flex-col gap-2 p-4 text-black">
               <span>Media</span>
 
               <div className="flex items-center justify-center gap-2">

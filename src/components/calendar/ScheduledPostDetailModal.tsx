@@ -265,11 +265,11 @@ export function ScheduledPostDetailModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-white/40">
+      <div className="bg-zinc-950/60 rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-white/40">
         {/* Header */}
-        <div className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-white/40 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+        <div className="z-10 sticky top-0 px-6 py-4 flex items-center bg-black  justify-between rounded-t-2xl">
           <div>
-            <h3 className="text-lg font-semibold">
+            <h3 className="text-lg font-semibold text-white">
               {canEditContent ? "Editar publicación" : "Detalle de publicación"}
             </h3>
             <div className="flex items-center gap-2 mt-1">
@@ -295,7 +295,7 @@ export function ScheduledPostDetailModal({
           {/* Título + Fecha/Hora */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-2 sm:col-span-1">
-              <Label>Título</Label>
+              <Label className="text-white">Título</Label>
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -305,7 +305,7 @@ export function ScheduledPostDetailModal({
               />
             </div>
             <div className="space-y-2">
-              <Label>Fecha</Label>
+              <Label className="text-white">Fecha</Label>
               <Input
                 type="date"
                 value={dateStr}
@@ -315,7 +315,7 @@ export function ScheduledPostDetailModal({
               />
             </div>
             <div className="space-y-2">
-              <Label>Hora</Label>
+              <Label className="text-white">Hora</Label>
               <Input
                 type="time"
                 value={time}
@@ -328,7 +328,7 @@ export function ScheduledPostDetailModal({
 
           {/* Redes */}
           <div className="space-y-3">
-            <Label>Redes</Label>
+            <Label className="text-white">Redes</Label>
             <div className="flex gap-2 justify-center flex-wrap">
               <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg">
                 <Checkbox
@@ -433,7 +433,7 @@ export function ScheduledPostDetailModal({
 
           {/* Texto */}
           <div className="space-y-2">
-            <Label>Texto / Caption</Label>
+            <Label className="text-white">Texto / Caption</Label>
             <Textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
@@ -445,10 +445,10 @@ export function ScheduledPostDetailModal({
 
           {/* Media */}
           <div className="space-y-3">
-            <Label>Media</Label>
+            <Label className="text-white">Media</Label>
 
             {(imageUrl || videoUrl) && (
-              <div className="relative rounded-lg overflow-hidden border bg-muted/30">
+              <div className="relative rounded-lg overflow-hidden border bg-black">
                 {imageUrl && (
                   <img
                     src={imageUrl}

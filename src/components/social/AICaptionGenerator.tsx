@@ -100,7 +100,7 @@ export function AICaptionGenerator({
           id="topic"
           placeholder="Ej: Lanzamiento de nuevo producto, tips de productividad..."
           value={topic}
-          className="bg-white/80 text-black"
+          className="bg-white text-black"
           onChange={(e) => setTopic(e.target.value)}
           disabled={loading}
         />
@@ -113,7 +113,7 @@ export function AICaptionGenerator({
           onValueChange={(v) => setTone(v as any)}
           disabled={loading}
         >
-          <SelectTrigger className="bg-white/80 text-black">
+          <SelectTrigger className="bg-white text-black">
             <SelectValue placeholder="Selecciona un tono" />
           </SelectTrigger>
           <SelectContent>

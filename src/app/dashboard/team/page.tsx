@@ -196,7 +196,7 @@ export default function TeamPage() {
                 <Input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="bg-white/80 text-black"
+                  className="bg-white text-black"
                   disabled={saving}
                 />
               </div>
@@ -206,7 +206,7 @@ export default function TeamPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="bg-white/80 text-black"
+                  className="bg-white text-black"
                   disabled={saving}
                 />
               </div>
@@ -216,7 +216,7 @@ export default function TeamPage() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="bg-white/80 text-black"
+                  className="bg-white text-black"
                   disabled={saving}
                 />
               </div>
@@ -227,7 +227,7 @@ export default function TeamPage() {
                   onValueChange={(v) => setRole(v as any)}
                   disabled={saving}
                 >
-                  <SelectTrigger className="bg-white/80 text-black">
+                  <SelectTrigger className="bg-white text-black">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

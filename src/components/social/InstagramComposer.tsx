@@ -255,7 +255,7 @@ export function InstagramComposer({
                 value={caption}
                 onChange={(e) => onCaptionChange(e.target.value)}
                 rows={4}
-                className="resize-none flex-1 bg-white/80 text-black"
+                className="resize-none flex-1 bg-white text-black"
                 disabled={isLoading}
               />
             </div>

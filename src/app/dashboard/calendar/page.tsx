@@ -347,31 +347,14 @@ export default function CalendarPage() {
         )}
 
         {modalOpen && selectedDate && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-background rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">
-                  Programar para{" "}
-                  {format(selectedDate, "d MMMM yyyy", { locale: es })}
-                </h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setModalOpen(false)}
-                >
-                  Cerrar
-                </Button>
-              </div>
-              <SchedulePostModal
-                date={selectedDate}
-                open={modalOpen}
-                onClose={() => setModalOpen(false)}
-                onSaved={() => {
-                  loadPosts();
-                }}
-              />
-            </div>
-          </div>
+          <SchedulePostModal
+            date={selectedDate}
+            open={modalOpen}
+            onClose={() => setModalOpen(false)}
+            onSaved={() => {
+              loadPosts();
+            }}
+          />
         )}
 
         <ScheduledPostDetailModal

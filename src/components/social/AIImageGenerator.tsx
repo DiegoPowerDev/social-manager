@@ -224,7 +224,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
         <Label htmlFor="image-prompt">Describe la imagen</Label>
         <Textarea
           id="image-prompt"
-          className="resize-none  bg-white/80 text-black"
+          className="resize-none  bg-white text-black"
           placeholder="Ej: Interior moderno del salón de esta casa, luz natural, mismos materiales..."
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
@@ -240,7 +240,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
           onValueChange={(s) => setStyle(s as any)}
           disabled={loading}
         >
-          <SelectTrigger className="bg-white/80 text-black">
+          <SelectTrigger className="bg-white text-black">
             <SelectValue placeholder="Selecciona un estilo" />
           </SelectTrigger>
           <SelectContent>
