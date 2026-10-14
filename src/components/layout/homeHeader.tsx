@@ -1,8 +1,12 @@
+"use client";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "../ui/button";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 export default function HomeHeader() {
+  const { user } = useAuthStore();
+
   return (
     <header className="sticky top-0 z-50  bg-zinc-950/50 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
@@ -29,12 +33,22 @@ export default function HomeHeader() {
           </a>
         </nav>
         <div className="flex items-center gap-2 sm:gap-3">
-          <Link
-            href="/login"
-            className="rounded-lg px-3 py-1.5 text-sm text-zinc-300 hover:text-white"
-          >
-            Iniciar sesión
-          </Link>
+          {user ? (
+            <Link
+              href="/dashboard"
+              className="rounded-lg px-3 py-1.5 text-sm text-zinc-300 hover:text-white"
+            >
+              Dashboard
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              className="rounded-lg px-3 py-1.5 text-sm text-zinc-300 hover:text-white"
+            >
+              Iniciar sesión
+            </Link>
+          )}
+
           <a href="/plans">
             <Button
               size="lg"

@@ -4,12 +4,13 @@ export type PlanKey = "basic" | "premium";
 export type Interval = "month" | "year";
 
 /** Variant ID de Lemon → plan de Trendly */
-export function planFromVariantId(variantId: string | number): {
-  plan: PlanKey;
-  interval: Interval;
-} | null {
-  const id = String(variantId);
-  const map: Record<string, { plan: PlanKey; interval: Interval }> = {
+export function planFromVariantId(
+  variantId: string,
+): { plan: "basic" | "premium"; interval: "month" | "year" } | null {
+  const map: Record<
+    string,
+    { plan: "basic" | "premium"; interval: "month" | "year" }
+  > = {
     [process.env.LEMONSQUEEZY_VARIANT_BASIC_MONTHLY || ""]: {
       plan: "basic",
       interval: "month",
@@ -27,7 +28,7 @@ export function planFromVariantId(variantId: string | number): {
       interval: "year",
     },
   };
-  return map[id] || null;
+  return map[variantId] || null;
 }
 
 export function variantIdFor(plan: PlanKey, interval: Interval): string | null {

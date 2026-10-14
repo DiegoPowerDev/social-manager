@@ -3,12 +3,14 @@ import { variantIdFor, type PlanKey, type Interval } from "@/lib/lemon";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const plan = body.plan as PlanKey; // "basic" | "premium"
-    const interval = (body.interval || "month") as Interval;
-    const companyId = body.companyId as string;
-    const email = body.email as string | undefined;
-    const uid = body.uid as string | undefined;
+    const {
+      plan,
+      interval = "month",
+      companyId,
+      email,
+      uid,
+      guest,
+    } = await req.json();
 
     if (!companyId || !plan) {
       return NextResponse.json(
@@ -28,7 +30,21 @@ export async function POST(req: NextRequest) {
         { status: 500 },
       );
     }
-
+    const attributes: any = {
+      checkout_data: {
+        email: email || undefined,
+        custom: {
+          company_id: companyId || "",
+          user_id: uid || "",
+          plan: plan,
+          interval: interval,
+          guest: guest ? "1" : "0",
+        },
+      },
+      product_options: {
+        redirect_url: `${baseUrl}/login?billing=success`,
+      },
+    };
     // API Lemon Squeezy: crear checkout
     // Docs: https://docs.lemonsqueezy.com/api/checkouts
     const res = await fetch("https://api.lemonsqueezy.com/v1/checkouts", {
@@ -41,18 +57,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         data: {
           type: "checkouts",
-          attributes: {
-            checkout_data: {
-              email: email || undefined,
-              custom: {
-                company_id: companyId,
-                user_id: uid || "",
-              },
-            },
-            product_options: {
-              redirect_url: `${baseUrl}/dashboard?billing=success`,
-            },
-          },
+          attributes: attributes,
           relationships: {
             store: {
               data: { type: "stores", id: String(storeId) },

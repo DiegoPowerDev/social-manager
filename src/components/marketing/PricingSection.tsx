@@ -32,30 +32,30 @@ export function PricingSection({
   const isDark = variant === "dark";
 
   const handleSelect = async (planId: PlanId, paid: boolean) => {
-    if (!user) {
-      router.push(`/login?next=/plans&plan=${planId}`);
-      return;
-    }
-
     if (!paid) {
+      if (!user) {
+        router.push("/login?next=/dashboard");
+        return;
+      }
       router.push("/dashboard");
       return;
     }
 
-    if (memberRole !== "admin") {
-      alert("Solo un administrador puede cambiar el plan de la empresa.");
-      return;
-    }
-
-    if (!companyId) {
-      alert("No hay empresa asociada a tu cuenta.");
-      return;
-    }
-
-    // basic | premium (ajusta si tus PlanId son otros)
     if (planId !== "basic" && planId !== "premium") {
       alert("Plan no disponible para pago.");
       return;
+    }
+
+    // Logueado: solo admin de la empresa
+    if (user) {
+      if (memberRole !== "admin") {
+        alert("Solo un administrador puede cambiar el plan de la empresa.");
+        return;
+      }
+      if (!companyId) {
+        alert("No hay empresa asociada a tu cuenta.");
+        return;
+      }
     }
 
     setLoadingPlan(planId);
@@ -64,11 +64,13 @@ export function PricingSection({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          companyId,
-          plan: planId, // "basic" | "premium"
-          interval: "month", // o "year" si más adelante pones toggle
-          email: user.email,
-          uid: user.uid,
+          plan: planId,
+          interval: "month", // o "year" según variantes
+          // Si hay sesión, upgrade de empresa existente
+          companyId: companyId || undefined,
+          email: user?.email || undefined,
+          uid: user?.uid || undefined,
+          guest: !user,
         }),
       });
       const data = await res.json();
@@ -175,7 +177,7 @@ export function PricingSection({
           ))}
         </div>
 
-        {!user && (
+        {user && (
           <p className={`mt-8 text-center text-sm text-white`}>
             ¿Ya tienes cuenta?{" "}
             <Link href="/login" className="underline hover:no-underline">
