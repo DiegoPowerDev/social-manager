@@ -32,7 +32,6 @@ export function PricingSection({
   const isDark = variant === "dark";
 
   const handleSelect = async (planId: PlanId, paid: boolean) => {
-    // No logueado → login (luego puede ir a /plans)
     if (!user) {
       router.push(`/login?next=/plans&plan=${planId}`);
       return;
@@ -53,14 +52,22 @@ export function PricingSection({
       return;
     }
 
+    // basic | premium (ajusta si tus PlanId son otros)
+    if (planId !== "basic" && planId !== "premium") {
+      alert("Plan no disponible para pago.");
+      return;
+    }
+
     setLoadingPlan(planId);
     try {
-      const res = await fetch("/api/stripe/checkout", {
+      const res = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           companyId,
           plan: planId, // "basic" | "premium"
+          interval: "month", // o "year" si más adelante pones toggle
+          email: user.email,
           uid: user.uid,
         }),
       });
@@ -70,7 +77,7 @@ export function PricingSection({
       }
       window.location.href = data.url;
     } catch (e: any) {
-      alert(e.message || "Error al conectar con Stripe");
+      alert(e.message || "Error al conectar con el pago");
       setLoadingPlan(null);
     }
   };

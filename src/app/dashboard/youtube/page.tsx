@@ -173,7 +173,7 @@ export default function YouTubePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="">
       <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
         <div className="p-6  text-white">
           <h1 className="text-2xl font-bold">YouTube</h1>
@@ -184,7 +184,7 @@ export default function YouTubePage() {
             </span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 ">
           {(() => {
             const s = getTokenStatus(account.expiresAt);
             if (s === "expired")
@@ -213,7 +213,7 @@ export default function YouTubePage() {
         if (tokenStatus === "ok") return null;
         return (
           <div
-            className={`mx-6 p-3 rounded-md text-sm border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
+            className={`mx-6 p-3 mt-4 rounded-md text-sm border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
               tokenStatus === "expired"
                 ? "bg-red-50 text-red-800 border-red-200"
                 : "bg-amber-50 text-amber-900 border-amber-200"

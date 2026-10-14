@@ -184,12 +184,14 @@ export function TikTokComposer({
   return (
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
       <div className="xl:col-span-2">
-        <Card className="bg-white/70">
+        <Card className="bg-zinc-950/60 ">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Publicar en TikTok</CardTitle>
-                <CardDescription>Cuenta: {accountName}</CardDescription>
+                <CardTitle className="text-white">Publicar en TikTok</CardTitle>
+                <CardDescription className="text-white/50">
+                  Cuenta: {accountName}
+                </CardDescription>
               </div>
               <Badge variant="secondary">TikTok</Badge>
             </div>
@@ -204,7 +206,7 @@ export function TikTokComposer({
               </p>
             )}
 
-            <div className="flex justify-between gap-2 bg-white/60 rounded">
+            <div className="flex justify-between gap-2 bg-zinc-950/50 text-white rounded">
               <AICaptionGenerator
                 platform="general"
                 onGenerate={(caption) => onTitleChange(caption)}
@@ -218,7 +220,7 @@ export function TikTokComposer({
                   value={title}
                   onChange={(e) => onTitleChange(e.target.value)}
                   rows={4}
-                  className="resize-none flex-1 bg-white"
+                  className="resize-none flex-1 bg-white text-black"
                   disabled={isLoading}
                 />
                 <p
@@ -254,12 +256,9 @@ export function TikTokComposer({
               </Select>
             </div>
 
-            <div className="space-y-3 p-4 bg-white/60 rounded">
-              <Label>Video</Label>
-              <p className="text-xs text-muted-foreground">
-                MP4 recomendado. URL pública (R2). El dominio del video debe
-                estar verificado en TikTok si usas PULL_FROM_URL.
-              </p>
+            <div className="space-y-3 p-4 bg-zinc-950/50 rounded">
+              <Label className="text-white">Video</Label>
+              <p className="text-xs text-white/50">MP4 recomendado.</p>
 
               <input
                 type="file"

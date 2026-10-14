@@ -186,8 +186,12 @@ export function YouTubeComposer({
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Subir video</CardTitle>
-                <CardDescription>Canal: {channelName}</CardDescription>
+                <CardTitle className="text-white font-bold">
+                  Subir video
+                </CardTitle>
+                <CardDescription className="text-white/50">
+                  Canal: {channelName}
+                </CardDescription>
               </div>
               <Badge variant="secondary">YouTube</Badge>
             </div>
@@ -195,7 +199,9 @@ export function YouTubeComposer({
 
           <CardContent className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="yt-title">Título (obligatorio)</Label>
+              <Label className="text-white" htmlFor="yt-title">
+                Título (obligatorio)
+              </Label>
               <Input
                 id="yt-title"
                 placeholder="Título del video"
@@ -214,28 +220,30 @@ export function YouTubeComposer({
               </p>
             </div>
 
-            <div className="flex justify-between gap-2 bg-white/60 rounded">
+            <div className="flex justify-between gap-2 bg-zinc-950/50 text-white rounded">
               <AICaptionGenerator
                 platform="general"
                 onGenerate={(caption) => onDescriptionChange(caption)}
               />
               <Separator orientation="vertical" />
               <div className="flex flex-col w-full gap-2 p-4">
-                <Label htmlFor="yt-desc">Descripción</Label>
+                <Label className="text-white" htmlFor="yt-desc">
+                  Descripción
+                </Label>
                 <Textarea
                   id="yt-desc"
                   placeholder="Descripción del video, links, hashtags..."
                   value={description}
                   onChange={(e) => onDescriptionChange(e.target.value)}
                   rows={5}
-                  className="resize-none flex-1 bg-white"
+                  className="resize-none flex-1 bg-white text-black"
                   disabled={isLoading}
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label>Visibilidad</Label>
+              <Label className="text-white">Visibilidad</Label>
               <Select
                 value={privacyStatus}
                 onValueChange={(v) =>
@@ -254,9 +262,9 @@ export function YouTubeComposer({
               </Select>
             </div>
 
-            <div className="space-y-3 p-4 bg-white/60 rounded">
-              <Label>Video</Label>
-              <p className="text-xs text-muted-foreground">
+            <div className="space-y-3 p-4 bg-zinc-950/50 rounded">
+              <Label className="text-white">Video</Label>
+              <p className="text-xs text-white/50">
                 MP4 recomendado. Máx. ~256MB en este flujo. También puedes
                 elegir uno de la biblioteca.
               </p>
