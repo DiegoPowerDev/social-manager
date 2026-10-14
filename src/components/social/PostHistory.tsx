@@ -28,7 +28,7 @@ interface Post {
 
 interface Props {
   pageId: string;
-  platform?: "facebook" | "instagram" | "linkedin" | "youtube";
+  platform?: "facebook" | "instagram" | "linkedin" | "youtube" | "tiktok";
 }
 
 function getPostUrl(post: Post): string | null {

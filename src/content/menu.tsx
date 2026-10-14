@@ -78,6 +78,20 @@ export const mainNav: Menu[] = [
     ),
   },
   {
+    title: "tiktok",
+    href: "/dashboard/tiktok ",
+    icon: "",
+    image: (
+      <Image
+        className=" rounded"
+        height={20}
+        width={20}
+        src="/tiktok.svg"
+        alt="Tik Tok logo"
+      />
+    ),
+  },
+  {
     title: "Publicar en masa",
     href: "/dashboard/publish",
     icon: Send,
