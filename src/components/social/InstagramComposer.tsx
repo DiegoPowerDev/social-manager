@@ -26,6 +26,8 @@ import { Separator } from "@/components/ui/separator";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { saveMediaToLibrary } from "@/lib/media";
 
+type IgMediaType = "FEED" | "REELS" | "STORIES" | "CAROUSEL";
+
 interface Props {
   username: string;
   loading?: boolean;
@@ -33,10 +35,12 @@ interface Props {
   onCaptionChange: (value: string) => void;
   imageUrl: string | null;
   onImageChange: (url: string | null) => void;
+  imageUrls: string[];
+  onImageUrlsChange: (urls: string[]) => void;
   videoUrl: string | null;
   onVideoChange: (url: string | null) => void;
-  mediaType: "FEED" | "REELS" | "STORIES";
-  onMediaTypeChange: (value: "FEED" | "REELS" | "STORIES") => void;
+  mediaType: IgMediaType;
+  onMediaTypeChange: (value: IgMediaType) => void;
   onPublish: () => Promise<void>;
 }
 
@@ -47,6 +51,8 @@ export function InstagramComposer({
   onCaptionChange,
   imageUrl,
   onImageChange,
+  imageUrls,
+  onImageUrlsChange,
   videoUrl,
   onVideoChange,
   mediaType,
@@ -66,7 +72,12 @@ export function InstagramComposer({
   const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
   const MAX_IMAGE_SIZE = 8 * 1024 * 1024;
 
-  const libraryAccept = mediaType === "REELS" ? "video" : "all";
+  const libraryAccept =
+    mediaType === "REELS"
+      ? "video"
+      : mediaType === "CAROUSEL"
+        ? "image"
+        : "all";
 
   const uploadToR2 = async (file: File) => {
     if (!companyId) {
@@ -118,28 +129,79 @@ export function InstagramComposer({
       setMediaError("Los Reels requieren un video");
       return;
     }
+    if (mediaType === "CAROUSEL" && item.type !== "image") {
+      setMediaError("El carrusel solo admite imágenes");
+      return;
+    }
     if (item.type === "video") {
       onImageChange(null);
+      onImageUrlsChange([]);
       onVideoChange(item.url);
+      return;
+    }
+    onVideoChange(null);
+    if (mediaType === "CAROUSEL") {
+      if (imageUrls.length >= 10) {
+        setMediaError("Máximo 10 imágenes");
+        return;
+      }
+      const next = [...imageUrls, item.url];
+      onImageUrlsChange(next);
+      onImageChange(next[0]);
     } else {
-      onVideoChange(null);
+      onImageUrlsChange([]);
       onImageChange(item.url);
     }
   };
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files?.length) return;
 
     setMediaError(null);
+
+    if (mediaType === "CAROUSEL") {
+      const list = Array.from(files);
+      if (imageUrls.length + list.length > 10) {
+        setMediaError("Máximo 10 imágenes en el carrusel");
+        if (imageInputRef.current) imageInputRef.current.value = "";
+        return;
+      }
+      try {
+        setUploading(true);
+        onVideoChange(null);
+        const uploaded: string[] = [];
+        for (const f of list) {
+          if (f.size > MAX_IMAGE_SIZE) {
+            setMediaError(`"${f.name}" supera 8MB`);
+            continue;
+          }
+          uploaded.push(await uploadToR2(f));
+        }
+        if (uploaded.length === 0) return;
+        const next = [...imageUrls, ...uploaded].slice(0, 10);
+        onImageUrlsChange(next);
+        onImageChange(next[0] || null);
+      } catch (err: any) {
+        setMediaError(err.message || "Error al subir");
+      } finally {
+        setUploading(false);
+        if (imageInputRef.current) imageInputRef.current.value = "";
+      }
+      return;
+    }
+
+    const file = files[0];
     if (file.size > MAX_IMAGE_SIZE) {
       setMediaError("La imagen es demasiado grande (máximo 8MB)");
+      if (imageInputRef.current) imageInputRef.current.value = "";
       return;
     }
 
     try {
       setUploading(true);
       onVideoChange(null);
+      onImageUrlsChange([]);
       const url = await uploadToR2(file);
       onImageChange(url);
     } catch (err: any) {
@@ -164,6 +226,7 @@ export function InstagramComposer({
     try {
       setUploading(true);
       onImageChange(null);
+      onImageUrlsChange([]);
       const url = await uploadToR2(file);
       onVideoChange(url);
     } catch (err: any) {
@@ -176,6 +239,7 @@ export function InstagramComposer({
 
   const removeMedia = () => {
     onImageChange(null);
+    onImageUrlsChange([]);
     onVideoChange(null);
     setMediaError(null);
     if (imageInputRef.current) imageInputRef.current.value = "";
@@ -183,6 +247,7 @@ export function InstagramComposer({
   };
 
   const handleSubmit = async () => {
+    setMediaError(null);
     if (mediaType === "REELS" && !videoUrl) {
       setMediaError("Los Reels requieren un video");
       return;
@@ -193,6 +258,10 @@ export function InstagramComposer({
     }
     if (mediaType === "FEED" && !imageUrl && !videoUrl) {
       setMediaError("Instagram requiere una imagen o un video");
+      return;
+    }
+    if (mediaType === "CAROUSEL" && imageUrls.length < 2) {
+      setMediaError("El carrusel necesita al menos 2 imágenes");
       return;
     }
     await onPublish();
@@ -218,9 +287,7 @@ export function InstagramComposer({
           <Label className="text-white">Tipo de publicación</Label>
           <Select
             value={mediaType}
-            onValueChange={(value) =>
-              onMediaTypeChange(value as "FEED" | "REELS" | "STORIES")
-            }
+            onValueChange={(value) => onMediaTypeChange(value as IgMediaType)}
             disabled={isLoading}
           >
             <SelectTrigger className="bg-white">
@@ -228,6 +295,9 @@ export function InstagramComposer({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="FEED">Publicación (Feed)</SelectItem>
+              <SelectItem value="CAROUSEL">
+                Carrusel (varias imágenes)
+              </SelectItem>
               <SelectItem value="REELS">Reel</SelectItem>
               <SelectItem value="STORIES">Historia</SelectItem>
             </SelectContent>
@@ -238,6 +308,8 @@ export function InstagramComposer({
             {mediaType === "STORIES" &&
               "Las Historias duran 24 horas · Formato vertical recomendado"}
             {mediaType === "FEED" && "Publicación normal en el perfil"}
+            {mediaType === "CAROUSEL" &&
+              `Carrusel: ${imageUrls.length}/10 imágenes (mínimo 2)`}
           </p>
         </div>
 
@@ -266,8 +338,19 @@ export function InstagramComposer({
           <AIImageGenerator
             onGenerate={(url) => {
               if (mediaType === "REELS") return;
-              onImageChange(url);
               onVideoChange(null);
+              if (mediaType === "CAROUSEL") {
+                if (imageUrls.length >= 10) {
+                  setMediaError("Máximo 10 imágenes");
+                  return;
+                }
+                const next = [...imageUrls, url];
+                onImageUrlsChange(next);
+                onImageChange(next[0]);
+              } else {
+                onImageUrlsChange([]);
+                onImageChange(url);
+              }
             }}
           />
           <Separator orientation="vertical" />
@@ -277,6 +360,7 @@ export function InstagramComposer({
               <input
                 type="file"
                 accept="image/*"
+                multiple={mediaType === "CAROUSEL"}
                 ref={imageInputRef}
                 onChange={handleImageChange}
                 className="hidden"
@@ -288,7 +372,7 @@ export function InstagramComposer({
                 ref={videoInputRef}
                 onChange={handleVideoChange}
                 className="hidden"
-                disabled={isLoading}
+                disabled={isLoading || mediaType === "CAROUSEL"}
               />
 
               <Button
@@ -297,10 +381,14 @@ export function InstagramComposer({
                 size="sm"
                 onClick={() => imageInputRef.current?.click()}
                 className="text-black"
-                disabled={!!videoUrl || isLoading || mediaType === "REELS"}
+                disabled={
+                  isLoading ||
+                  mediaType === "REELS" ||
+                  (!!videoUrl && mediaType !== "CAROUSEL")
+                }
               >
-                <ImagePlus className="h-4 w-4 mr-2 " />
-                Imagen
+                <ImagePlus className="h-4 w-4 mr-2" />
+                {mediaType === "CAROUSEL" ? "Añadir imágenes" : "Imagen"}
               </Button>
 
               <Button
@@ -309,7 +397,12 @@ export function InstagramComposer({
                 size="sm"
                 className="text-black"
                 onClick={() => videoInputRef.current?.click()}
-                disabled={!!imageUrl || isLoading}
+                disabled={
+                  isLoading ||
+                  mediaType === "CAROUSEL" ||
+                  !!imageUrl ||
+                  imageUrls.length > 0
+                }
               >
                 <Video className="h-4 w-4 mr-2" />
                 Video {mediaType === "REELS" ? "/ Reel" : ""}
@@ -325,35 +418,79 @@ export function InstagramComposer({
                 <FolderOpen className="h-4 w-4 mr-2" />
                 Biblioteca
               </Button>
+
+              {(imageUrl || videoUrl || imageUrls.length > 0) && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={removeMedia}
+                  disabled={isLoading}
+                  className="text-red-400"
+                >
+                  Quitar todo
+                </Button>
+              )}
             </div>
 
-            <div className="flex-1 flex items-center justify-center">
-              {(imageUrl || videoUrl) && (
-                <div className="relative rounded-lg overflow-hidden border bg-muted/30">
-                  {imageUrl && (
-                    <img
-                      src={imageUrl}
-                      alt="Preview"
-                      className="w-full max-h-64 object-contain"
-                    />
-                  )}
-                  {videoUrl && (
-                    <video
-                      src={videoUrl}
-                      controls
-                      className="w-full max-h-64"
-                    />
-                  )}
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    className="absolute top-2 right-2 h-8 w-8 rounded-full"
-                    onClick={removeMedia}
-                    disabled={isLoading}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+            <div className="flex-1 flex items-center justify-center min-h-[80px]">
+              {mediaType === "CAROUSEL" && imageUrls.length > 0 ? (
+                <div className="flex gap-2 overflow-x-auto py-2 w-full">
+                  {imageUrls.map((url, i) => (
+                    <div
+                      key={`${url}-${i}`}
+                      className="relative shrink-0 w-24 h-24 rounded border overflow-hidden bg-muted"
+                    >
+                      <img
+                        src={url}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="secondary"
+                        className="absolute top-0.5 right-0.5 h-6 w-6"
+                        onClick={() => {
+                          const next = imageUrls.filter((_, j) => j !== i);
+                          onImageUrlsChange(next);
+                          onImageChange(next[0] || null);
+                        }}
+                        disabled={isLoading}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
+              ) : (
+                (imageUrl || videoUrl) && (
+                  <div className="relative rounded-lg overflow-hidden border bg-muted/30 w-full max-w-md">
+                    {imageUrl && (
+                      <img
+                        src={imageUrl}
+                        alt="Preview"
+                        className="w-full max-h-64 object-contain"
+                      />
+                    )}
+                    {videoUrl && (
+                      <video
+                        src={videoUrl}
+                        controls
+                        className="w-full max-h-64"
+                      />
+                    )}
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="absolute top-2 right-2 h-8 w-8 rounded-full"
+                      onClick={removeMedia}
+                      disabled={isLoading}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )
               )}
             </div>
           </div>
@@ -365,8 +502,10 @@ export function InstagramComposer({
             onClick={handleSubmit}
             disabled={
               isLoading ||
+              (mediaType === "CAROUSEL" && imageUrls.length < 2) ||
               (mediaType === "REELS" && !videoUrl) ||
-              (mediaType !== "REELS" && !imageUrl && !videoUrl)
+              (mediaType === "FEED" && !imageUrl && !videoUrl) ||
+              (mediaType === "STORIES" && !imageUrl && !videoUrl)
             }
           >
             {isLoading ? (
@@ -374,6 +513,8 @@ export function InstagramComposer({
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 {uploading ? "Subiendo..." : "Publicando..."}
               </>
+            ) : mediaType === "CAROUSEL" ? (
+              "Publicar carrusel"
             ) : (
               "Publicar ahora"
             )}

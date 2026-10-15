@@ -39,6 +39,7 @@ interface ScheduledPost {
   title: string;
   message?: string | null;
   imageUrl?: string | null;
+  imageUrls?: string[] | null;
   videoUrl?: string | null;
   link?: string | null;
   platforms: {
@@ -48,7 +49,9 @@ interface ScheduledPost {
     youtube?: boolean;
     tiktok?: boolean;
   };
-  instagramMediaType?: "FEED" | "REELS" | "STORIES" | null;
+  instagramMediaType?: "FEED" | "REELS" | "STORIES" | "CAROUSEL" | null;
+  youtubeTitle?: string | null;
+  youtubePrivacy?: "public" | "unlisted" | "private" | null;
   scheduledAt: Date;
   status: "scheduled" | "publishing" | "published" | "failed";
   results?: Record<string, { success: boolean; message?: string }>;
@@ -128,11 +131,14 @@ export default function CalendarPage() {
           id: docSnap.id,
           title: d.title || "Sin título",
           message: d.message || null,
-          imageUrl: d.imageUrl || null,
+          imageUrl: d.imageUrl || d.imageUrls?.[0] || null,
+          imageUrls: d.imageUrls || null,
           videoUrl: d.videoUrl || null,
           link: d.link || null,
           platforms: d.platforms || {},
           instagramMediaType: d.instagramMediaType || null,
+          youtubeTitle: d.youtubeTitle || null,
+          youtubePrivacy: d.youtubePrivacy || null,
           scheduledAt: d.scheduledAt?.toDate?.() || new Date(d.scheduledAt),
           status: d.status || "scheduled",
           results: d.results || undefined,
@@ -320,6 +326,12 @@ export default function CalendarPage() {
                                 alt="Instagram"
                               />
                             )}
+                            {post.platforms.instagram &&
+                              post.instagramMediaType === "CAROUSEL" && (
+                                <span className="text-[9px] opacity-80">
+                                  carousel
+                                </span>
+                              )}
                             {post.platforms.linkedin && (
                               <Image
                                 height={16}

@@ -3,7 +3,7 @@ const GRAPH_API = "https://graph.facebook.com/v21.0";
 async function waitForContainer(
   containerId: string,
   accessToken: string,
-  maxAttempts = 30,
+  maxAttempts = 40,
 ) {
   for (let i = 0; i < maxAttempts; i++) {
     const res = await fetch(
@@ -28,15 +28,73 @@ export async function publishToInstagram(
   data: {
     caption?: string;
     imageUrl?: string;
+    imageUrls?: string[];
     videoUrl?: string;
-    mediaType?: "FEED" | "REELS" | "STORIES";
+    mediaType?: "FEED" | "REELS" | "STORIES" | "CAROUSEL";
   },
 ) {
   const mediaType = data.mediaType || "FEED";
   let containerId: string;
 
+  // ========== CARRUSEL (2–10 imágenes) ==========
+  if (mediaType === "CAROUSEL") {
+    const urls = (
+      data.imageUrls?.length
+        ? data.imageUrls
+        : data.imageUrl
+          ? [data.imageUrl]
+          : []
+    ).filter(Boolean);
+
+    if (urls.length < 2) {
+      throw new Error("El carrusel requiere al menos 2 imágenes");
+    }
+    if (urls.length > 10) {
+      throw new Error("El carrusel admite máximo 10 imágenes");
+    }
+
+    const childIds: string[] = [];
+
+    for (const imageUrl of urls) {
+      const res = await fetch(`${GRAPH_API}/${igUserId}/media`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image_url: imageUrl,
+          is_carousel_item: true,
+          access_token: accessToken,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(
+          json.error?.message || "Error al crear ítem del carrusel",
+        );
+      }
+      childIds.push(json.id);
+    }
+
+    const parentRes = await fetch(`${GRAPH_API}/${igUserId}/media`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        media_type: "CAROUSEL",
+        children: childIds.join(","),
+        caption: data.caption || "",
+        access_token: accessToken,
+      }),
+    });
+    const parentJson = await parentRes.json();
+    if (!parentRes.ok) {
+      throw new Error(
+        parentJson.error?.message || "Error al crear el carrusel",
+      );
+    }
+    containerId = parentJson.id;
+  }
+
   // ========== HISTORIA ==========
-  if (mediaType === "STORIES") {
+  else if (mediaType === "STORIES") {
     if (data.imageUrl) {
       const res = await fetch(`${GRAPH_API}/${igUserId}/media`, {
         method: "POST",
@@ -95,7 +153,7 @@ export async function publishToInstagram(
     containerId = json.id;
   }
 
-  // ========== FEED (publicación normal) ==========
+  // ========== FEED ==========
   else {
     if (data.imageUrl) {
       const res = await fetch(`${GRAPH_API}/${igUserId}/media`, {
@@ -114,7 +172,6 @@ export async function publishToInstagram(
         );
       containerId = json.id;
     } else if (data.videoUrl) {
-      // Video en feed también se publica como REELS actualmente
       const res = await fetch(`${GRAPH_API}/${igUserId}/media`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -136,10 +193,8 @@ export async function publishToInstagram(
     }
   }
 
-  // Esperar procesamiento
   await waitForContainer(containerId, accessToken);
 
-  // Publicar
   const publishRes = await fetch(`${GRAPH_API}/${igUserId}/media_publish`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -157,31 +212,23 @@ export async function publishToInstagram(
   }
 
   const mediaId = publishData.id as string;
-
   let permalink: string | null = null;
 
-  // Las historias a veces no tienen permalink público
   if (mediaType !== "STORIES") {
     try {
       const infoRes = await fetch(
         `${GRAPH_API}/${mediaId}?fields=permalink,shortcode&access_token=${accessToken}`,
       );
       const info = await infoRes.json();
-
       permalink = info.permalink || null;
-
       if (!permalink && info.shortcode) {
-        // Reels suelen ser /reel/, posts /p/
         const path = mediaType === "REELS" ? "reel" : "p";
         permalink = `https://www.instagram.com/${path}/${info.shortcode}/`;
       }
     } catch {
-      // no bloquear la publicación
+      // no bloquear
     }
   }
 
-  return {
-    id: mediaId,
-    permalink,
-  };
+  return { id: mediaId, permalink };
 }

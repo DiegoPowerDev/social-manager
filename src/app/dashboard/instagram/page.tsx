@@ -17,18 +17,13 @@ import { PostHistory } from "@/components/social/PostHistory";
 import { PostPreview } from "@/components/social/PostPreview";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LucideLoaderCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { InstagramConnectFlow } from "@/components/social/InstagramConnectFlow";
+
+type IgMediaType = "FEED" | "REELS" | "STORIES" | "CAROUSEL";
 
 export default function InstagramPage() {
   const [activeTab, setActiveTab] = useState("create");
@@ -44,36 +39,30 @@ export default function InstagramPage() {
     text: string;
   } | null>(null);
 
-  // Estado del post (controlado)
-  const [mediaType, setMediaType] = useState<"FEED" | "REELS" | "STORIES">(
-    "FEED",
-  );
-
   const companyId = useAuthStore((s) => s.companyId);
-
   const memberRole = useAuthStore((s) => s.memberRole);
   const canEdit = memberRole === "admin" || memberRole === "editor";
   const canConnect = memberRole === "admin";
+
   const [caption, setCaption] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [mediaType, setMediaType] = useState<IgMediaType>("FEED");
 
   const loadAccount = async () => {
     try {
-      if (!companyId) {
-        return;
-      }
+      if (!companyId) return;
+
       const q = query(
         collection(db, "socialAccounts"),
         where("companyId", "==", companyId),
         where("platform", "==", "instagram"),
       );
-      console.log(memberRole);
       const snapshot = await getDocs(q);
 
       if (!snapshot.empty) {
         const data = snapshot.docs[0].data();
-
         setAccount({
           id: snapshot.docs[0].id,
           ...data,
@@ -114,9 +103,57 @@ export default function InstagramPage() {
     }
   }, [searchParams]);
 
+  const handleMediaTypeChange = (value: IgMediaType) => {
+    setMediaType(value);
+    setStatus(null);
+
+    if (value === "REELS") {
+      setImageUrl(null);
+      setImageUrls([]);
+    }
+    if (value === "CAROUSEL") {
+      setVideoUrl(null);
+    }
+    if (value !== "CAROUSEL") {
+      setImageUrls([]);
+    }
+  };
+
+  const clearComposer = () => {
+    setCaption("");
+    setImageUrl(null);
+    setImageUrls([]);
+    setVideoUrl(null);
+  };
+
   const handlePublish = async () => {
     if (!account || !companyId || !canEdit) return;
-    if (!caption.trim() && !imageUrl && !videoUrl) return;
+
+    if (mediaType === "CAROUSEL" && imageUrls.length < 2) {
+      setStatus({
+        type: "error",
+        text: "El carrusel necesita al menos 2 imágenes",
+      });
+      return;
+    }
+    if (mediaType === "REELS" && !videoUrl) {
+      setStatus({ type: "error", text: "Los Reels requieren un video" });
+      return;
+    }
+    if (mediaType === "STORIES" && !imageUrl && !videoUrl) {
+      setStatus({
+        type: "error",
+        text: "Las Historias requieren imagen o video",
+      });
+      return;
+    }
+    if (mediaType === "FEED" && !imageUrl && !videoUrl) {
+      setStatus({
+        type: "error",
+        text: "Instagram requiere una imagen o un video",
+      });
+      return;
+    }
 
     setLoading(true);
     setStatus(null);
@@ -130,8 +167,10 @@ export default function InstagramPage() {
           accessToken: account.accessToken,
           username: account.username,
           companyId,
-          caption,
-          imageUrl: imageUrl || undefined,
+          caption: mediaType === "STORIES" ? undefined : caption || undefined,
+          imageUrl:
+            mediaType === "CAROUSEL" ? imageUrls[0] : imageUrl || undefined,
+          imageUrls: mediaType === "CAROUSEL" ? imageUrls : undefined,
           videoUrl: videoUrl || undefined,
           mediaType,
         }),
@@ -142,13 +181,12 @@ export default function InstagramPage() {
 
       setStatus({
         type: "success",
-        text: "Publicado correctamente en Instagram",
+        text:
+          mediaType === "CAROUSEL"
+            ? "Carrusel publicado en Instagram"
+            : "Publicado correctamente en Instagram",
       });
-
-      // Limpiar solo después de publicar
-      setCaption("");
-      setImageUrl(null);
-      setVideoUrl(null);
+      clearComposer();
     } catch (err: any) {
       const msg = err.message || "Error al publicar";
       if (
@@ -161,7 +199,7 @@ export default function InstagramPage() {
           text: "El token expiró o es inválido. Reconecta la cuenta.",
         });
       } else {
-        setStatus({ type: "error", text: err.message });
+        setStatus({ type: "error", text: msg });
       }
     } finally {
       setLoading(false);
@@ -181,6 +219,7 @@ export default function InstagramPage() {
       </div>
     );
   }
+
   if (!companyId) {
     return (
       <div className="p-6 text-muted-foreground">
@@ -201,16 +240,15 @@ export default function InstagramPage() {
 
   return (
     <div className="">
-      {/* Header */}
       <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
-        <div className="p-6  text-white">
+        <div className="p-6 text-white">
           <h1 className="text-2xl font-bold">Instagram</h1>
           <p className="text-sm">
             Publicando como{" "}
-            <span className="font-medium ">@{account.username}</span>
+            <span className="font-medium">@{account.username}</span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pr-6">
           {(() => {
             const s = getTokenStatus(account.expiresAt);
             if (s === "expired")
@@ -233,6 +271,7 @@ export default function InstagramPage() {
           </Button>
         </div>
       </div>
+
       {(() => {
         const tokenStatus = getTokenStatus(account.expiresAt);
         if (tokenStatus === "ok") return null;
@@ -265,15 +304,17 @@ export default function InstagramPage() {
           </div>
         );
       })()}
+
       {!canEdit && (
-        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded-md mb-4">
+        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded-md mx-6 mb-4">
           Tu rol es solo lectura. No puedes publicar ni desconectar.
         </p>
       )}
+
       <div className="w-full h-full p-6">
         {status && (
           <div
-            className={`p-3 rounded-md text-sm ${
+            className={`mb-4 p-3 rounded-md text-sm ${
               status.type === "success"
                 ? "bg-green-50 text-green-700 border border-green-200"
                 : "bg-red-50 text-red-700 border border-red-200"
@@ -283,24 +324,15 @@ export default function InstagramPage() {
           </div>
         )}
 
-        <Tabs
-          value={activeTab}
-          onValueChange={setActiveTab}
-          className="w-full "
-        >
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full max-w-md grid-cols-2 bg-yellow-500/60 font-bold backdrop-blur-xs">
             <TabsTrigger value="create">Crear contenido</TabsTrigger>
             <TabsTrigger value="history">Historial</TabsTrigger>
           </TabsList>
         </Tabs>
 
-        {/* TAB: Crear */}
         <div className={cn(activeTab === "create" ? "mt-6 block" : "hidden")}>
-          {!canEdit ? (
-            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded-md mb-4">
-              Tu rol es solo lectura. No puedes publicar ni desconectar.
-            </p>
-          ) : (
+          {canEdit && (
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               <div className="xl:col-span-2">
                 <InstagramComposer
@@ -310,10 +342,12 @@ export default function InstagramPage() {
                   onCaptionChange={setCaption}
                   imageUrl={imageUrl}
                   onImageChange={setImageUrl}
+                  imageUrls={imageUrls}
+                  onImageUrlsChange={setImageUrls}
                   videoUrl={videoUrl}
                   onVideoChange={setVideoUrl}
                   mediaType={mediaType}
-                  onMediaTypeChange={setMediaType}
+                  onMediaTypeChange={handleMediaTypeChange}
                   onPublish={handlePublish}
                 />
               </div>
@@ -323,7 +357,9 @@ export default function InstagramPage() {
                   platform="instagram"
                   accountName={account.username}
                   message={caption}
-                  imageUrl={imageUrl}
+                  imageUrl={
+                    mediaType === "CAROUSEL" ? imageUrls[0] || null : imageUrl
+                  }
                   videoUrl={videoUrl}
                 />
               </div>
@@ -331,7 +367,6 @@ export default function InstagramPage() {
           )}
         </div>
 
-        {/* Historial - siempre montado, solo se oculta */}
         <div className={activeTab === "history" ? "mt-6 block" : "hidden"}>
           <PostHistory
             pageId={account.igUserId}

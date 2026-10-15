@@ -21,14 +21,16 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Loader2, ImagePlus, Video, X, Trash2 } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { useAuthStore } from "@/stores/useAuthStore";
+
+type IgMediaType = "FEED" | "REELS" | "STORIES" | "CAROUSEL";
 
 interface ScheduledPost {
   id: string;
   title: string;
   message?: string | null;
   imageUrl?: string | null;
+  imageUrls?: string[] | null;
   videoUrl?: string | null;
   link?: string | null;
   platforms: {
@@ -38,7 +40,7 @@ interface ScheduledPost {
     youtube?: boolean;
     tiktok?: boolean;
   };
-  instagramMediaType?: "FEED" | "REELS" | "STORIES" | null;
+  instagramMediaType?: IgMediaType | null;
   scheduledAt: Date;
   youtubeTitle?: string | null;
   youtubePrivacy?: "public" | "unlisted" | "private" | null;
@@ -62,83 +64,76 @@ export function ScheduledPostDetailModal({
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [link, setLink] = useState("");
   const [selectedFacebook, setSelectedFacebook] = useState(false);
   const [selectedInstagram, setSelectedInstagram] = useState(false);
   const [selectedLinkedIn, setSelectedLinkedIn] = useState(false);
-  const [instagramMediaType, setInstagramMediaType] = useState<
-    "FEED" | "REELS" | "STORIES"
-  >("FEED");
+  const [selectedYouTube, setSelectedYouTube] = useState(false);
+  const [selectedTikTok, setSelectedTikTok] = useState(false);
+  const [instagramMediaType, setInstagramMediaType] =
+    useState<IgMediaType>("FEED");
   const [dateStr, setDateStr] = useState("");
   const [time, setTime] = useState("10:00");
+  const [youtubeTitle, setYoutubeTitle] = useState("");
+  const [youtubePrivacy, setYoutubePrivacy] = useState<
+    "public" | "unlisted" | "private"
+  >("public");
 
-  const user = useAuthStore((s) => s.user);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
 
+  const user = useAuthStore((s) => s.user);
   const companyId = useAuthStore((s) => s.companyId);
   const memberRole = useAuthStore((s) => s.memberRole);
   const canEditContent =
     post?.status === "scheduled" &&
     (memberRole === "admin" || memberRole === "editor");
 
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [uploadingMedia, setUploadingMedia] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const [selectedYouTube, setSelectedYouTube] = useState(false);
-  const [selectedTikTok, setSelectedTikTok] = useState(false);
-  const [youtubeTitle, setYoutubeTitle] = useState("");
-  const [youtubePrivacy, setYoutubePrivacy] = useState<
-    "public" | "unlisted" | "private"
-  >("public");
-
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+
+  const isCarousel = selectedInstagram && instagramMediaType === "CAROUSEL";
 
   useEffect(() => {
     if (!post || !open) return;
 
     setTitle(post.title || "");
     setMessage(post.message || "");
-    setImageUrl(post.imageUrl || null);
+    setImageUrl(post.imageUrl || post.imageUrls?.[0] || null);
+    setImageUrls(post.imageUrls || []);
     setVideoUrl(post.videoUrl || null);
     setLink(post.link || "");
     setSelectedFacebook(!!post.platforms?.facebook);
     setSelectedInstagram(!!post.platforms?.instagram);
     setSelectedLinkedIn(!!post.platforms?.linkedin);
-    setInstagramMediaType(post.instagramMediaType || "FEED");
     setSelectedYouTube(!!post.platforms?.youtube);
     setSelectedTikTok(!!post.platforms?.tiktok);
-    setYoutubeTitle((post as any).youtubeTitle || "");
-    setYoutubePrivacy((post as any).youtubePrivacy || "public");
+    setInstagramMediaType((post.instagramMediaType as IgMediaType) || "FEED");
+    setYoutubeTitle(post.youtubeTitle || "");
+    setYoutubePrivacy(post.youtubePrivacy || "public");
     setDateStr(format(post.scheduledAt, "yyyy-MM-dd"));
     setTime(format(post.scheduledAt, "HH:mm"));
     setError(null);
   }, [post, open]);
 
   const uploadToR2 = async (file: File) => {
-    if (!companyId) {
-      throw new Error(
-        "No hay empresa asociada. Recarga la página o vuelve a iniciar sesión.",
-      );
-    }
+    if (!companyId) throw new Error("No hay empresa asociada");
     const formData = new FormData();
     formData.append("file", file);
     formData.append("platform", "scheduled");
     formData.append("companyId", companyId);
-    const res = await fetch("/api/upload", {
-      method: "POST",
-      body: formData,
-    });
+    const res = await fetch("/api/upload", { method: "POST", body: formData });
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.error || "Error al subir");
     }
     const data = await res.json();
     const publicUrl = data.publicUrl as string;
-
     if (user?.uid) {
       try {
         await saveMediaToLibrary({
@@ -152,31 +147,58 @@ export function ScheduledPostDetailModal({
           source: "upload",
         });
       } catch (e) {
-        console.warn("No se pudo guardar en biblioteca:", e);
+        console.warn(e);
       }
     }
-
     return publicUrl;
   };
+
   const onLibrarySelect = (item: { url: string; type: "image" | "video" }) => {
     setError(null);
     if (item.type === "video") {
       setImageUrl(null);
+      setImageUrls([]);
       setVideoUrl(item.url);
+      return;
+    }
+    setVideoUrl(null);
+    if (isCarousel) {
+      if (imageUrls.length >= 10) {
+        setError("Máximo 10 imágenes");
+        return;
+      }
+      const next = [...imageUrls, item.url];
+      setImageUrls(next);
+      setImageUrl(next[0]);
     } else {
-      setVideoUrl(null);
+      setImageUrls([]);
       setImageUrl(item.url);
     }
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files?.length) return;
     try {
       setUploadingMedia(true);
       setVideoUrl(null);
-      const url = await uploadToR2(file);
-      setImageUrl(url);
+      if (isCarousel) {
+        const list = Array.from(files);
+        if (imageUrls.length + list.length > 10) {
+          setError("Máximo 10 imágenes");
+          return;
+        }
+        const uploaded: string[] = [];
+        for (const f of list) {
+          uploaded.push(await uploadToR2(f));
+        }
+        const next = [...imageUrls, ...uploaded].slice(0, 10);
+        setImageUrls(next);
+        setImageUrl(next[0] || null);
+      } else {
+        setImageUrls([]);
+        setImageUrl(await uploadToR2(files[0]));
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -191,14 +213,20 @@ export function ScheduledPostDetailModal({
     try {
       setUploadingMedia(true);
       setImageUrl(null);
-      const url = await uploadToR2(file);
-      setVideoUrl(url);
+      setImageUrls([]);
+      setVideoUrl(await uploadToR2(file));
     } catch (err: any) {
       setError(err.message);
     } finally {
       setUploadingMedia(false);
       if (videoInputRef.current) videoInputRef.current.value = "";
     }
+  };
+
+  const clearMedia = () => {
+    setImageUrl(null);
+    setImageUrls([]);
+    setVideoUrl(null);
   };
 
   const handleSave = async () => {
@@ -219,23 +247,32 @@ export function ScheduledPostDetailModal({
       setError("Selecciona al menos una red");
       return;
     }
-    if (selectedInstagram && !imageUrl && !videoUrl) {
-      setError("Instagram requiere imagen o video");
-      return;
+    if (selectedInstagram) {
+      if (instagramMediaType === "CAROUSEL" && imageUrls.length < 2) {
+        setError("El carrusel necesita al menos 2 imágenes");
+        return;
+      }
+      if (instagramMediaType === "REELS" && !videoUrl) {
+        setError("Los Reels requieren un video");
+        return;
+      }
+      if (instagramMediaType !== "CAROUSEL" && !imageUrl && !videoUrl) {
+        setError("Instagram requiere imagen o video");
+        return;
+      }
     }
     if ((selectedYouTube || selectedTikTok) && !videoUrl) {
       setError("YouTube y TikTok requieren un video");
       return;
     }
-
     if (selectedYouTube && !youtubeTitle.trim() && !message.trim()) {
       setError("YouTube requiere un título");
       return;
     }
+
     const [hours, minutes] = time.split(":").map(Number);
     const scheduledAt = new Date(dateStr + "T00:00:00");
     scheduledAt.setHours(hours, minutes, 0, 0);
-
     if (scheduledAt.getTime() < Date.now()) {
       setError("La fecha/hora debe ser en el futuro");
       return;
@@ -246,7 +283,8 @@ export function ScheduledPostDetailModal({
       await updateDoc(doc(db, "scheduledPosts", post.id), {
         title: title.trim(),
         message: message.trim() || null,
-        imageUrl: imageUrl || null,
+        imageUrl: isCarousel ? imageUrls[0] || null : imageUrl || null,
+        imageUrls: isCarousel ? imageUrls : null,
         videoUrl: videoUrl || null,
         link: link.trim() || null,
         platforms: {
@@ -276,7 +314,6 @@ export function ScheduledPostDetailModal({
   const handleDelete = async () => {
     if (!post) return;
     if (!confirm("¿Eliminar esta publicación programada?")) return;
-
     try {
       setDeleting(true);
       await deleteDoc(doc(db, "scheduledPosts", post.id));
@@ -301,25 +338,14 @@ export function ScheduledPostDetailModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-zinc-950/60 rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-white/40">
-        {/* Header */}
-        <div className="z-10 sticky top-0 px-6 py-4 flex items-center bg-black  justify-between rounded-t-2xl">
+        <div className="sticky top-0 px-6 py-4 flex items-center bg-black justify-between rounded-t-2xl">
           <div>
             <h3 className="text-lg font-semibold text-white">
-              {canEditContent ? "Editar publicación" : "Detalle de publicación"}
+              {canEditContent ? "Editar publicación" : "Detalle"}
             </h3>
-            <div className="flex items-center gap-2 mt-1">
-              <Badge
-                variant={
-                  post.status === "published"
-                    ? "default"
-                    : post.status === "failed"
-                      ? "destructive"
-                      : "secondary"
-                }
-              >
-                {statusLabel[post.status] || post.status}
-              </Badge>
-            </div>
+            <Badge className="mt-1">
+              {statusLabel[post.status] || post.status}
+            </Badge>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose}>
             Cerrar
@@ -327,15 +353,13 @@ export function ScheduledPostDetailModal({
         </div>
 
         <div className="p-6 space-y-5">
-          {/* Título + Fecha/Hora */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="space-y-2 sm:col-span-1">
+            <div className="space-y-2">
               <Label className="text-white">Título</Label>
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 disabled={!canEditContent || saving}
-                maxLength={80}
                 className="bg-white"
               />
             </div>
@@ -361,36 +385,42 @@ export function ScheduledPostDetailModal({
             </div>
           </div>
 
-          {/* Redes */}
           <div className="space-y-3">
             <Label className="text-white">Redes</Label>
-            <div className="flex gap-2 justify-center flex-wrap">
-              <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg">
+            <div className="flex gap-2 flex-wrap justify-center">
+              <div className="flex items-center gap-2 p-3 bg-white/60 rounded-lg">
                 <Checkbox
                   id="edit-fb"
                   checked={selectedFacebook}
                   onCheckedChange={(c) => setSelectedFacebook(c === true)}
                   disabled={!canEditContent || saving}
                 />
-                <Label htmlFor="edit-fb" className="cursor-pointer">
-                  Facebook
-                </Label>
+                <Label htmlFor="edit-fb">Facebook</Label>
               </div>
-
-              <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg">
+              <div className="flex items-center gap-2 p-3 bg-white/60 rounded-lg flex-wrap">
                 <Checkbox
                   id="edit-ig"
                   checked={selectedInstagram}
-                  onCheckedChange={(c) => setSelectedInstagram(c === true)}
+                  onCheckedChange={(c) => {
+                    setSelectedInstagram(c === true);
+                    if (!c) setImageUrls([]);
+                  }}
                   disabled={!canEditContent || saving}
                 />
-                <Label htmlFor="edit-ig" className="cursor-pointer">
-                  Instagram
-                </Label>
+                <Label htmlFor="edit-ig">Instagram</Label>
                 {selectedInstagram && canEditContent && (
                   <Select
                     value={instagramMediaType}
-                    onValueChange={(v) => setInstagramMediaType(v as any)}
+                    onValueChange={(v) => {
+                      const t = v as IgMediaType;
+                      setInstagramMediaType(t);
+                      if (t !== "CAROUSEL") setImageUrls([]);
+                      if (t === "CAROUSEL") setVideoUrl(null);
+                      if (t === "REELS") {
+                        setImageUrl(null);
+                        setImageUrls([]);
+                      }
+                    }}
                     disabled={saving}
                   >
                     <SelectTrigger className="h-8 w-32 bg-white">
@@ -398,134 +428,80 @@ export function ScheduledPostDetailModal({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="FEED">Feed</SelectItem>
+                      <SelectItem value="CAROUSEL">Carrusel</SelectItem>
                       <SelectItem value="REELS">Reel</SelectItem>
                       <SelectItem value="STORIES">Historia</SelectItem>
                     </SelectContent>
                   </Select>
                 )}
               </div>
-
-              <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg">
+              <div className="flex items-center gap-2 p-3 bg-white/60 rounded-lg">
                 <Checkbox
                   id="edit-li"
                   checked={selectedLinkedIn}
                   onCheckedChange={(c) => setSelectedLinkedIn(c === true)}
                   disabled={!canEditContent || saving}
                 />
-                <Label htmlFor="edit-li" className="cursor-pointer">
-                  LinkedIn
-                </Label>
+                <Label htmlFor="edit-li">LinkedIn</Label>
               </div>
-              <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg">
+              <div className="flex items-center gap-2 p-3 bg-white/60 rounded-lg">
                 <Checkbox
                   id="edit-yt"
                   checked={selectedYouTube}
                   onCheckedChange={(c) => setSelectedYouTube(c === true)}
                   disabled={!canEditContent || saving}
                 />
-                <Label htmlFor="edit-yt" className="cursor-pointer">
-                  YouTube
-                </Label>
+                <Label htmlFor="edit-yt">YouTube</Label>
               </div>
-
-              <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg">
+              <div className="flex items-center gap-2 p-3 bg-white/60 rounded-lg">
                 <Checkbox
                   id="edit-tt"
                   checked={selectedTikTok}
                   onCheckedChange={(c) => setSelectedTikTok(c === true)}
                   disabled={!canEditContent || saving}
                 />
-                <Label htmlFor="edit-tt" className="cursor-pointer">
-                  TikTok
-                </Label>
+                <Label htmlFor="edit-tt">TikTok</Label>
               </div>
-            </div>
-            {selectedYouTube && canEditContent && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label className="text-white">Título YouTube</Label>
-                  <Input
-                    value={youtubeTitle}
-                    onChange={(e) => setYoutubeTitle(e.target.value)}
-                    maxLength={100}
-                    className="bg-white"
-                    disabled={saving}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-white">Privacidad</Label>
-                  <Select
-                    value={youtubePrivacy}
-                    onValueChange={(v) => setYoutubePrivacy(v as any)}
-                    disabled={saving}
-                  >
-                    <SelectTrigger className="bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="public">Público</SelectItem>
-                      <SelectItem value="unlisted">No listado</SelectItem>
-                      <SelectItem value="private">Privado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-            {/* Avisos */}
-            <div className="space-y-2 text-xs">
-              {(selectedYouTube || selectedTikTok) && (
-                <div className="rounded-md border border-violet-200 bg-violet-50 text-violet-900 p-3 text-xs">
-                  <p className="font-medium">YouTube / TikTok</p>
-                  <p>
-                    Requieren un video. TikTok en sandbox suele publicarse como
-                    privado.
-                  </p>
-                </div>
-              )}
-              {selectedInstagram && (
-                <div className="rounded-md border border-amber-200 bg-amber-50 text-amber-900 p-3 space-y-1">
-                  <p className="font-medium">Instagram — formato de media</p>
-                  {instagramMediaType === "FEED" && (
-                    <p>
-                      Imagen: ratio entre <strong>4:5</strong> (vertical) y{" "}
-                      <strong>1.91:1</strong> (horizontal). Cuadrado 1:1
-                      recomendado.
-                    </p>
-                  )}
-                  {instagramMediaType === "REELS" && (
-                    <p>
-                      Reels: video vertical <strong>9:16</strong> (ej.
-                      1080×1920). Máx. ~90 segundos recomendado.
-                    </p>
-                  )}
-                  {instagramMediaType === "STORIES" && (
-                    <p>
-                      Historias: imagen o video vertical <strong>9:16</strong>.
-                      No se publica caption por la API.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {selectedLinkedIn && (
-                <div className="rounded-md border border-sky-200 bg-sky-50 text-sky-900 p-3">
-                  <p className="font-medium">LinkedIn</p>
-                  <p>Soporta texto, imagen y video.</p>
-                </div>
-              )}
-
-              {selectedFacebook && (
-                <div className="rounded-md border border-blue-200 bg-blue-50 text-blue-900 p-3">
-                  <p className="font-medium">Facebook</p>
-                  <p>
-                    Texto, imagen, video y enlace. Más flexible con el formato.
-                  </p>
-                </div>
-              )}
             </div>
           </div>
 
-          {/* Texto */}
+          {selectedYouTube && canEditContent && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label className="text-white">Título YouTube</Label>
+                <Input
+                  value={youtubeTitle}
+                  onChange={(e) => setYoutubeTitle(e.target.value)}
+                  className="bg-white"
+                  disabled={saving}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-white">Privacidad</Label>
+                <Select
+                  value={youtubePrivacy}
+                  onValueChange={(v) => setYoutubePrivacy(v as any)}
+                  disabled={saving}
+                >
+                  <SelectTrigger className="bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="public">Público</SelectItem>
+                    <SelectItem value="unlisted">No listado</SelectItem>
+                    <SelectItem value="private">Privado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          {isCarousel && (
+            <p className="text-xs text-amber-200">
+              Carrusel: {imageUrls.length}/10 (mín. 2)
+            </p>
+          )}
+
           <div className="space-y-2">
             <Label className="text-white">Texto / Caption</Label>
             <Textarea
@@ -537,56 +513,77 @@ export function ScheduledPostDetailModal({
             />
           </div>
 
-          {/* Media */}
           <div className="space-y-3">
             <Label className="text-white">Media</Label>
 
-            {(imageUrl || videoUrl) && (
-              <div className="relative rounded-lg overflow-hidden border bg-black">
-                {imageUrl && (
-                  <img
-                    src={imageUrl}
-                    alt="Preview"
-                    className="w-full max-h-48 object-contain"
-                  />
-                )}
-
-                {videoUrl && (
-                  <video src={videoUrl} controls className="w-full max-h-48" />
-                )}
-                {canEditContent && (
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    className="absolute top-2 right-2 h-8 w-8 rounded-full"
-                    onClick={() => {
-                      setImageUrl(null);
-                      setVideoUrl(null);
-                    }}
-                    disabled={saving}
+            {isCarousel && imageUrls.length > 0 ? (
+              <div className="flex gap-2 overflow-x-auto py-2">
+                {imageUrls.map((url, i) => (
+                  <div
+                    key={`${url}-${i}`}
+                    className="relative shrink-0 w-24 h-24 rounded border overflow-hidden"
                   >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
+                    <img
+                      src={url}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                    {canEditContent && (
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="secondary"
+                        className="absolute top-0.5 right-0.5 h-6 w-6"
+                        onClick={() => {
+                          const next = imageUrls.filter((_, j) => j !== i);
+                          setImageUrls(next);
+                          setImageUrl(next[0] || null);
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
               </div>
+            ) : (
+              (imageUrl || videoUrl) && (
+                <div className="relative rounded-lg overflow-hidden border bg-black">
+                  {imageUrl && (
+                    <img
+                      src={imageUrl}
+                      alt=""
+                      className="w-full max-h-48 object-contain"
+                    />
+                  )}
+                  {videoUrl && (
+                    <video
+                      src={videoUrl}
+                      controls
+                      className="w-full max-h-48"
+                    />
+                  )}
+                  {canEditContent && (
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="absolute top-2 right-2 h-8 w-8 rounded-full"
+                      onClick={clearMedia}
+                      disabled={saving}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              )
             )}
-            {canEditContent && (imageUrl || videoUrl) && (
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => setLibraryOpen(true)}
-                disabled={saving || uploadingMedia}
-              >
-                <FolderOpen className="h-4 w-4 mr-2" />
-                Cambiar desde biblioteca
-              </Button>
-            )}
-            {canEditContent && !imageUrl && !videoUrl && (
-              <div className="flex gap-2">
+
+            {canEditContent && (
+              <div className="flex gap-2 flex-wrap">
                 <input
                   type="file"
                   accept="image/*"
+                  multiple={isCarousel}
                   ref={imageInputRef}
                   onChange={handleImageUpload}
                   className="hidden"
@@ -603,17 +600,25 @@ export function ScheduledPostDetailModal({
                   variant="outline"
                   size="sm"
                   onClick={() => imageInputRef.current?.click()}
-                  disabled={saving || uploadingMedia}
+                  disabled={
+                    saving || uploadingMedia || (!!videoUrl && !isCarousel)
+                  }
                 >
                   <ImagePlus className="h-4 w-4 mr-2" />
-                  Imagen
+                  {isCarousel ? "Añadir imágenes" : "Imagen"}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => videoInputRef.current?.click()}
-                  disabled={saving || uploadingMedia}
+                  disabled={
+                    saving ||
+                    uploadingMedia ||
+                    isCarousel ||
+                    !!imageUrl ||
+                    imageUrls.length > 0
+                  }
                 >
                   <Video className="h-4 w-4 mr-2" />
                   Video
@@ -632,7 +637,6 @@ export function ScheduledPostDetailModal({
             )}
           </div>
 
-          {/* Link */}
           <div className="space-y-2">
             <Label>Enlace (Facebook)</Label>
             <Input
@@ -643,10 +647,9 @@ export function ScheduledPostDetailModal({
             />
           </div>
 
-          {/* Resultados */}
           {post.results && Object.keys(post.results).length > 0 && (
             <div className="space-y-2 p-3 bg-white/60 rounded-lg">
-              <Label>Resultados de publicación</Label>
+              <Label>Resultados</Label>
               {Object.entries(post.results).map(([platform, result]) => (
                 <p key={platform} className="text-sm">
                   <span className="font-medium capitalize">{platform}: </span>
@@ -664,7 +667,6 @@ export function ScheduledPostDetailModal({
 
           {error && <p className="text-sm text-red-500">{error}</p>}
 
-          {/* Acciones */}
           <div className="flex items-center justify-between gap-2 pt-4 border-t border-white/40">
             <Button
               variant="destructive"
@@ -680,7 +682,6 @@ export function ScheduledPostDetailModal({
                 </>
               )}
             </Button>
-
             <div className="flex gap-2">
               <Button variant="outline" onClick={onClose} disabled={saving}>
                 Cerrar
@@ -689,7 +690,7 @@ export function ScheduledPostDetailModal({
                 <Button
                   onClick={handleSave}
                   disabled={saving || uploadingMedia}
-                  className="bg-gradient-to-r from-orange-400 to-yellow-500 hover:from-orange-500 hover:to-yellow-500 text-white shadow-lg shadow-orange-500/25"
+                  className="bg-gradient-to-r from-orange-400 to-yellow-500 text-white"
                 >
                   {saving ? (
                     <>
@@ -705,6 +706,7 @@ export function ScheduledPostDetailModal({
           </div>
         </div>
       </div>
+
       <MediaLibraryPicker
         open={libraryOpen}
         onClose={() => setLibraryOpen(false)}
@@ -713,7 +715,9 @@ export function ScheduledPostDetailModal({
           selectedTikTok ||
           (selectedInstagram && instagramMediaType === "REELS")
             ? "video"
-            : "all"
+            : isCarousel
+              ? "image"
+              : "all"
         }
         onSelect={onLibrarySelect}
       />

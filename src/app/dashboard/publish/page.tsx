@@ -60,6 +60,8 @@ interface PublishResult {
   message: string;
 }
 
+type IgMediaType = "FEED" | "REELS" | "STORIES" | "CAROUSEL";
+
 export default function BulkPublishPage() {
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [loadingAccounts, setLoadingAccounts] = useState(true);
@@ -71,28 +73,25 @@ export default function BulkPublishPage() {
   const memberRole = useAuthStore((s) => s.memberRole);
   const canEdit = memberRole === "admin" || memberRole === "editor";
 
-  // Contenido
   const [message, setMessage] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [link, setLink] = useState("");
 
-  // Selección de redes
   const [selectedFacebook, setSelectedFacebook] = useState(false);
   const [selectedInstagram, setSelectedInstagram] = useState(false);
   const [selectedLinkedIn, setSelectedLinkedIn] = useState(false);
   const [selectedYouTube, setSelectedYouTube] = useState(false);
   const [selectedTikTok, setSelectedTikTok] = useState(false);
-  const [instagramMediaType, setInstagramMediaType] = useState<
-    "FEED" | "REELS" | "STORIES"
-  >("FEED");
+  const [instagramMediaType, setInstagramMediaType] =
+    useState<IgMediaType>("FEED");
 
   const [youtubeTitle, setYoutubeTitle] = useState("");
   const [youtubePrivacy, setYoutubePrivacy] = useState<
     "public" | "unlisted" | "private"
   >("public");
 
-  // Estados de carga
   const [publishing, setPublishing] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [results, setResults] = useState<PublishResult[]>([]);
@@ -186,27 +185,62 @@ export default function BulkPublishPage() {
   const onLibrarySelect = (item: { url: string; type: "image" | "video" }) => {
     if (item.type === "video") {
       setImageUrl(null);
+      setImageUrls([]);
       setVideoUrl(item.url);
+      return;
+    }
+    setVideoUrl(null);
+    if (selectedInstagram && instagramMediaType === "CAROUSEL") {
+      if (imageUrls.length >= 10) {
+        alert("Máximo 10 imágenes en el carrusel");
+        return;
+      }
+      const next = [...imageUrls, item.url];
+      setImageUrls(next);
+      setImageUrl(next[0]);
     } else {
-      setVideoUrl(null);
+      setImageUrls([]);
       setImageUrl(item.url);
     }
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files?.length) return;
 
-    if (file.size > 10 * 1024 * 1024) {
-      alert("La imagen no puede superar los 10MB");
-      return;
-    }
+    const isCarousel = selectedInstagram && instagramMediaType === "CAROUSEL";
 
     try {
       setUploadingMedia(true);
       setVideoUrl(null);
-      const url = await uploadToR2(file);
-      setImageUrl(url);
+
+      if (isCarousel) {
+        const list = Array.from(files);
+        if (imageUrls.length + list.length > 10) {
+          alert("Máximo 10 imágenes en el carrusel");
+          return;
+        }
+        const uploaded: string[] = [];
+        for (const file of list) {
+          if (file.size > 10 * 1024 * 1024) {
+            alert(`"${file.name}" supera 10MB`);
+            continue;
+          }
+          uploaded.push(await uploadToR2(file));
+        }
+        const next = [...imageUrls, ...uploaded].slice(0, 10);
+        setImageUrls(next);
+        setImageUrl(next[0] || null);
+      } else {
+        const file = files[0];
+        if (file.size > 10 * 1024 * 1024) {
+          alert("La imagen no puede superar los 10MB");
+          return;
+        }
+        const url = await uploadToR2(file);
+        setImageUrls([]);
+        setImageUrl(url);
+      }
     } catch (err: any) {
       alert(err.message || "Error al subir la imagen");
     } finally {
@@ -227,6 +261,7 @@ export default function BulkPublishPage() {
     try {
       setUploadingMedia(true);
       setImageUrl(null);
+      setImageUrls([]);
       const url = await uploadToR2(file);
       setVideoUrl(url);
     } catch (err: any) {
@@ -239,6 +274,7 @@ export default function BulkPublishPage() {
 
   const removeMedia = () => {
     setImageUrl(null);
+    setImageUrls([]);
     setVideoUrl(null);
     if (imageInputRef.current) imageInputRef.current.value = "";
     if (videoInputRef.current) videoInputRef.current.value = "";
@@ -247,8 +283,10 @@ export default function BulkPublishPage() {
   const clearForm = () => {
     setMessage("");
     setImageUrl(null);
+    setImageUrls([]);
     setVideoUrl(null);
     setLink("");
+    setYoutubeTitle("");
     if (imageInputRef.current) imageInputRef.current.value = "";
     if (videoInputRef.current) videoInputRef.current.value = "";
   };
@@ -274,18 +312,29 @@ export default function BulkPublishPage() {
       return;
     }
 
-    if (selectedInstagram && !imageUrl && !videoUrl) {
-      alert("Instagram requiere una imagen o un video");
-      return;
-    }
     if (selectedYouTube && !youtubeTitle.trim() && !message.trim()) {
       alert("YouTube requiere un título");
       return;
     }
 
-    if (selectedInstagram && instagramMediaType === "REELS" && !videoUrl) {
-      alert("Los Reels requieren un video");
-      return;
+    if (selectedInstagram) {
+      if (instagramMediaType === "CAROUSEL" && imageUrls.length < 2) {
+        alert("El carrusel de Instagram necesita al menos 2 imágenes");
+        return;
+      }
+      if (instagramMediaType === "REELS" && !videoUrl) {
+        alert("Los Reels requieren un video");
+        return;
+      }
+      if (
+        instagramMediaType !== "CAROUSEL" &&
+        instagramMediaType !== "REELS" &&
+        !imageUrl &&
+        !videoUrl
+      ) {
+        alert("Instagram requiere una imagen o un video");
+        return;
+      }
     }
 
     setPublishing(true);
@@ -293,7 +342,6 @@ export default function BulkPublishPage() {
 
     const publishResults: PublishResult[] = [];
 
-    // Facebook
     if (selectedFacebook && facebookAccount) {
       try {
         const res = await fetch("/api/publish/facebook", {
@@ -310,7 +358,6 @@ export default function BulkPublishPage() {
             videoUrl: videoUrl || undefined,
           }),
         });
-
         const data = await res.json();
         publishResults.push({
           platform: "Facebook",
@@ -326,7 +373,6 @@ export default function BulkPublishPage() {
       }
     }
 
-    // Instagram
     if (selectedInstagram && instagramAccount) {
       try {
         const res = await fetch("/api/publish/instagram", {
@@ -336,21 +382,28 @@ export default function BulkPublishPage() {
             igUserId: instagramAccount.igUserId,
             accessToken: instagramAccount.accessToken,
             username: instagramAccount.username,
+            companyId,
             caption: instagramMediaType === "STORIES" ? undefined : message,
-            imageUrl: imageUrl || undefined,
+            imageUrl:
+              instagramMediaType === "CAROUSEL"
+                ? imageUrls[0]
+                : imageUrl || undefined,
+            imageUrls:
+              instagramMediaType === "CAROUSEL" ? imageUrls : undefined,
             videoUrl: videoUrl || undefined,
             mediaType: instagramMediaType,
           }),
         });
-
         const data = await res.json();
         publishResults.push({
           platform: "Instagram",
           success: res.ok,
           message: res.ok
             ? instagramMediaType === "STORIES"
-              ? "Historia publicada (sin texto, limitación de Instagram)"
-              : "Publicado correctamente"
+              ? "Historia publicada (sin texto)"
+              : instagramMediaType === "CAROUSEL"
+                ? "Carrusel publicado"
+                : "Publicado correctamente"
             : data.error || "Error",
         });
       } catch (err: any) {
@@ -362,7 +415,6 @@ export default function BulkPublishPage() {
       }
     }
 
-    // LinkedIn
     if (selectedLinkedIn && linkedinAccount) {
       try {
         const res = await fetch("/api/publish/linkedin", {
@@ -372,12 +424,12 @@ export default function BulkPublishPage() {
             personId: linkedinAccount.personId,
             accessToken: linkedinAccount.accessToken,
             name: linkedinAccount.name,
+            companyId,
             text: message,
             imageUrl: imageUrl || undefined,
             videoUrl: videoUrl || undefined,
           }),
         });
-
         const data = await res.json();
         publishResults.push({
           platform: "LinkedIn",
@@ -392,7 +444,7 @@ export default function BulkPublishPage() {
         });
       }
     }
-    // YouTube
+
     if (selectedYouTube && youtubeAccount) {
       try {
         const res = await fetch("/api/publish/youtube", {
@@ -425,7 +477,6 @@ export default function BulkPublishPage() {
       }
     }
 
-    // TikTok
     if (selectedTikTok && tiktokAccount) {
       try {
         const res = await fetch("/api/publish/tiktok", {
@@ -438,7 +489,7 @@ export default function BulkPublishPage() {
             name: tiktokAccount.name || tiktokAccount.username,
             title: message.trim() || "Video",
             videoUrl,
-            privacyLevel: "SELF_ONLY", // sandbox; en prod podrás ampliar
+            privacyLevel: "SELF_ONLY",
           }),
         });
         const data = await res.json();
@@ -459,8 +510,7 @@ export default function BulkPublishPage() {
     setResults(publishResults);
     setPublishing(false);
 
-    const allSuccess = publishResults.every((r) => r.success);
-    if (allSuccess) {
+    if (publishResults.every((r) => r.success)) {
       clearForm();
     }
   };
@@ -475,20 +525,13 @@ export default function BulkPublishPage() {
 
   if (accounts.length === 0) {
     return (
-      <div className="flex-1  flex  flex-col h-full w-full">
+      <div className="flex flex-1 flex-col h-full w-full">
         <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
-          <div className="p-6  text-white">
+          <div className="p-6 text-white">
             <h1 className="text-2xl font-bold">Publicar en varias redes</h1>
-            <p className=" text-sm">
-              No tienes ninguna red conectada. Conecta Facebook, Instagram,
-              LinkedIn, YouTube o TikTok primero.
+            <p className="text-sm">
+              Conecta Facebook, Instagram, LinkedIn, YouTube o TikTok primero.
             </p>
-          </div>
-        </div>
-
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-white">
-            ¡No pierdas tiempo, empieza a añadir tus redes!
           </div>
         </div>
       </div>
@@ -503,22 +546,22 @@ export default function BulkPublishPage() {
     selectedTikTok,
   ].filter(Boolean).length;
 
+  const isCarousel = selectedInstagram && instagramMediaType === "CAROUSEL";
+
   return (
-    <div className="">
+    <div>
       <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
-        <div className="p-6  text-white">
+        <div className="p-6 text-white">
           <h1 className="text-2xl font-bold">Publicar en varias redes</h1>
           <p className="text-sm">
-            Crea el contenido una vez y publícalo en todas las redes
-            seleccionadas
+            Crea el contenido una vez y publícalo en las redes seleccionadas
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
-        {/* Contenido */}
         <div className="lg:col-span-2 space-y-5">
-          <Card className="bg-zinc-950/50 ">
+          <Card className="bg-zinc-950/50">
             <CardHeader>
               <CardTitle className="text-white">Contenido</CardTitle>
               <CardDescription className="text-white/60">
@@ -531,15 +574,13 @@ export default function BulkPublishPage() {
                   <CardTitle>Redes</CardTitle>
                   <CardDescription>Selecciona dónde publicar</CardDescription>
                 </CardHeader>
-                <CardContent className="grid grid-cols-3 bg-zinc-950/60">
+                <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-2">
                   {facebookAccount && (
-                    <div className="flex items-start space-x-3 p-3 rounded-lg ">
+                    <div className="flex items-start space-x-3 p-3 rounded-lg">
                       <Checkbox
                         id="fb"
                         checked={selectedFacebook}
-                        onCheckedChange={(checked) =>
-                          setSelectedFacebook(checked === true)
-                        }
+                        onCheckedChange={(c) => setSelectedFacebook(c === true)}
                         disabled={publishing}
                       />
                       <div className="space-y-1">
@@ -557,7 +598,7 @@ export default function BulkPublishPage() {
                   )}
 
                   {instagramAccount && (
-                    <div className="space-y-3 p-3 rounded-lg ">
+                    <div className="space-y-3 p-3 rounded-lg">
                       <div className="flex items-start space-x-3">
                         <Checkbox
                           id="ig"
@@ -565,7 +606,10 @@ export default function BulkPublishPage() {
                           onCheckedChange={(checked) => {
                             const on = checked === true;
                             setSelectedInstagram(on);
-                            if (!on) setInstagramMediaType("FEED");
+                            if (!on) {
+                              setInstagramMediaType("FEED");
+                              setImageUrls([]);
+                            }
                           }}
                           disabled={publishing}
                         />
@@ -584,12 +628,19 @@ export default function BulkPublishPage() {
 
                       {selectedInstagram && (
                         <div className="ml-7 space-y-2">
-                          <Label className="text-xs">Tipo de publicación</Label>
+                          <Label className="text-xs">Tipo</Label>
                           <Select
                             value={instagramMediaType}
-                            onValueChange={(v) =>
-                              setInstagramMediaType(v as any)
-                            }
+                            onValueChange={(v) => {
+                              const t = v as IgMediaType;
+                              setInstagramMediaType(t);
+                              if (t !== "CAROUSEL") setImageUrls([]);
+                              if (t === "CAROUSEL") setVideoUrl(null);
+                              if (t === "REELS") {
+                                setImageUrl(null);
+                                setImageUrls([]);
+                              }
+                            }}
                             disabled={publishing}
                           >
                             <SelectTrigger className="h-8 bg-black">
@@ -597,6 +648,7 @@ export default function BulkPublishPage() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="FEED">Feed</SelectItem>
+                              <SelectItem value="CAROUSEL">Carrusel</SelectItem>
                               <SelectItem value="REELS">Reel</SelectItem>
                               <SelectItem value="STORIES">Historia</SelectItem>
                             </SelectContent>
@@ -607,13 +659,11 @@ export default function BulkPublishPage() {
                   )}
 
                   {linkedinAccount && (
-                    <div className="flex items-start space-x-3 p-3 rounded-lg ">
+                    <div className="flex items-start space-x-3 p-3 rounded-lg">
                       <Checkbox
                         id="li"
                         checked={selectedLinkedIn}
-                        onCheckedChange={(checked) =>
-                          setSelectedLinkedIn(checked === true)
-                        }
+                        onCheckedChange={(c) => setSelectedLinkedIn(c === true)}
                         disabled={publishing}
                       />
                       <div className="space-y-1">
@@ -626,12 +676,10 @@ export default function BulkPublishPage() {
                         <p className="text-xs text-muted-foreground">
                           {linkedinAccount.name}
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          Texto, imagen y video
-                        </p>
                       </div>
                     </div>
                   )}
+
                   {youtubeAccount && (
                     <div className="flex items-start space-x-3 p-3 rounded-lg">
                       <Checkbox
@@ -649,9 +697,6 @@ export default function BulkPublishPage() {
                         </Label>
                         <p className="text-xs text-muted-foreground">
                           {youtubeAccount.name || "Canal"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Solo video
                         </p>
                       </div>
                     </div>
@@ -675,14 +720,12 @@ export default function BulkPublishPage() {
                         <p className="text-xs text-muted-foreground">
                           {tiktokAccount.name || tiktokAccount.username}
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          Solo video · sandbox privado
-                        </p>
                       </div>
                     </div>
                   )}
                 </CardContent>
               </Card>
+
               {selectedYouTube && (
                 <div className="space-y-2">
                   <Label className="text-white">Título YouTube</Label>
@@ -708,10 +751,9 @@ export default function BulkPublishPage() {
                   </Select>
                 </div>
               )}
-              {/* Texto + AI Caption */}
+
               {!(selectedInstagram && instagramMediaType === "STORIES") && (
                 <div className="flex justify-between gap-2 bg-zinc-950/50 text-white rounded">
-                  {" "}
                   <AICaptionGenerator
                     platform="general"
                     onGenerate={(caption) => setMessage(caption)}
@@ -724,7 +766,7 @@ export default function BulkPublishPage() {
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
                       rows={5}
-                      className="resize-none flex-1  text-black"
+                      className="resize-none flex-1 text-black"
                       disabled={publishing || uploadingMedia}
                     />
                   </div>
@@ -733,31 +775,46 @@ export default function BulkPublishPage() {
 
               {selectedInstagram && instagramMediaType === "STORIES" && (
                 <p className="text-sm text-black bg-white/60 p-3 rounded">
-                  Las Historias de Instagram no permiten texto a través de la
-                  API.
+                  Las Historias de Instagram no permiten texto por la API.
                 </p>
               )}
+
               {(selectedYouTube || selectedTikTok) && !videoUrl && (
                 <p className="text-sm text-amber-200">
-                  YouTube y TikTok solo publican si hay un video seleccionado.
+                  YouTube y TikTok requieren un video.
                 </p>
               )}
-              {/* Media + AI Image */}
+
+              {isCarousel && (
+                <p className="text-sm text-amber-200">
+                  Carrusel IG: {imageUrls.length}/10 (mín. 2). Otras redes
+                  usarán la primera imagen si aplica.
+                </p>
+              )}
+
               <div className="flex justify-between gap-2 bg-zinc-950/50 text-white rounded">
                 <AIImageGenerator
                   onGenerate={(url) => {
-                    setImageUrl(url);
                     setVideoUrl(null);
+                    if (isCarousel) {
+                      if (imageUrls.length >= 10) return;
+                      const next = [...imageUrls, url];
+                      setImageUrls(next);
+                      setImageUrl(next[0]);
+                    } else {
+                      setImageUrls([]);
+                      setImageUrl(url);
+                    }
                   }}
                 />
                 <Separator orientation="vertical" />
                 <div className="flex w-full flex-col gap-2 p-4">
-                  <span>Media (imagen o video)</span>
-
-                  <div className="flex items-center justify-center gap-2">
+                  <span>Media</span>
+                  <div className="flex items-center justify-center gap-2 flex-wrap">
                     <input
                       type="file"
                       accept="image/*"
+                      multiple={isCarousel}
                       ref={imageInputRef}
                       onChange={handleImageUpload}
                       className="hidden"
@@ -769,7 +826,7 @@ export default function BulkPublishPage() {
                       ref={videoInputRef}
                       onChange={handleVideoUpload}
                       className="hidden"
-                      disabled={publishing || uploadingMedia}
+                      disabled={publishing || uploadingMedia || isCarousel}
                     />
 
                     <Button
@@ -778,10 +835,14 @@ export default function BulkPublishPage() {
                       size="sm"
                       className="text-black"
                       onClick={() => imageInputRef.current?.click()}
-                      disabled={publishing || uploadingMedia || !!videoUrl}
+                      disabled={
+                        publishing ||
+                        uploadingMedia ||
+                        (!!videoUrl && !isCarousel)
+                      }
                     >
                       <ImagePlus className="h-4 w-4 mr-2" />
-                      Imagen
+                      {isCarousel ? "Añadir imágenes" : "Imagen"}
                     </Button>
 
                     <Button
@@ -790,11 +851,18 @@ export default function BulkPublishPage() {
                       size="sm"
                       className="text-black"
                       onClick={() => videoInputRef.current?.click()}
-                      disabled={publishing || uploadingMedia || !!imageUrl}
+                      disabled={
+                        publishing ||
+                        uploadingMedia ||
+                        isCarousel ||
+                        !!imageUrl ||
+                        imageUrls.length > 0
+                      }
                     >
                       <Video className="h-4 w-4 mr-2" />
                       Video
                     </Button>
+
                     <Button
                       type="button"
                       variant="secondary"
@@ -809,49 +877,77 @@ export default function BulkPublishPage() {
                   </div>
 
                   <div className="flex-1 flex items-center justify-center">
-                    {(imageUrl || videoUrl) && (
-                      <div className="relative rounded-lg overflow-hidden border bg-muted/30">
-                        {imageUrl && (
-                          <img
-                            src={imageUrl}
-                            alt="Preview"
-                            className="w-full max-h-64 object-contain"
-                          />
-                        )}
-                        {videoUrl && (
-                          <video
-                            src={videoUrl}
-                            controls
-                            className="w-full max-h-64"
-                          />
-                        )}
-                        <Button
-                          variant="secondary"
-                          size="icon"
-                          className="absolute top-2 right-2 h-8 w-8 rounded-full"
-                          onClick={removeMedia}
-                          disabled={publishing || uploadingMedia}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+                    {isCarousel && imageUrls.length > 0 ? (
+                      <div className="flex gap-2 overflow-x-auto py-2 w-full">
+                        {imageUrls.map((url, i) => (
+                          <div
+                            key={`${url}-${i}`}
+                            className="relative shrink-0 w-24 h-24 rounded border overflow-hidden"
+                          >
+                            <img
+                              src={url}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="secondary"
+                              className="absolute top-0.5 right-0.5 h-6 w-6"
+                              onClick={() => {
+                                const next = imageUrls.filter(
+                                  (_, j) => j !== i,
+                                );
+                                setImageUrls(next);
+                                setImageUrl(next[0] || null);
+                              }}
+                              disabled={publishing || uploadingMedia}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
                       </div>
+                    ) : (
+                      (imageUrl || videoUrl) && (
+                        <div className="relative rounded-lg overflow-hidden border bg-muted/30">
+                          {imageUrl && (
+                            <img
+                              src={imageUrl}
+                              alt="Preview"
+                              className="w-full max-h-64 object-contain"
+                            />
+                          )}
+                          {videoUrl && (
+                            <video
+                              src={videoUrl}
+                              controls
+                              className="w-full max-h-64"
+                            />
+                          )}
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="absolute top-2 right-2 h-8 w-8 rounded-full"
+                            onClick={removeMedia}
+                            disabled={publishing || uploadingMedia}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )
                     )}
                   </div>
 
                   {uploadingMedia && (
                     <p className="text-sm text-muted-foreground flex items-center gap-2 justify-center">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Subiendo archivo...
+                      Subiendo...
                     </p>
                   )}
                 </div>
               </div>
-              {videoUrl && (
-                <p className="text-sm text-muted-foreground bg-white/60 p-3 rounded">
-                  LinkedIn video: MP4 recomendado, máx. ~200 MB, hasta ~10 min.
-                </p>
-              )}
-              {/* Enlace */}
+
               <div className="space-y-2">
                 <Label className="text-white font-bold">
                   Enlace (solo Facebook)
@@ -869,16 +965,14 @@ export default function BulkPublishPage() {
         </div>
 
         <div className="space-y-5">
-          <div>
-            <PostPreview
-              platform="linkedin"
-              message={message}
-              imageUrl={imageUrl}
-              videoUrl={videoUrl}
-            />
-          </div>
+          <PostPreview
+            platform="linkedin"
+            message={message}
+            imageUrl={isCarousel ? imageUrls[0] || null : imageUrl}
+            videoUrl={videoUrl}
+          />
           <Button
-            className="w-full h-12 text-base font-semibold rounded-xl bg-gradient-to-r from-orange-400 to-yellow-500 hover:from-orange-500 hover:to-yellow-500 text-white shadow-lg shadow-orange-500/25 transition-all"
+            className="w-full h-12 text-base font-semibold rounded-xl bg-gradient-to-r from-orange-400 to-yellow-500 hover:from-orange-500 hover:to-yellow-500 text-white shadow-lg shadow-orange-500/25"
             size="lg"
             onClick={handlePublish}
             disabled={
@@ -886,15 +980,13 @@ export default function BulkPublishPage() {
               !companyId ||
               publishing ||
               uploadingMedia ||
-              selectedCount === 0 ||
-              (selectedInstagram && !imageUrl && !videoUrl) ||
-              (!imageUrl && !videoUrl && !message.trim() && !selectedInstagram)
+              selectedCount === 0
             }
           >
             {uploadingMedia ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Subiendo archivo...
+                Subiendo...
               </>
             ) : publishing ? (
               <>
@@ -939,11 +1031,16 @@ export default function BulkPublishPage() {
           )}
         </div>
       </div>
+
       <MediaLibraryPicker
         open={libraryOpen}
         onClose={() => setLibraryOpen(false)}
         accept={
-          selectedInstagram && instagramMediaType === "REELS" ? "video" : "all"
+          instagramMediaType === "REELS"
+            ? "video"
+            : isCarousel
+              ? "image"
+              : "all"
         }
         onSelect={onLibrarySelect}
       />

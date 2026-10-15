@@ -109,29 +109,75 @@ export async function GET(req: NextRequest) {
       }
 
       if (post.platforms?.instagram && instagramAccount) {
+        const mediaType = post.instagramMediaType || "FEED";
         try {
-          const res = await fetch(`${baseUrl}/api/publish/instagram`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              igUserId: instagramAccount.igUserId,
-              accessToken: instagramAccount.accessToken,
-              username: instagramAccount.username,
-              companyId,
-              caption:
-                post.instagramMediaType === "STORIES"
-                  ? undefined
-                  : post.message || "",
-              imageUrl: post.imageUrl || undefined,
-              videoUrl: post.videoUrl || undefined,
-              mediaType: post.instagramMediaType || "FEED",
-            }),
-          });
-          const data = await res.json();
-          results.instagram = {
-            success: res.ok,
-            message: res.ok ? "OK" : data.error || "Error",
-          };
+          // Validaciones rápidas antes de llamar a la API
+          if (mediaType === "CAROUSEL") {
+            const urls = Array.isArray(post.imageUrls)
+              ? post.imageUrls.filter(Boolean)
+              : [];
+            if (urls.length < 2) {
+              results.instagram = {
+                success: false,
+                message: "Carrusel requiere al menos 2 imágenes",
+              };
+            } else {
+              const res = await fetch(`${baseUrl}/api/publish/instagram`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  igUserId: instagramAccount.igUserId,
+                  accessToken: instagramAccount.accessToken,
+                  username: instagramAccount.username,
+                  companyId,
+                  caption: post.message || "",
+                  imageUrl: urls[0],
+                  imageUrls: urls,
+                  mediaType: "CAROUSEL",
+                }),
+              });
+              const data = await res.json();
+              results.instagram = {
+                success: res.ok,
+                message: res.ok ? "OK" : data.error || "Error",
+              };
+            }
+          } else if (mediaType === "REELS" && !post.videoUrl) {
+            results.instagram = {
+              success: false,
+              message: "Reels requiere video",
+            };
+          } else if (
+            mediaType !== "REELS" &&
+            !post.imageUrl &&
+            !post.videoUrl
+          ) {
+            results.instagram = {
+              success: false,
+              message: "Instagram requiere imagen o video",
+            };
+          } else {
+            const res = await fetch(`${baseUrl}/api/publish/instagram`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                igUserId: instagramAccount.igUserId,
+                accessToken: instagramAccount.accessToken,
+                username: instagramAccount.username,
+                companyId,
+                caption:
+                  mediaType === "STORIES" ? undefined : post.message || "",
+                imageUrl: post.imageUrl || undefined,
+                videoUrl: post.videoUrl || undefined,
+                mediaType,
+              }),
+            });
+            const data = await res.json();
+            results.instagram = {
+              success: res.ok,
+              message: res.ok ? "OK" : data.error || "Error",
+            };
+          }
         } catch (e: any) {
           results.instagram = { success: false, message: e.message };
         }
