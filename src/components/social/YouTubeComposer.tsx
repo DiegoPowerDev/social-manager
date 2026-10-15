@@ -354,7 +354,7 @@ export function YouTubeComposer({
 
       <div>
         <PostPreview
-          platform="tiktok"
+          platform="youtube"
           accountName={channelName}
           message={title}
           videoUrl={videoUrl}
