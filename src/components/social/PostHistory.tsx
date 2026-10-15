@@ -16,6 +16,7 @@ interface Post {
   pageId: string;
   platform: string;
   message?: string;
+  title?: string;
   imageUrl?: string;
   videoUrl?: string;
   link?: string | null;
@@ -24,6 +25,8 @@ interface Post {
   facebookPostId?: string | null;
   instagramPostId?: string | null;
   linkedinPostId?: string | null;
+  youtubeVideoId?: string | null;
+  tiktokPublishId?: string | null;
 }
 
 interface Props {
@@ -44,7 +47,9 @@ function getPostUrl(post: Post): string | null {
   if (post.platform === "linkedin" && post.linkedinPostId) {
     return `https://www.linkedin.com/feed/update/${post.linkedinPostId}/`;
   }
-
+  if (post.platform === "youtube" && post.youtubeVideoId) {
+    return `https://www.youtube.com/watch?v=${post.youtubeVideoId}`;
+  }
   // 4. Instagram SIN permalink → no inventar /p/{mediaId}/
   return null;
 }
@@ -73,9 +78,16 @@ export function PostHistory({ pageId, platform = "facebook" }: Props) {
           const d = doc.data();
           return {
             id: doc.id,
-            pageId: d.pageId || d.igUserId || d.personId || "",
+            pageId:
+              d.pageId ||
+              d.igUserId ||
+              d.personId ||
+              d.channelId ||
+              d.openId ||
+              "",
             platform: d.platform,
-            message: d.message,
+            message: d.message || d.title || "",
+            title: d.title || null,
             imageUrl: d.imageUrl,
             videoUrl: d.videoUrl,
             link: d.link || null,
@@ -84,9 +96,21 @@ export function PostHistory({ pageId, platform = "facebook" }: Props) {
             facebookPostId: d.facebookPostId || d.postId || null,
             instagramPostId: d.instagramPostId || null,
             linkedinPostId: d.linkedinPostId || null,
+            youtubeVideoId: d.youtubeVideoId || null,
+            tiktokPublishId: d.tiktokPublishId || null,
           } as Post;
         })
-        .filter((post) => !pageId || post.pageId === pageId)
+        .filter((post) => {
+          if (!pageId) return true;
+          // YouTube / TikTok: si el post no trae id de cuenta, no ocultarlo
+          if (
+            (platform === "youtube" || platform === "tiktok") &&
+            !post.pageId
+          ) {
+            return true;
+          }
+          return post.pageId === pageId;
+        })
         .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime())
         .slice(0, 10);
 
