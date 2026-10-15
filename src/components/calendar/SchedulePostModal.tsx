@@ -36,7 +36,7 @@ import { useAuthStore } from "@/stores/useAuthStore";
 
 interface SocialAccount {
   id: string;
-  platform: "facebook" | "instagram" | "linkedin";
+  platform: "facebook" | "instagram" | "linkedin" | "youtube" | "tiktok";
   name?: string;
   username?: string;
 }
@@ -66,6 +66,12 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
   const [instagramMediaType, setInstagramMediaType] = useState<
     "FEED" | "REELS" | "STORIES"
   >("FEED");
+  const [selectedYouTube, setSelectedYouTube] = useState(false);
+  const [selectedTikTok, setSelectedTikTok] = useState(false);
+  const [youtubeTitle, setYoutubeTitle] = useState("");
+  const [youtubePrivacy, setYoutubePrivacy] = useState<
+    "public" | "unlisted" | "private"
+  >("public");
 
   // Hora (timezone del navegador)
   const [time, setTime] = useState("10:00");
@@ -100,6 +106,8 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
         setSelectedFacebook(!!data.find((a) => a.platform === "facebook"));
         setSelectedInstagram(!!data.find((a) => a.platform === "instagram"));
         setSelectedLinkedIn(!!data.find((a) => a.platform === "linkedin"));
+        setSelectedYouTube(!!data.find((a) => a.platform === "youtube"));
+        setSelectedTikTok(!!data.find((a) => a.platform === "tiktok"));
       } catch (e) {
         console.error(e);
       } finally {
@@ -120,12 +128,16 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
       setLink("");
       setTime("10:00");
       setError(null);
+      setYoutubeTitle("");
+      setYoutubePrivacy("public");
     }
   }, [open, date]);
 
   const facebookAccount = accounts.find((a) => a.platform === "facebook");
   const instagramAccount = accounts.find((a) => a.platform === "instagram");
   const linkedinAccount = accounts.find((a) => a.platform === "linkedin");
+  const youtubeAccount = accounts.find((a) => a.platform === "youtube");
+  const tiktokAccount = accounts.find((a) => a.platform === "tiktok");
 
   const uploadToR2 = async (file: File) => {
     if (!companyId) {
@@ -239,7 +251,13 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
       return;
     }
 
-    if (!selectedFacebook && !selectedInstagram && !selectedLinkedIn) {
+    if (
+      !selectedFacebook &&
+      !selectedInstagram &&
+      !selectedLinkedIn &&
+      !selectedYouTube &&
+      !selectedTikTok
+    ) {
       setError("Selecciona al menos una red");
       return;
     }
@@ -251,6 +269,15 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
 
     if (selectedInstagram && instagramMediaType === "REELS" && !videoUrl) {
       setError("Los Reels requieren un video");
+      return;
+    }
+    if ((selectedYouTube || selectedTikTok) && !videoUrl) {
+      setError("YouTube y TikTok requieren un video");
+      return;
+    }
+
+    if (selectedYouTube && !youtubeTitle.trim() && !message.trim()) {
+      setError("YouTube requiere un título");
       return;
     }
 
@@ -278,8 +305,14 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
           facebook: selectedFacebook || false,
           instagram: selectedInstagram || false,
           linkedin: selectedLinkedIn || false,
+          youtube: selectedYouTube || false,
+          tiktok: selectedTikTok || false,
         },
         instagramMediaType: selectedInstagram ? instagramMediaType : null,
+        youtubeTitle: selectedYouTube
+          ? youtubeTitle.trim() || message.slice(0, 100)
+          : null,
+        youtubePrivacy: selectedYouTube ? youtubePrivacy : null,
         scheduledAt: Timestamp.fromDate(scheduledAt),
         status: "scheduled",
         createdAt: Timestamp.now(),
@@ -420,10 +453,74 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
                       </Label>
                     </div>
                   )}
-                </div>
+                  {youtubeAccount && (
+                    <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg">
+                      <Checkbox
+                        id="yt"
+                        checked={selectedYouTube}
+                        onCheckedChange={(c) => setSelectedYouTube(c === true)}
+                        disabled={saving}
+                      />
+                      <Label htmlFor="yt" className="cursor-pointer">
+                        YouTube
+                      </Label>
+                    </div>
+                  )}
 
+                  {tiktokAccount && (
+                    <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg">
+                      <Checkbox
+                        id="tt"
+                        checked={selectedTikTok}
+                        onCheckedChange={(c) => setSelectedTikTok(c === true)}
+                        disabled={saving}
+                      />
+                      <Label htmlFor="tt" className="cursor-pointer">
+                        TikTok
+                      </Label>
+                    </div>
+                  )}
+                </div>
+                {selectedYouTube && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>Título YouTube</Label>
+                      <Input
+                        value={youtubeTitle}
+                        onChange={(e) => setYoutubeTitle(e.target.value)}
+                        maxLength={100}
+                        className="bg-white"
+                        disabled={saving}
+                        placeholder="Título del video"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Privacidad</Label>
+                      <Select
+                        value={youtubePrivacy}
+                        onValueChange={(v) => setYoutubePrivacy(v as any)}
+                        disabled={saving}
+                      >
+                        <SelectTrigger className="bg-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="public">Público</SelectItem>
+                          <SelectItem value="unlisted">No listado</SelectItem>
+                          <SelectItem value="private">Privado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
                 {/* Avisos según redes y tipo */}
                 <div className="space-y-2 text-xs">
+                  {(selectedYouTube || selectedTikTok) && (
+                    <div className="rounded-md border border-violet-200 bg-violet-50 text-violet-900 p-3 text-xs">
+                      <p className="font-medium">YouTube / TikTok</p>
+                      <p>Requieren video.</p>
+                    </div>
+                  )}
                   {selectedInstagram && (
                     <div className="rounded-md border border-amber-200 bg-amber-50 text-amber-900 p-3 space-y-1">
                       <p className="font-medium">
@@ -470,11 +567,15 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
                   )}
                 </div>
 
-                {!facebookAccount && !instagramAccount && !linkedinAccount && (
-                  <p className="text-sm text-muted-foreground">
-                    No hay cuentas conectadas
-                  </p>
-                )}
+                {!facebookAccount &&
+                  !instagramAccount &&
+                  !linkedinAccount &&
+                  !youtubeAccount &&
+                  !tiktokAccount && (
+                    <p className="text-sm text-muted-foreground">
+                      No hay cuentas conectadas
+                    </p>
+                  )}
               </div>
             )}
           </div>
@@ -641,7 +742,11 @@ export function SchedulePostModal({ date, open, onClose, onSaved }: Props) {
         open={libraryOpen}
         onClose={() => setLibraryOpen(false)}
         accept={
-          selectedInstagram && instagramMediaType === "REELS" ? "video" : "all"
+          selectedYouTube ||
+          selectedTikTok ||
+          (selectedInstagram && instagramMediaType === "REELS")
+            ? "video"
+            : "all"
         }
         onSelect={onLibrarySelect}
       />

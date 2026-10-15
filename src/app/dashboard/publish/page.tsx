@@ -39,17 +39,19 @@ import { AIImageGenerator } from "@/components/social/AIImageGenerator";
 import { Separator } from "@/components/ui/separator";
 import { PostPreview } from "@/components/social/PostPreview";
 import { useAuthStore } from "@/stores/useAuthStore";
-import TitleComponent from "@/components/layout/titleComponent";
 
 interface SocialAccount {
   id: string;
-  platform: "facebook" | "instagram" | "linkedin";
+  platform: "facebook" | "instagram" | "linkedin" | "youtube" | "tiktok";
   name?: string;
   username?: string;
   pageId?: string;
   igUserId?: string;
   personId?: string;
+  channelId?: string;
+  openId?: string;
   accessToken: string;
+  refreshToken?: string;
 }
 
 interface PublishResult {
@@ -79,9 +81,16 @@ export default function BulkPublishPage() {
   const [selectedFacebook, setSelectedFacebook] = useState(false);
   const [selectedInstagram, setSelectedInstagram] = useState(false);
   const [selectedLinkedIn, setSelectedLinkedIn] = useState(false);
+  const [selectedYouTube, setSelectedYouTube] = useState(false);
+  const [selectedTikTok, setSelectedTikTok] = useState(false);
   const [instagramMediaType, setInstagramMediaType] = useState<
     "FEED" | "REELS" | "STORIES"
   >("FEED");
+
+  const [youtubeTitle, setYoutubeTitle] = useState("");
+  const [youtubePrivacy, setYoutubePrivacy] = useState<
+    "public" | "unlisted" | "private"
+  >("public");
 
   // Estados de carga
   const [publishing, setPublishing] = useState(false);
@@ -113,6 +122,8 @@ export default function BulkPublishPage() {
         setSelectedFacebook(!!data.find((a) => a.platform === "facebook"));
         setSelectedInstagram(!!data.find((a) => a.platform === "instagram"));
         setSelectedLinkedIn(!!data.find((a) => a.platform === "linkedin"));
+        setSelectedYouTube(!!data.find((a) => a.platform === "youtube"));
+        setSelectedTikTok(!!data.find((a) => a.platform === "tiktok"));
       } catch (error) {
         console.error(error);
       } finally {
@@ -126,6 +137,8 @@ export default function BulkPublishPage() {
   const facebookAccount = accounts.find((a) => a.platform === "facebook");
   const instagramAccount = accounts.find((a) => a.platform === "instagram");
   const linkedinAccount = accounts.find((a) => a.platform === "linkedin");
+  const youtubeAccount = accounts.find((a) => a.platform === "youtube");
+  const tiktokAccount = accounts.find((a) => a.platform === "tiktok");
 
   const uploadToR2 = async (file: File) => {
     if (!companyId) {
@@ -245,13 +258,28 @@ export default function BulkPublishPage() {
       alert(!canEdit ? "No tienes permiso para publicar" : "Sin empresa");
       return;
     }
-    if (!selectedFacebook && !selectedInstagram && !selectedLinkedIn) {
+    if (
+      !selectedFacebook &&
+      !selectedInstagram &&
+      !selectedLinkedIn &&
+      !selectedYouTube &&
+      !selectedTikTok
+    ) {
       alert("Selecciona al menos una red");
+      return;
+    }
+
+    if ((selectedYouTube || selectedTikTok) && !videoUrl) {
+      alert("YouTube y TikTok requieren un video");
       return;
     }
 
     if (selectedInstagram && !imageUrl && !videoUrl) {
       alert("Instagram requiere una imagen o un video");
+      return;
+    }
+    if (selectedYouTube && !youtubeTitle.trim() && !message.trim()) {
+      alert("YouTube requiere un título");
       return;
     }
 
@@ -364,6 +392,69 @@ export default function BulkPublishPage() {
         });
       }
     }
+    // YouTube
+    if (selectedYouTube && youtubeAccount) {
+      try {
+        const res = await fetch("/api/publish/youtube", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            companyId,
+            channelId: youtubeAccount.channelId,
+            accessToken: youtubeAccount.accessToken,
+            refreshToken: youtubeAccount.refreshToken,
+            accountDocId: youtubeAccount.id,
+            title: youtubeTitle.trim() || message.slice(0, 100),
+            description: message,
+            videoUrl,
+            privacyStatus: youtubePrivacy,
+          }),
+        });
+        const data = await res.json();
+        publishResults.push({
+          platform: "YouTube",
+          success: res.ok,
+          message: res.ok ? "Video publicado" : data.error || "Error",
+        });
+      } catch (err: any) {
+        publishResults.push({
+          platform: "YouTube",
+          success: false,
+          message: err.message || "Error de conexión",
+        });
+      }
+    }
+
+    // TikTok
+    if (selectedTikTok && tiktokAccount) {
+      try {
+        const res = await fetch("/api/publish/tiktok", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            companyId,
+            accessToken: tiktokAccount.accessToken,
+            openId: tiktokAccount.openId,
+            name: tiktokAccount.name || tiktokAccount.username,
+            title: message.trim() || "Video",
+            videoUrl,
+            privacyLevel: "SELF_ONLY", // sandbox; en prod podrás ampliar
+          }),
+        });
+        const data = await res.json();
+        publishResults.push({
+          platform: "TikTok",
+          success: res.ok,
+          message: res.ok ? "Video enviado a TikTok" : data.error || "Error",
+        });
+      } catch (err: any) {
+        publishResults.push({
+          platform: "TikTok",
+          success: false,
+          message: err.message || "Error de conexión",
+        });
+      }
+    }
 
     setResults(publishResults);
     setPublishing(false);
@@ -389,8 +480,8 @@ export default function BulkPublishPage() {
           <div className="p-6  text-white">
             <h1 className="text-2xl font-bold">Publicar en varias redes</h1>
             <p className=" text-sm">
-              No tienes ninguna red conectada. Conecta Facebook, Instagram o
-              LinkedIn primero.
+              No tienes ninguna red conectada. Conecta Facebook, Instagram,
+              LinkedIn, YouTube o TikTok primero.
             </p>
           </div>
         </div>
@@ -408,6 +499,8 @@ export default function BulkPublishPage() {
     selectedFacebook,
     selectedInstagram,
     selectedLinkedIn,
+    selectedYouTube,
+    selectedTikTok,
   ].filter(Boolean).length;
 
   return (
@@ -539,8 +632,82 @@ export default function BulkPublishPage() {
                       </div>
                     </div>
                   )}
+                  {youtubeAccount && (
+                    <div className="flex items-start space-x-3 p-3 rounded-lg">
+                      <Checkbox
+                        id="yt"
+                        checked={selectedYouTube}
+                        onCheckedChange={(c) => setSelectedYouTube(c === true)}
+                        disabled={publishing}
+                      />
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor="yt"
+                          className="font-medium cursor-pointer"
+                        >
+                          YouTube
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          {youtubeAccount.name || "Canal"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Solo video
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {tiktokAccount && (
+                    <div className="flex items-start space-x-3 p-3 rounded-lg">
+                      <Checkbox
+                        id="tt"
+                        checked={selectedTikTok}
+                        onCheckedChange={(c) => setSelectedTikTok(c === true)}
+                        disabled={publishing}
+                      />
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor="tt"
+                          className="font-medium cursor-pointer"
+                        >
+                          TikTok
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          {tiktokAccount.name || tiktokAccount.username}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Solo video · sandbox privado
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
+              {selectedYouTube && (
+                <div className="space-y-2">
+                  <Label className="text-white">Título YouTube</Label>
+                  <Input
+                    value={youtubeTitle}
+                    onChange={(e) => setYoutubeTitle(e.target.value)}
+                    maxLength={100}
+                    className="bg-white text-black"
+                    disabled={publishing}
+                  />
+                  <Select
+                    value={youtubePrivacy}
+                    onValueChange={(v) => setYoutubePrivacy(v as any)}
+                  >
+                    <SelectTrigger className="bg-black text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="public">Público</SelectItem>
+                      <SelectItem value="unlisted">No listado</SelectItem>
+                      <SelectItem value="private">Privado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               {/* Texto + AI Caption */}
               {!(selectedInstagram && instagramMediaType === "STORIES") && (
                 <div className="flex justify-between gap-2 bg-zinc-950/50 text-white rounded">
@@ -570,7 +737,11 @@ export default function BulkPublishPage() {
                   API.
                 </p>
               )}
-
+              {(selectedYouTube || selectedTikTok) && !videoUrl && (
+                <p className="text-sm text-amber-200">
+                  YouTube y TikTok solo publican si hay un video seleccionado.
+                </p>
+              )}
               {/* Media + AI Image */}
               <div className="flex justify-between gap-2 bg-zinc-950/50 text-white rounded">
                 <AIImageGenerator

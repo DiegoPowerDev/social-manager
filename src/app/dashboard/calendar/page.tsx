@@ -45,6 +45,8 @@ interface ScheduledPost {
     facebook?: boolean;
     instagram?: boolean;
     linkedin?: boolean;
+    youtube?: boolean;
+    tiktok?: boolean;
   };
   instagramMediaType?: "FEED" | "REELS" | "STORIES" | null;
   scheduledAt: Date;
@@ -324,6 +326,22 @@ export default function CalendarPage() {
                                 width={16}
                                 src="/linkedin.svg"
                                 alt="LinkedIn"
+                              />
+                            )}
+                            {post.platforms.youtube && (
+                              <Image
+                                height={16}
+                                width={16}
+                                src="/youtube.svg" // o la ruta que uses en el menú
+                                alt="YouTube"
+                              />
+                            )}
+                            {post.platforms.tiktok && (
+                              <Image
+                                height={16}
+                                width={16}
+                                src="/tiktok.svg"
+                                alt="TikTok"
                               />
                             )}
                             <span className="text-[10px] opacity-70 ml-auto">

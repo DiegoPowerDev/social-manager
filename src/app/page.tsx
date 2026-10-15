@@ -106,7 +106,7 @@ export default function HomePage() {
           <p className="mb-3 text-sm font-medium text-yellow-500">
             Publicación multi-red para equipos
           </p>
-          <h1 className="max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
+          <h1 className="max-w-2xl text-4xl font-bold tracking-tight text-white sm:text-5xl">
             Crea, programa y publica en todas tus redes desde un solo lugar
           </h1>
           <p className="mt-5 max-w-xl text-lg text-zinc-300">

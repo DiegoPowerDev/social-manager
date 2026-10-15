@@ -35,9 +35,13 @@ interface ScheduledPost {
     facebook?: boolean;
     instagram?: boolean;
     linkedin?: boolean;
+    youtube?: boolean;
+    tiktok?: boolean;
   };
   instagramMediaType?: "FEED" | "REELS" | "STORIES" | null;
   scheduledAt: Date;
+  youtubeTitle?: string | null;
+  youtubePrivacy?: "public" | "unlisted" | "private" | null;
   status: "scheduled" | "publishing" | "published" | "failed";
   results?: Record<string, { success: boolean; message?: string }>;
 }
@@ -83,6 +87,13 @@ export function ScheduledPostDetailModal({
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [selectedYouTube, setSelectedYouTube] = useState(false);
+  const [selectedTikTok, setSelectedTikTok] = useState(false);
+  const [youtubeTitle, setYoutubeTitle] = useState("");
+  const [youtubePrivacy, setYoutubePrivacy] = useState<
+    "public" | "unlisted" | "private"
+  >("public");
+
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
 
@@ -98,6 +109,10 @@ export function ScheduledPostDetailModal({
     setSelectedInstagram(!!post.platforms?.instagram);
     setSelectedLinkedIn(!!post.platforms?.linkedin);
     setInstagramMediaType(post.instagramMediaType || "FEED");
+    setSelectedYouTube(!!post.platforms?.youtube);
+    setSelectedTikTok(!!post.platforms?.tiktok);
+    setYoutubeTitle((post as any).youtubeTitle || "");
+    setYoutubePrivacy((post as any).youtubePrivacy || "public");
     setDateStr(format(post.scheduledAt, "yyyy-MM-dd"));
     setTime(format(post.scheduledAt, "HH:mm"));
     setError(null);
@@ -194,7 +209,13 @@ export function ScheduledPostDetailModal({
       setError("El título es obligatorio");
       return;
     }
-    if (!selectedFacebook && !selectedInstagram && !selectedLinkedIn) {
+    if (
+      !selectedFacebook &&
+      !selectedInstagram &&
+      !selectedLinkedIn &&
+      !selectedYouTube &&
+      !selectedTikTok
+    ) {
       setError("Selecciona al menos una red");
       return;
     }
@@ -202,7 +223,15 @@ export function ScheduledPostDetailModal({
       setError("Instagram requiere imagen o video");
       return;
     }
+    if ((selectedYouTube || selectedTikTok) && !videoUrl) {
+      setError("YouTube y TikTok requieren un video");
+      return;
+    }
 
+    if (selectedYouTube && !youtubeTitle.trim() && !message.trim()) {
+      setError("YouTube requiere un título");
+      return;
+    }
     const [hours, minutes] = time.split(":").map(Number);
     const scheduledAt = new Date(dateStr + "T00:00:00");
     scheduledAt.setHours(hours, minutes, 0, 0);
@@ -224,8 +253,14 @@ export function ScheduledPostDetailModal({
           facebook: selectedFacebook,
           instagram: selectedInstagram,
           linkedin: selectedLinkedIn,
+          youtube: selectedYouTube,
+          tiktok: selectedTikTok,
         },
         instagramMediaType: selectedInstagram ? instagramMediaType : null,
+        youtubeTitle: selectedYouTube
+          ? youtubeTitle.trim() || message.slice(0, 100)
+          : null,
+        youtubePrivacy: selectedYouTube ? youtubePrivacy : null,
         scheduledAt: Timestamp.fromDate(scheduledAt),
         updatedAt: Timestamp.now(),
       });
@@ -381,10 +416,72 @@ export function ScheduledPostDetailModal({
                   LinkedIn
                 </Label>
               </div>
-            </div>
+              <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg">
+                <Checkbox
+                  id="edit-yt"
+                  checked={selectedYouTube}
+                  onCheckedChange={(c) => setSelectedYouTube(c === true)}
+                  disabled={!canEditContent || saving}
+                />
+                <Label htmlFor="edit-yt" className="cursor-pointer">
+                  YouTube
+                </Label>
+              </div>
 
+              <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg">
+                <Checkbox
+                  id="edit-tt"
+                  checked={selectedTikTok}
+                  onCheckedChange={(c) => setSelectedTikTok(c === true)}
+                  disabled={!canEditContent || saving}
+                />
+                <Label htmlFor="edit-tt" className="cursor-pointer">
+                  TikTok
+                </Label>
+              </div>
+            </div>
+            {selectedYouTube && canEditContent && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-white">Título YouTube</Label>
+                  <Input
+                    value={youtubeTitle}
+                    onChange={(e) => setYoutubeTitle(e.target.value)}
+                    maxLength={100}
+                    className="bg-white"
+                    disabled={saving}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white">Privacidad</Label>
+                  <Select
+                    value={youtubePrivacy}
+                    onValueChange={(v) => setYoutubePrivacy(v as any)}
+                    disabled={saving}
+                  >
+                    <SelectTrigger className="bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="public">Público</SelectItem>
+                      <SelectItem value="unlisted">No listado</SelectItem>
+                      <SelectItem value="private">Privado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
             {/* Avisos */}
             <div className="space-y-2 text-xs">
+              {(selectedYouTube || selectedTikTok) && (
+                <div className="rounded-md border border-violet-200 bg-violet-50 text-violet-900 p-3 text-xs">
+                  <p className="font-medium">YouTube / TikTok</p>
+                  <p>
+                    Requieren un video. TikTok en sandbox suele publicarse como
+                    privado.
+                  </p>
+                </div>
+              )}
               {selectedInstagram && (
                 <div className="rounded-md border border-amber-200 bg-amber-50 text-amber-900 p-3 space-y-1">
                   <p className="font-medium">Instagram — formato de media</p>
@@ -413,10 +510,7 @@ export function ScheduledPostDetailModal({
               {selectedLinkedIn && (
                 <div className="rounded-md border border-sky-200 bg-sky-50 text-sky-900 p-3">
                   <p className="font-medium">LinkedIn</p>
-                  <p>
-                    Soporta texto e imagen. El video aún no está habilitado en
-                    este flujo.
-                  </p>
+                  <p>Soporta texto, imagen y video.</p>
                 </div>
               )}
 
@@ -615,7 +709,11 @@ export function ScheduledPostDetailModal({
         open={libraryOpen}
         onClose={() => setLibraryOpen(false)}
         accept={
-          selectedInstagram && instagramMediaType === "REELS" ? "video" : "all"
+          selectedYouTube ||
+          selectedTikTok ||
+          (selectedInstagram && instagramMediaType === "REELS")
+            ? "video"
+            : "all"
         }
         onSelect={onLibrarySelect}
       />

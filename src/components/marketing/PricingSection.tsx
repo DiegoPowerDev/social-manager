@@ -125,11 +125,7 @@ export function PricingSection({
           >
             {title}
           </h2>
-          <p
-            className={`mt-3 font-bold ${isDark ? "text-zinc-400" : "text-slate-600"}`}
-          >
-            {subtitle}
-          </p>
+          <p className={`mt-3 font-bold text-zinc-100`}>{subtitle}</p>
         </div>
 
         <div className="mt-12 grid gap-6 lg:grid-cols-3">

@@ -16,7 +16,7 @@ export const PLAN_CARDS: PlanCard[] = [
   {
     id: "free",
     name: "Free",
-    price: "€0",
+    price: "$0",
     period: "/mes",
     description: "Para conocer la plataforma.",
     features: [
@@ -32,7 +32,7 @@ export const PLAN_CARDS: PlanCard[] = [
   {
     id: "basic",
     name: "Básico",
-    price: "€19",
+    price: "$19",
     period: "/mes",
     description: "Redes esenciales y calendario.",
     features: [
@@ -50,7 +50,7 @@ export const PLAN_CARDS: PlanCard[] = [
   {
     id: "premium",
     name: "Premium",
-    price: "€49",
+    price: "$49",
     period: "/mes",
     description: "Todo el stack + IA.",
     features: [

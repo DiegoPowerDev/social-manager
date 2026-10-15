@@ -59,7 +59,9 @@ interface PublishedPost {
   link?: string | null;
   facebookPostId?: string | null;
   instagramPostId?: string | null;
+  tiktokPostId?: string | null;
   linkedinPostId?: string | null;
+  youtubeVideoId?: string | null;
   permalink?: string | null;
 }
 
@@ -70,12 +72,20 @@ interface ScheduledPost {
 }
 
 type RangeKey = "7" | "14" | "30" | "90";
-type PlatformFilter = "all" | "facebook" | "instagram" | "linkedin";
+type PlatformFilter =
+  | "all"
+  | "facebook"
+  | "instagram"
+  | "linkedin"
+  | "tiktok"
+  | "youtube";
 
 const PLATFORM_COLORS: Record<string, string> = {
   facebook: "#1877F2",
   instagram: "#E4405F",
   linkedin: "#2E77FF",
+  tiktok: "#000000",
+  youtube: "#FF0000",
   other: "#94a3b8",
 };
 
@@ -131,6 +141,7 @@ export default function DashboardPage() {
               imageUrl: data.imageUrl || null,
               videoUrl: data.videoUrl || null,
               link: data.link || null,
+              tiktokPostId: data.tiktokPostId || null,
               facebookPostId: data.facebookPostId || data.postId || null,
               instagramPostId: data.instagramPostId || null,
               linkedinPostId: data.linkedinPostId || null,
@@ -159,7 +170,7 @@ export default function DashboardPage() {
     };
 
     load();
-  }, []);
+  }, [companyId]);
 
   const getExternalUrl = (post: PublishedPost): string | null => {
     if (post.permalink) return post.permalink;
@@ -168,6 +179,13 @@ export default function DashboardPage() {
     }
     if (post.platform === "linkedin" && post.linkedinPostId) {
       return `https://www.linkedin.com/feed/update/${post.linkedinPostId}/`;
+    }
+    if (post.platform === "tiktok" && post.tiktokPostId) {
+      // si no hay permalink, a veces solo open_id; mejor siempre guardar permalink al publicar
+      return `https://www.tiktok.com/@/video/${post.tiktokPostId}`;
+    }
+    if (post.platform === "youtube" && post.youtubeVideoId) {
+      return `https://www.youtube.com/watch?v=${post.youtubeVideoId}`;
     }
     return null;
   };
@@ -308,6 +326,8 @@ export default function DashboardPage() {
                 ["facebook", "Facebook"],
                 ["instagram", "Instagram"],
                 ["linkedin", "LinkedIn"],
+                ["tiktok", "TikTok"],
+                ["youtube", "YouTube"],
               ] as const
             ).map(([key, label]) => (
               <Button

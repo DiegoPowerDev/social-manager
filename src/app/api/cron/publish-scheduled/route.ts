@@ -76,6 +76,8 @@ export async function GET(req: NextRequest) {
       const facebookAccount = accounts.find((a) => a.platform === "facebook");
       const instagramAccount = accounts.find((a) => a.platform === "instagram");
       const linkedinAccount = accounts.find((a) => a.platform === "linkedin");
+      const youtubeAccount = accounts.find((a) => a.platform === "youtube");
+      const tiktokAccount = accounts.find((a) => a.platform === "tiktok");
 
       const results: Record<string, { success: boolean; message?: string }> =
         {};
@@ -157,6 +159,76 @@ export async function GET(req: NextRequest) {
           };
         } catch (e: any) {
           results.linkedin = { success: false, message: e.message };
+        }
+      }
+
+      if (post.platforms?.youtube && youtubeAccount) {
+        try {
+          if (!post.videoUrl) {
+            results.youtube = {
+              success: false,
+              message: "YouTube requiere video",
+            };
+          } else {
+            const res = await fetch(`${baseUrl}/api/publish/youtube`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                companyId,
+                channelId: youtubeAccount.channelId,
+                accessToken: youtubeAccount.accessToken,
+                refreshToken: youtubeAccount.refreshToken,
+                accountDocId: youtubeAccount.id,
+                title:
+                  post.youtubeTitle ||
+                  post.title ||
+                  (post.message || "").slice(0, 100) ||
+                  "Video",
+                description: post.message || "",
+                videoUrl: post.videoUrl,
+                privacyStatus: post.youtubePrivacy || "public",
+              }),
+            });
+            const data = await res.json();
+            results.youtube = {
+              success: res.ok,
+              message: res.ok ? "OK" : data.error || "Error",
+            };
+          }
+        } catch (e: any) {
+          results.youtube = { success: false, message: e.message };
+        }
+      }
+
+      if (post.platforms?.tiktok && tiktokAccount) {
+        try {
+          if (!post.videoUrl) {
+            results.tiktok = {
+              success: false,
+              message: "TikTok requiere video",
+            };
+          } else {
+            const res = await fetch(`${baseUrl}/api/publish/tiktok`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                companyId,
+                accessToken: tiktokAccount.accessToken,
+                openId: tiktokAccount.openId,
+                name: tiktokAccount.name || tiktokAccount.username,
+                title: post.message || post.title || "Video",
+                videoUrl: post.videoUrl,
+                privacyLevel: "SELF_ONLY", // sandbox; en prod ajusta si tienes más niveles
+              }),
+            });
+            const data = await res.json();
+            results.tiktok = {
+              success: res.ok,
+              message: res.ok ? "OK" : data.error || "Error",
+            };
+          }
+        } catch (e: any) {
+          results.tiktok = { success: false, message: e.message };
         }
       }
 

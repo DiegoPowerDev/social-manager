@@ -23,46 +23,46 @@ export const mainNav: Menu[] = [
     href: "/dashboard",
     icon: BarChart,
   },
-  {
-    title: "Instagram",
-    href: "/dashboard/instagram",
-    icon: "",
-    image: (
-      <Image
-        height={20}
-        width={20}
-        src="/instagram-icon.svg"
-        alt="Instagram logo"
-      />
-    ),
-  },
-  {
-    title: "Facebook",
-    href: "/dashboard/facebook",
-    icon: "",
-    image: (
-      <Image
-        height={20}
-        width={20}
-        src="/facebook-icon.svg"
-        alt="facebook logo"
-      />
-    ),
-  },
-  {
-    title: "LinkedIn",
-    href: "/dashboard/linkedin",
-    icon: "",
-    image: (
-      <Image
-        className="bg-white rounded"
-        height={20}
-        width={20}
-        src="/linkedin.svg"
-        alt="Linkedin logo"
-      />
-    ),
-  },
+  // {
+  //   title: "Instagram",
+  //   href: "/dashboard/instagram",
+  //   icon: "",
+  //   image: (
+  //     <Image
+  //       height={20}
+  //       width={20}
+  //       src="/instagram-icon.svg"
+  //       alt="Instagram logo"
+  //     />
+  //   ),
+  // },
+  // {
+  //   title: "Facebook",
+  //   href: "/dashboard/facebook",
+  //   icon: "",
+  //   image: (
+  //     <Image
+  //       height={20}
+  //       width={20}
+  //       src="/facebook-icon.svg"
+  //       alt="facebook logo"
+  //     />
+  //   ),
+  // },
+  // {
+  //   title: "LinkedIn",
+  //   href: "/dashboard/linkedin",
+  //   icon: "",
+  //   image: (
+  //     <Image
+  //       className="bg-white rounded"
+  //       height={20}
+  //       width={20}
+  //       src="/linkedin.svg"
+  //       alt="Linkedin logo"
+  //     />
+  //   ),
+  // },
   {
     title: "youtube",
     href: "/dashboard/youtube ",
@@ -77,25 +77,25 @@ export const mainNav: Menu[] = [
       />
     ),
   },
-  {
-    title: "tiktok",
-    href: "/dashboard/tiktok ",
-    icon: "",
-    image: (
-      <Image
-        className=" rounded"
-        height={20}
-        width={20}
-        src="/tiktok.svg"
-        alt="Tik Tok logo"
-      />
-    ),
-  },
-  {
-    title: "Publicar en masa",
-    href: "/dashboard/publish",
-    icon: Send,
-  },
+  // {
+  //   title: "tiktok",
+  //   href: "/dashboard/tiktok ",
+  //   icon: "",
+  //   image: (
+  //     <Image
+  //       className=" rounded"
+  //       height={20}
+  //       width={20}
+  //       src="/tiktok.svg"
+  //       alt="Tik Tok logo"
+  //     />
+  //   ),
+  // },
+  // {
+  //   title: "Publicar en masa",
+  //   href: "/dashboard/publish",
+  //   icon: Send,
+  // },
   { title: "Calendario", href: "/dashboard/calendar", icon: Calendar },
   { title: "Configuración", href: "/dashboard/settings", icon: Settings },
 ];
