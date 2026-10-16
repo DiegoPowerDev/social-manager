@@ -7,14 +7,23 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { useState } from "react";
 
 type Variant = "light" | "dark";
+type Interval = "month" | "year";
 
 interface Props {
-  /** light = landing clara; dark = sección tipo zinc */
   variant?: Variant;
   title?: string;
   subtitle?: string;
-  /** Si true, muestra solo las cards sin el section wrapper largo */
   compact?: boolean;
+}
+
+function toPayPalPlanKey(
+  planId: "basic" | "premium",
+  interval: Interval,
+): string {
+  if (planId === "basic") {
+    return interval === "year" ? "basic_yearly" : "basic_monthly";
+  }
+  return interval === "year" ? "premium_yearly" : "premium_monthly";
 }
 
 export function PricingSection({
@@ -28,6 +37,7 @@ export function PricingSection({
   const companyId = useAuthStore((s) => s.companyId);
   const memberRole = useAuthStore((s) => s.memberRole);
   const [loadingPlan, setLoadingPlan] = useState<PlanId | null>(null);
+  const [interval, setInterval] = useState<Interval>("month");
 
   const isDark = variant === "dark";
 
@@ -46,7 +56,6 @@ export function PricingSection({
       return;
     }
 
-    // Logueado: solo admin de la empresa
     if (user) {
       if (memberRole !== "admin") {
         alert("Solo un administrador puede cambiar el plan de la empresa.");
@@ -58,28 +67,26 @@ export function PricingSection({
       }
     }
 
+    const planKey = toPayPalPlanKey(planId, interval);
+
     setLoadingPlan(planId);
     try {
-      const res = await fetch("/api/billing/checkout", {
+      const res = await fetch("/api/billing/paypal/create-subscription", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          plan: planId,
-          interval: "month", // o "year" según variantes
-          // Si hay sesión, upgrade de empresa existente
-          companyId: companyId || undefined,
+          planKey,
+          companyId: companyId || "new",
           email: user?.email || undefined,
-          uid: user?.uid || undefined,
-          guest: !user,
         }),
       });
       const data = await res.json();
-      if (!res.ok || !data.url) {
-        throw new Error(data.error || "No se pudo iniciar el pago");
+      if (!res.ok || !data.approveUrl) {
+        throw new Error(data.error || "No se pudo iniciar la suscripción");
       }
-      window.location.href = data.url;
+      window.location.href = data.approveUrl;
     } catch (e: any) {
-      alert(e.message || "Error al conectar con el pago");
+      alert(e.message || "Error al conectar con PayPal");
       setLoadingPlan(null);
     }
   };
@@ -116,7 +123,7 @@ export function PricingSection({
 
   return (
     <section id="pricing" className={sectionClass}>
-      <div className={`mx-auto max-w-6xl px-4 sm:px-6 ${compact ? "" : ""}`}>
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="mx-auto max-w-2xl text-center">
           <h2
             className={`text-3xl font-bold tracking-tight ${
@@ -125,7 +132,43 @@ export function PricingSection({
           >
             {title}
           </h2>
-          <p className={`mt-3 font-bold text-zinc-100`}>{subtitle}</p>
+          <p
+            className={`mt-3 ${
+              isDark ? "font-medium text-zinc-300" : "text-slate-600"
+            }`}
+          >
+            {subtitle}
+          </p>
+
+          {/* Mensual / Anual */}
+          <div className="mt-6 inline-flex rounded-full border border-white/20 bg-black/10 p-1 text-sm">
+            <button
+              type="button"
+              onClick={() => setInterval("month")}
+              className={`rounded-full px-4 py-1.5 font-medium transition ${
+                interval === "month"
+                  ? "bg-amber-400 text-slate-900"
+                  : isDark
+                    ? "text-zinc-300"
+                    : "text-slate-600"
+              }`}
+            >
+              Mensual
+            </button>
+            <button
+              type="button"
+              onClick={() => setInterval("year")}
+              className={`rounded-full px-4 py-1.5 font-medium transition ${
+                interval === "year"
+                  ? "bg-amber-400 text-slate-900"
+                  : isDark
+                    ? "text-zinc-300"
+                    : "text-slate-600"
+              }`}
+            >
+              Anual
+            </button>
+          </div>
         </div>
 
         <div className="mt-12 grid gap-6 lg:grid-cols-3">
@@ -142,9 +185,22 @@ export function PricingSection({
               <p className="mt-6">
                 <span className="text-4xl font-bold">{plan.price}</span>
                 <span className={isDark ? "text-zinc-500" : "text-slate-500"}>
-                  {plan.period}
+                  {plan.paid
+                    ? interval === "year"
+                      ? " / año"
+                      : plan.period
+                    : plan.period}
                 </span>
               </p>
+              {plan.paid && interval === "year" && (
+                <p
+                  className={`text-xs ${
+                    isDark ? "text-zinc-500" : "text-slate-500"
+                  }`}
+                >
+                  Facturación anual vía PayPal
+                </p>
+              )}
               <ul
                 className={`mt-6 flex-1 space-y-2 text-sm ${
                   isDark ? "text-zinc-300" : "text-slate-600"
@@ -173,13 +229,17 @@ export function PricingSection({
           ))}
         </div>
 
-        {user && (
-          <p className={`mt-8 text-center text-sm text-white`}>
+        {!user && (
+          <p
+            className={`mt-8 text-center text-sm ${
+              isDark ? "text-zinc-300" : "text-slate-600"
+            }`}
+          >
             ¿Ya tienes cuenta?{" "}
             <Link href="/login" className="underline hover:no-underline">
               Inicia sesión
             </Link>{" "}
-            para contratar un plan.
+            para vincular el plan a tu empresa.
           </p>
         )}
       </div>

@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPayPalAccessToken, paypalBase } from "@/lib/paypal";
-// import { adminDb } from "@/lib/firebase-admin";
-// import { provisionFromPayPal } from "@/lib/billing-provision";
+import {
+  provisionFromPayPal,
+  cancelPayPalSubscription,
+} from "@/lib/billing-provision";
 
 export const maxDuration = 60;
 
-async function verifyWebhook(headers: Headers, body: string): Promise<boolean> {
+async function verifyWebhook(headers: Headers, body: string) {
   const webhookId = process.env.PAYPAL_WEBHOOK_ID;
   if (!webhookId) {
-    // En sandbox puedes loguear sin verificar un rato; en live pon WEBHOOK_ID
-    console.warn("PAYPAL_WEBHOOK_ID no configurado — skip verify");
+    console.warn("PAYPAL_WEBHOOK_ID missing — skip verify (solo sandbox)");
     return true;
   }
 
@@ -41,8 +42,7 @@ export async function POST(req: NextRequest) {
   const raw = await req.text();
 
   try {
-    const ok = await verifyWebhook(req.headers, raw);
-    if (!ok) {
+    if (!(await verifyWebhook(req.headers, raw))) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
@@ -53,35 +53,42 @@ export async function POST(req: NextRequest) {
     console.log("PayPal webhook:", type, resource.id);
 
     if (type === "BILLING.SUBSCRIPTION.ACTIVATED") {
-      let meta: { companyId?: string; planKey?: string; email?: string } = {};
+      let meta: {
+        companyId?: string;
+        planKey?: string;
+        email?: string | null;
+      } = {};
       try {
-        meta = resource.custom_id ? JSON.parse(resource.custom_id) : {};
+        if (resource.custom_id) meta = JSON.parse(resource.custom_id);
       } catch {
-        /* custom_id simple */
+        /* ignore */
       }
 
       const email = resource.subscriber?.email_address || meta.email || null;
-      const subscriptionId = resource.id as string;
-      const planKey = meta.planKey || "premium_monthly";
 
-      // TODO: provisionFromPayPal({ email, subscriptionId, planKey, companyId: meta.companyId })
-      console.log("ACTIVATED → provision", {
+      const result = await provisionFromPayPal({
         email,
-        subscriptionId,
-        planKey,
+        subscriptionId: resource.id,
+        planKey: meta.planKey || "premium_monthly",
         companyId: meta.companyId,
       });
+
+      console.log("provision result", result);
     }
 
-    if (type === "BILLING.SUBSCRIPTION.CANCELLED") {
-      const subscriptionId = resource.id as string;
-      console.log("CANCELLED", subscriptionId);
-      // TODO: bajar plan a free en Firestore por subscriptionId
+    if (
+      type === "BILLING.SUBSCRIPTION.CANCELLED" ||
+      type === "BILLING.SUBSCRIPTION.EXPIRED"
+    ) {
+      await cancelPayPalSubscription(resource.id);
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ received: true });
   } catch (e: any) {
-    console.error("webhook error", e);
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    console.error("PayPal webhook error:", e);
+    return NextResponse.json(
+      { error: e.message || "webhook failed" },
+      { status: 500 },
+    );
   }
 }
