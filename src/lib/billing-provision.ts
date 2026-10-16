@@ -2,7 +2,7 @@ import { getAuth } from "firebase-admin/auth";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { randomBytes } from "crypto";
-import { sendHostingerEmail } from "./hostinger-email";
+import { sendHostingerEmail } from "./hostinger-mail";
 
 export type PayPalPlanKey =
   | "basic_monthly"
