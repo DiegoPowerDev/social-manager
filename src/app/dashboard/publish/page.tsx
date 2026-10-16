@@ -766,7 +766,7 @@ export default function BulkPublishPage() {
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
                       rows={5}
-                      className="resize-none flex-1 text-black"
+                      className="resize-none bg-white flex-1 text-black"
                       disabled={publishing || uploadingMedia}
                     />
                   </div>
