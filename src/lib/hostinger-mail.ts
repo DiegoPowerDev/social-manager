@@ -1,46 +1,47 @@
-const API = "https://developers.hostinger.com";
-
-export async function sendHostingerEmail(opts: {
-  to: string;
+export async function sendHostingerEmail(options: {
+  to: string | string[];
   subject: string;
-  html: string;
+  html?: string;
   text?: string;
+  displayName?: string;
 }) {
   const token = process.env.HOSTINGER_MAIL_TOKEN;
   const mailboxId = process.env.HOSTINGER_MAILBOX_ID;
-  const fromName = process.env.HOSTINGER_MAIL_FROM_NAME || "TrendlyStudio";
+  const fromName =
+    options.displayName ||
+    process.env.HOSTINGER_MAIL_FROM_NAME ||
+    "TrendlyStudio";
 
   if (!token || !mailboxId) {
     throw new Error("Faltan HOSTINGER_MAIL_TOKEN o HOSTINGER_MAILBOX_ID");
   }
 
-  // Endpoint de envío desde mailbox (API Hostinger)
-  const res = await fetch(`${API}/api/email/v1/mailboxes/${mailboxId}/emails`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      from: {
-        name: fromName,
+  const to = Array.isArray(options.to) ? options.to : [options.to];
+
+  const res = await fetch(
+    `https://api.mail.hostinger.com/api/v1/mailboxes/${mailboxId}/send`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
-      to: [{ address: opts.to }],
-      subject: opts.subject,
-      html: opts.html,
-      text: opts.text || opts.html.replace(/<[^>]+>/g, " "),
-    }),
-  });
+      body: JSON.stringify({
+        to,
+        display_name: fromName,
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+      }),
+    },
+  );
 
-  const data = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    console.error("Hostinger mail error:", res.status, data);
-    throw new Error(
-      data.message || data.error || `Hostinger mail ${res.status}`,
-    );
+  // Hostinger suele responder 204 No Content si salió bien
+  if (!res.ok && res.status !== 204) {
+    const errText = await res.text().catch(() => "");
+    console.error("Hostinger mail error:", res.status, errText);
+    throw new Error(errText || `Error enviando email (HTTP ${res.status})`);
   }
 
-  return data;
+  return { ok: true };
 }
