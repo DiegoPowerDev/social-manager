@@ -1,4 +1,3 @@
-import { getAuth } from "firebase-admin/auth";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { randomBytes } from "crypto";
@@ -97,6 +96,11 @@ export async function provisionFromPayPal(opts: {
   const config = PLAN_CONFIG[planKey] || PLAN_CONFIG.premium_monthly;
   const email = opts.email?.trim().toLowerCase() || null;
   const subscriptionId = opts.subscriptionId;
+  const { getAuth } = await import("firebase-admin/auth");
+  // Asegura que el app admin ya está inicializado
+  const { adminDb, FieldValue } = await import("@/lib/firebase-admin");
+
+  const auth = getAuth();
 
   // Idempotencia: si ya guardamos esta subscription, no duplicar
   const existingSub = await adminDb
