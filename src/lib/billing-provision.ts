@@ -2,7 +2,6 @@ import { getAuth } from "firebase-admin/auth";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { randomBytes } from "crypto";
-import { sendHostingerEmail } from "./hostinger-mail";
 
 export type PayPalPlanKey =
   | "basic_monthly"
@@ -60,25 +59,26 @@ async function sendWelcomeEmail(opts: {
   isNew: boolean;
   plan: string;
 }) {
-  const login = `${process.env.NEXT_PUBLIC_APP_URL || "https://www.trendly.studio"}/login`;
-  const subject = opts.isNew
-    ? "Tu cuenta TrendlyStudio está lista"
-    : "Tu plan de TrendlyStudio se actualizó";
-
-  const html = opts.isNew
-    ? `<p>Hola,</p><p>Plan <strong>${opts.plan}</strong> activo.</p>
-       <p>Email: ${opts.to}<br/>Contraseña temporal: <code>${opts.password}</code></p>
-       <p><a href="${login}">Iniciar sesión</a></p><p>— TrendlyStudio</p>`
-    : `<p>Hola,</p><p>Plan actualizado a <strong>${opts.plan}</strong>.</p>
-       <p><a href="${login}">Ir al panel</a></p><p>— TrendlyStudio</p>`;
-
+  // Reutiliza tu API Hostinger si ya la tienes, o log por ahora
   try {
-    await sendHostingerEmail({ to: opts.to, subject, html });
+    const base =
+      process.env.NEXT_PUBLIC_APP_URL || "https://www.trendly.studio";
+    await fetch(`${base}/api/email/welcome`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.CRON_SECRET || ""}`,
+      },
+      body: JSON.stringify({
+        to: opts.to,
+        password: opts.password,
+        isNew: opts.isNew,
+        plan: opts.plan,
+        loginUrl: `${base}/login`,
+      }),
+    });
   } catch (e) {
-    console.warn("Welcome email failed:", e);
-    if (opts.isNew && opts.password) {
-      console.log("SANDBOX NEW USER", opts.to, opts.password);
-    }
+    console.warn("No se pudo enviar email de bienvenida:", e);
   }
 }
 
