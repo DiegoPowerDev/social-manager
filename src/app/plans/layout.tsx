@@ -5,8 +5,8 @@ export default function RootLayout({
 }) {
   return (
     <div
-      style={{ backgroundImage: `url("/background.webp")` }}
-      className="bg-cover bg-no-repeat"
+      style={{ backgroundImage: `url("/home-background.webp")` }}
+      className="bg-cover bg-center bg-no-repeat min-h-screen max-w-full"
     >
       {children}
     </div>

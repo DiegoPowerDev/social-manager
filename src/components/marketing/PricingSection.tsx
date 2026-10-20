@@ -112,12 +112,12 @@ export function PricingSection({
     isDark
       ? `mt-8 block w-full rounded-xl py-2.5 text-center text-sm font-semibold disabled:opacity-60 ${
           highlighted
-            ? "bg-yellow-500 text-black hover:bg-yellow-400"
+            ? "bg-gradient-to-r from-orange-400 to-yellow-500 hover:from-orange-500 hover:to-yellow-500 text-white shadow-lg shadow-orange-500/25"
             : "border border-white/20 hover:bg-white/5"
         }`
       : `mt-8 block w-full rounded-full py-2.5 text-center text-sm font-semibold disabled:opacity-60 ${
           highlighted
-            ? "bg-amber-400 text-slate-900 hover:bg-amber-300"
+            ? "bg-gradient-to-r from-orange-400 to-yellow-500 hover:from-orange-500 hover:to-yellow-500 text-white shadow-lg shadow-orange-500/25"
             : "bg-slate-100 text-slate-800 hover:bg-slate-200"
         }`;
 
@@ -182,16 +182,39 @@ export function PricingSection({
               >
                 {plan.description}
               </p>
-              <p className="mt-6">
-                <span className="text-4xl font-bold">{plan.price}</span>
-                <span className={isDark ? "text-zinc-500" : "text-slate-500"}>
-                  {plan.paid
-                    ? interval === "year"
-                      ? " / año"
-                      : plan.period
-                    : plan.period}
-                </span>
-              </p>
+              {(() => {
+                const displayPrice =
+                  !plan.paid || interval === "month"
+                    ? plan.priceMonthly
+                    : plan.priceYearly;
+                const displayPeriod = !plan.paid
+                  ? ""
+                  : interval === "year"
+                    ? plan.periodYearly
+                    : plan.periodMonthly;
+
+                return (
+                  <>
+                    <p className="mt-6">
+                      <span className="text-4xl font-bold">{displayPrice}</span>
+                      <span
+                        className={isDark ? "text-zinc-500" : "text-slate-500"}
+                      >
+                        {displayPeriod}
+                      </span>
+                    </p>
+                    {plan.paid && interval === "year" && (
+                      <p
+                        className={`text-xs ${
+                          isDark ? "text-zinc-500" : "text-slate-500"
+                        }`}
+                      >
+                        Facturación anual vía PayPal
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
               {plan.paid && interval === "year" && (
                 <p
                   className={`text-xs ${

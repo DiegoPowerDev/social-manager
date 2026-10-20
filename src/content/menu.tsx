@@ -1,6 +1,7 @@
 import {
   BarChart,
   Calendar,
+  CreditCard,
   ImageIcon,
   LucideIcon,
   Send,
@@ -110,5 +111,10 @@ export const secondaryNav = [
     title: "Equipo",
     href: "/dashboard/team",
     icon: Users,
+  },
+  {
+    title: "Membresía",
+    href: "/dashboard/membresia",
+    icon: CreditCard,
   },
 ];
