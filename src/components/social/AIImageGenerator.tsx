@@ -14,6 +14,9 @@ import {
 import { Loader2, Sparkles, ImagePlus, X } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useAiUsage } from "@/app/hooks/useAiUsage";
+import { canUseAi } from "@/content/access";
+import { AiLockedOverlay } from "../auth/AiLockedOverlay";
+import { cn } from "@/lib/utils";
 
 interface Props {
   onGenerate: (imageUrl: string) => void;
@@ -85,9 +88,15 @@ export function AIImageGenerator({ onGenerate }: Props) {
   const { aiEnabled, imagesLeft, imagesUsed, imagesLimit, setFromApi } =
     useAiUsage();
   const companyId = useAuthStore((s) => s.companyId);
+  const memberRole = useAuthStore((s) => s.memberRole);
   const aiEnabledPlan = useAuthStore((s) => s.aiEnabled);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { allowed, reason } = canUseAi({
+    role: memberRole,
+    aiEnabled: aiEnabledPlan !== false,
+  });
 
   const handleReferenceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -214,147 +223,155 @@ export function AIImageGenerator({ onGenerate }: Props) {
   };
 
   return (
-    <div className="space-y-4 p-4 w-full flex flex-col">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <Sparkles className="h-4 w-4 text-purple-500" />
-        Generar imagen con IA
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="image-prompt">Describe la imagen</Label>
-        <Textarea
-          id="image-prompt"
-          className="resize-none  bg-white text-black"
-          placeholder="Ej: Interior moderno del salón de esta casa, luz natural, mismos materiales..."
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          rows={3}
-          disabled={loading}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label>Estilo</Label>
-        <Select
-          value={style}
-          onValueChange={(s) => setStyle(s as any)}
-          disabled={loading}
-        >
-          <SelectTrigger className="bg-white text-black">
-            <SelectValue placeholder="Selecciona un estilo" />
-          </SelectTrigger>
-          <SelectContent>
-            {STYLES.map((s) => (
-              <SelectItem key={s.value} value={s.value}>
-                {s.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Imágenes de referencia (opcional, máx. {MAX_REFS})</Label>
-        <p className="text-xs text-white/60">
-          Ej: fachada + materiales + estilo. La IA usará estas fotos como guía.
-        </p>
-
-        <div className="flex flex-wrap gap-2">
-          {refs.map((ref, i) => (
-            <div
-              key={ref.preview}
-              className="relative w-20 h-20 rounded-md overflow-hidden border-white/80"
-            >
-              <img
-                src={ref.preview}
-                alt={`Ref ${i + 1}`}
-                className="w-full h-full object-cover"
-              />
-              <Button
-                variant="secondary"
-                size="icon"
-                className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full"
-                onClick={() => removeReference(i)}
-                disabled={loading}
-              >
-                <X className="h-3 w-3 " />
-              </Button>
-            </div>
-          ))}
-
-          {refs.length < MAX_REFS && (
-            <>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                ref={fileInputRef}
-                onChange={handleReferenceChange}
-                className="hidden"
-                disabled={loading}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-20 w-20 flex flex-col gap-1 hover:opacity-80"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={loading}
-              >
-                <ImagePlus className="h-5 w-5" color="black" />
-                <span className="text-[10px] text-black">Añadir</span>
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {error && <p className="text-sm text-red-500">{error}</p>}
-      <p className="text-xs text-white/60 text-center">
-        {aiEnabledPlan
-          ? `${imagesLeft} imágenes restantes este mes (${imagesUsed}/${imagesLimit})`
-          : "Tu plan no incluye IA"}
-      </p>
-
-      <Button
-        onClick={handleGenerate}
-        disabled={
-          loading ||
-          !prompt.trim() ||
-          !aiEnabled ||
-          imagesLeft <= 0 ||
-          !companyId
-        }
-        className="w-full bg-gradient-to-r from-orange-400 to-yellow-500 h-10 text-white"
-        variant="secondary"
+    <div className="relative space-y-3 p-4 flex flex-col w-full">
+      {!allowed && <AiLockedOverlay reason={reason} />}
+      <div
+        className={cn(!allowed && "pointer-events-none select-none opacity-40")}
       >
-        {loading ? (
-          <>
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            Generando imagen...
-          </>
-        ) : (
-          <>
-            <Sparkles className="h-4 w-4 mr-2" />
-            Generar imagen
-          </>
-        )}
-      </Button>
+        <div className="space-y-4 p-4 w-full flex flex-col">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Sparkles className="h-4 w-4 text-purple-500" />
+            Generar imagen con IA
+          </div>
 
-      {generatedUrl && (
-        <div className="space-y-3 pt-2">
-          <div className="rounded-lg overflow-hidden border">
-            <img
-              src={generatedUrl}
-              alt="Imagen generada"
-              className="w-full max-h-72 object-contain"
+          <div className="space-y-2">
+            <Label htmlFor="image-prompt">Describe la imagen</Label>
+            <Textarea
+              id="image-prompt"
+              className="resize-none  bg-white text-black"
+              placeholder="Ej: Interior moderno del salón de esta casa, luz natural, mismos materiales..."
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              rows={3}
+              disabled={loading}
             />
           </div>
-          <Button onClick={handleUseImage} className="w-full">
-            Usar esta imagen en el post
+
+          <div className="space-y-2">
+            <Label>Estilo</Label>
+            <Select
+              value={style}
+              onValueChange={(s) => setStyle(s as any)}
+              disabled={loading}
+            >
+              <SelectTrigger className="bg-white text-black">
+                <SelectValue placeholder="Selecciona un estilo" />
+              </SelectTrigger>
+              <SelectContent>
+                {STYLES.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>
+                    {s.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Imágenes de referencia (opcional, máx. {MAX_REFS})</Label>
+            <p className="text-xs text-white/60">
+              Ej: fachada + materiales + estilo. La IA usará estas fotos como
+              guía.
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              {refs.map((ref, i) => (
+                <div
+                  key={ref.preview}
+                  className="relative w-20 h-20 rounded-md overflow-hidden border-white/80"
+                >
+                  <img
+                    src={ref.preview}
+                    alt={`Ref ${i + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full"
+                    onClick={() => removeReference(i)}
+                    disabled={loading}
+                  >
+                    <X className="h-3 w-3 " />
+                  </Button>
+                </div>
+              ))}
+
+              {refs.length < MAX_REFS && (
+                <>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    ref={fileInputRef}
+                    onChange={handleReferenceChange}
+                    className="hidden"
+                    disabled={loading}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-20 w-20 flex flex-col gap-1 hover:opacity-80"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={loading}
+                  >
+                    <ImagePlus className="h-5 w-5" color="black" />
+                    <span className="text-[10px] text-black">Añadir</span>
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {error && <p className="text-sm text-red-500">{error}</p>}
+          <p className="text-xs text-white/60 text-center">
+            {aiEnabledPlan
+              ? `${imagesLeft} imágenes restantes este mes (${imagesUsed}/${imagesLimit})`
+              : "Tu plan no incluye IA"}
+          </p>
+
+          <Button
+            onClick={handleGenerate}
+            disabled={
+              loading ||
+              !prompt.trim() ||
+              !aiEnabled ||
+              imagesLeft <= 0 ||
+              !companyId
+            }
+            className="w-full bg-gradient-to-r from-orange-400 to-yellow-500 h-10 text-white"
+            variant="secondary"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Generando imagen...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4 mr-2" />
+                Generar imagen
+              </>
+            )}
           </Button>
+
+          {generatedUrl && (
+            <div className="space-y-3 pt-2">
+              <div className="rounded-lg overflow-hidden border">
+                <img
+                  src={generatedUrl}
+                  alt="Imagen generada"
+                  className="w-full max-h-72 object-contain"
+                />
+              </div>
+              <Button onClick={handleUseImage} className="w-full">
+                Usar esta imagen en el post
+              </Button>
+            </div>
+          )}
         </div>
-      )}
+      </div>{" "}
     </div>
   );
 }

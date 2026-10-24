@@ -8,6 +8,7 @@ export interface AppUser {
   name: string;
   role: UserRole;
   createdAt: Date;
+  isSuperAdmin?: boolean;
 }
 
 export interface SocialAccount {

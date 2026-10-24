@@ -8,6 +8,7 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { AppUser } from "@/types";
 import {
   getCompany,
+  getEffectivePlan,
   getMembership,
   getUserMemberships,
   PLAN_LIMITS,
@@ -54,6 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           name: data.name || data.displayName || "Usuario",
           role: data.role || "viewer",
           createdAt: data.createdAt?.toDate?.() || new Date(),
+          isSuperAdmin: data.isSuperAdmin === true,
         } as AppUser);
 
         let activeCompanyId = data.activeCompanyId as string | undefined;
@@ -100,21 +102,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
           return;
         }
-
-        const planKey = (company.plan || "free") as keyof typeof PLAN_LIMITS;
-        const defaults = PLAN_LIMITS[planKey] || PLAN_LIMITS.free;
-        const limits = company.limits || defaults;
+        const effective = getEffectivePlan(company);
 
         setTenant({
           companyId: activeCompanyId,
           companyName: company.name || null,
           companyLogo: company.logoUrl || null,
           memberRole: membership.role,
-          plan: company.plan || "free",
-          aiEnabled: company.features?.aiEnabled !== false,
-          aiCaptionsLimit:
-            limits.aiCaptionsPerMonth ?? defaults.aiCaptionsPerMonth,
-          aiImagesLimit: limits.aiImagesPerMonth ?? defaults.aiImagesPerMonth,
+          plan: effective.plan,
+          aiEnabled: effective.aiEnabled,
+          aiCaptionsLimit: effective.limits.aiCaptionsPerMonth,
+          aiImagesLimit: effective.limits.aiImagesPerMonth,
         });
       } catch (error) {
         console.error("Error en AuthProvider:", error);

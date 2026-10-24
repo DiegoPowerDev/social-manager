@@ -184,19 +184,8 @@ export default function YouTubePage() {
             </span>
           </p>
         </div>
-        <div className="flex items-center gap-2 ">
-          {(() => {
-            const s = getTokenStatus(account.expiresAt);
-            if (s === "expired")
-              return <Badge variant="destructive">Token expirado</Badge>;
-            if (s === "expiring_soon")
-              return (
-                <Badge className="bg-amber-500 hover:bg-amber-500">
-                  Por vencer
-                </Badge>
-              );
-            return <Badge variant="secondary">Conectado</Badge>;
-          })()}
+        <div className="flex p-6 items-center gap-2 ">
+          <Badge variant="secondary">Conectado</Badge>
           <Button
             variant="outline"
             size="sm"
@@ -207,33 +196,6 @@ export default function YouTubePage() {
           </Button>
         </div>
       </div>
-
-      {(() => {
-        const tokenStatus = getTokenStatus(account.expiresAt);
-        if (tokenStatus === "ok") return null;
-        return (
-          <div
-            className={`mx-6 p-3 mt-4 rounded-md text-sm border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
-              tokenStatus === "expired"
-                ? "bg-red-50 text-red-800 border-red-200"
-                : "bg-amber-50 text-amber-900 border-amber-200"
-            }`}
-          >
-            <p className="font-medium">{tokenStatusLabel(tokenStatus)}</p>
-            {canConnect && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  window.location.href = `/api/auth/youtube?companyId=${companyId}`;
-                }}
-              >
-                Reconectar YouTube
-              </Button>
-            )}
-          </div>
-        );
-      })()}
 
       <div className="p-6">
         {status && (

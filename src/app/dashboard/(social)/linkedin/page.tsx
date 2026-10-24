@@ -12,12 +12,10 @@ import {
   doc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { TikTokConnectFlow } from "@/components/social/TikTokConnectFlow";
-import {
-  TikTokComposer,
-  type TikTokPrivacy,
-} from "@/components/social/TikTokComposer";
+import { LinkedInComposer } from "@/components/social/LinkedInComposer";
+import { LinkedInConnectFlow } from "@/components/social/LinkedInConnectFlow";
 import { PostHistory } from "@/components/social/PostHistory";
+import { PostPreview } from "@/components/social/PostPreview";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,11 +23,12 @@ import { LucideLoaderCircle } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { cn } from "@/lib/utils";
 
-export default function TikTokPage() {
+export default function LinkedInPage() {
   const [activeTab, setActiveTab] = useState("create");
   const searchParams = useSearchParams();
   const router = useRouter();
 
+  const plan = useAuthStore((s) => s.plan);
   const companyId = useAuthStore((s) => s.companyId);
   const memberRole = useAuthStore((s) => s.memberRole);
   const canEdit = memberRole === "admin" || memberRole === "editor";
@@ -43,19 +42,21 @@ export default function TikTokPage() {
     text: string;
   } | null>(null);
 
-  const [title, setTitle] = useState("");
+  const [text, setText] = useState("");
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [privacyLevel, setPrivacyLevel] = useState<TikTokPrivacy>("SELF_ONLY");
 
   const loadAccount = async () => {
     try {
       if (!companyId) return;
+
       const q = query(
         collection(db, "socialAccounts"),
         where("companyId", "==", companyId),
-        where("platform", "==", "tiktok"),
+        where("platform", "==", "linkedin"),
       );
       const snapshot = await getDocs(q);
+
       if (!snapshot.empty) {
         const data = snapshot.docs[0].data();
         setAccount({
@@ -70,8 +71,8 @@ export default function TikTokPage() {
       } else {
         setAccount(null);
       }
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error(error);
     } finally {
       setChecking(false);
     }
@@ -85,56 +86,65 @@ export default function TikTokPage() {
   useEffect(() => {
     const success = searchParams.get("success");
     const error = searchParams.get("error");
+
     if (success === "true") {
-      setStatus({ type: "success", text: "Cuenta de TikTok conectada" });
+      setStatus({ type: "success", text: "Cuenta de LinkedIn conectada" });
       loadAccount();
-      router.replace("/dashboard/tiktok");
+      router.replace("/dashboard/linkedin");
     }
+
     if (error) {
       setStatus({ type: "error", text: `Error al conectar: ${error}` });
-      router.replace("/dashboard/tiktok");
+      router.replace("/dashboard/linkedin");
     }
   }, [searchParams]);
 
   const handlePublish = async () => {
     if (!account || !companyId || !canEdit) return;
-    if (!videoUrl) {
-      setStatus({ type: "error", text: "Sube un video" });
-      return;
-    }
-    if (!title.trim()) {
-      setStatus({ type: "error", text: "El caption es obligatorio" });
-      return;
-    }
+    if (!text.trim() && !imageUrl && !videoUrl) return;
 
     setLoading(true);
     setStatus(null);
+
     try {
-      const res = await fetch("/api/publish/tiktok", {
+      const res = await fetch("/api/publish/linkedin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          companyId,
+          personId: account.personId,
           accessToken: account.accessToken,
-          openId: account.openId,
-          name: account.name || account.username,
-          title: title.trim(),
-          videoUrl,
-          // Sandbox / unaudited
-          privacyLevel: "SELF_ONLY",
+          name: account.name,
+          companyId,
+          text,
+          imageUrl: imageUrl || undefined,
+          videoUrl: videoUrl || undefined,
         }),
       });
+
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Error al publicar");
 
       setStatus({
         type: "success",
-        text: "Video enviado a TikTok (en sandbox suele quedar solo visible para ti)",
+        text: "Publicado correctamente en LinkedIn",
       });
-      setTitle("");
+      setText("");
+      setImageUrl(null);
       setVideoUrl(null);
     } catch (err: any) {
-      setStatus({ type: "error", text: err.message || "Error al publicar" });
+      const msg = err.message || "Error al publicar";
+      if (
+        msg === "TOKEN_EXPIRED" ||
+        msg.toLowerCase().includes("token") ||
+        msg.includes("401")
+      ) {
+        setStatus({
+          type: "error",
+          text: "El token expiró o es inválido. Reconecta la cuenta.",
+        });
+      } else {
+        setStatus({ type: "error", text: msg });
+      }
     } finally {
       setLoading(false);
     }
@@ -142,7 +152,7 @@ export default function TikTokPage() {
 
   const handleDisconnect = async () => {
     if (!account || !canConnect) return;
-    if (!confirm("¿Desconectar esta cuenta de TikTok?")) return;
+    if (!confirm("¿Desconectar esta cuenta de LinkedIn?")) return;
     await deleteDoc(doc(db, "socialAccounts", account.id));
     setAccount(null);
   };
@@ -165,7 +175,7 @@ export default function TikTokPage() {
 
   if (!account) {
     return (
-      <TikTokConnectFlow
+      <LinkedInConnectFlow
         companyId={companyId}
         canConnect={canConnect}
         status={status}
@@ -176,16 +186,13 @@ export default function TikTokPage() {
   return (
     <div className="">
       <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
-        <div className="p-6 text-white">
-          <h1 className="text-2xl font-bold">TikTok</h1>
+        <div className="p-6  text-white">
+          <h1 className="text-2xl font-bold">LinkedIn</h1>
           <p className="text-sm">
-            Cuenta:{" "}
-            <span className="font-bold text-white">
-              {account.name || account.username || account.openId}
-            </span>
+            Publicando como <span className="font-medium">{account.name}</span>
           </p>
         </div>
-        <div className="flex items-center gap-2 pr-6">
+        <div className="flex items-center gap-2">
           {(() => {
             const s = getTokenStatus(account.expiresAt);
             if (s === "expired")
@@ -212,31 +219,39 @@ export default function TikTokPage() {
       {(() => {
         const tokenStatus = getTokenStatus(account.expiresAt);
         if (tokenStatus === "ok") return null;
+
         return (
           <div
-            className={`mx-6 p-3 mt-4 rounded-md text-sm border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
+            className={`mx-6 mb-2 p-3 rounded-md text-sm border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
               tokenStatus === "expired"
                 ? "bg-red-50 text-red-800 border-red-200"
                 : "bg-amber-50 text-amber-900 border-amber-200"
             }`}
           >
-            <p className="font-medium">{tokenStatusLabel(tokenStatus)}</p>
+            <div>
+              <p className="font-medium">{tokenStatusLabel(tokenStatus)}</p>
+              {account.expiresAt && (
+                <p className="text-xs mt-0.5 opacity-80">
+                  Expira: {account.expiresAt.toLocaleString()}
+                </p>
+              )}
+            </div>
             {canConnect && (
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => {
-                  window.location.href = `/api/auth/tiktok?companyId=${companyId}`;
+                  window.location.href = `/api/auth/linkedin?companyId=${companyId}`;
                 }}
               >
-                Reconectar TikTok
+                Reconectar LinkedIn
               </Button>
             )}
           </div>
         );
       })()}
 
-      <div className="p-6">
+      <div className="w-full h-full p-6">
         {status && (
           <div
             className={`p-3 rounded-md text-sm mb-4 ${
@@ -249,9 +264,9 @@ export default function TikTokPage() {
           </div>
         )}
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="create">Publicar video</TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2 bg-yellow-500/60 font-bold backdrop-blur-xs">
+            <TabsTrigger value="create">Crear contenido</TabsTrigger>
             <TabsTrigger value="history">Historial</TabsTrigger>
           </TabsList>
         </Tabs>
@@ -259,28 +274,40 @@ export default function TikTokPage() {
         <div className={cn(activeTab === "create" ? "mt-6 block" : "hidden")}>
           {!canEdit ? (
             <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded-md">
-              Tu rol es solo lectura.
+              Tu rol es solo lectura. No puedes publicar ni desconectar.
             </p>
           ) : (
-            <TikTokComposer
-              accountName={account.name || account.username || "TikTok"}
-              loading={loading}
-              title={title}
-              onTitleChange={setTitle}
-              videoUrl={videoUrl}
-              onVideoChange={setVideoUrl}
-              privacyLevel={privacyLevel}
-              onPrivacyChange={setPrivacyLevel}
-              onPublish={handlePublish}
-              forcePrivate
-            />
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              <div className="xl:col-span-2">
+                <LinkedInComposer
+                  accountName={account.name}
+                  loading={loading}
+                  text={text}
+                  onTextChange={setText}
+                  imageUrl={imageUrl}
+                  onImageChange={setImageUrl}
+                  videoUrl={videoUrl}
+                  onVideoChange={setVideoUrl}
+                  onPublish={handlePublish}
+                />
+              </div>
+              <div>
+                <PostPreview
+                  platform="linkedin"
+                  accountName={account.name}
+                  message={text}
+                  imageUrl={imageUrl}
+                  videoUrl={videoUrl}
+                />
+              </div>
+            </div>
           )}
         </div>
 
         <div className={activeTab === "history" ? "mt-6 block" : "hidden"}>
           <PostHistory
-            pageId={account.openId}
-            platform="tiktok"
+            pageId={account.personId}
+            platform="linkedin"
             key={status?.type === "success" ? Date.now() : "history"}
           />
         </div>

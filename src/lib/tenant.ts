@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { MemberRole } from "@/types";
+import { PlanId } from "@/content/plans";
 
 /** Límites por plan (ajusta cuando tengas Stripe) */
 export const PLAN_LIMITS = {
@@ -204,4 +205,79 @@ export async function consumeAiCredit(
       { merge: true },
     );
   }
+}
+export function getEffectivePlan(company: any) {
+  const now = Date.now();
+
+  const courtesy = company?.courtesy;
+  if (
+    courtesy?.active &&
+    courtesy?.until &&
+    new Date(courtesy.until).getTime() > now
+  ) {
+    const tier = (courtesy.plan || "premium") as PlanId;
+    return fromTier(tier, courtesy.limits, "courtesy");
+  }
+
+  const partner = company?.partner;
+  if (
+    partner?.active &&
+    (!partner.until || new Date(partner.until).getTime() > now)
+  ) {
+    const tier = (partner.tier || "premium") as PlanId;
+    return fromTier(tier, partner.limits, "partner");
+  }
+
+  const plan = (company?.plan || "free") as PlanId;
+  return fromTier(plan, company?.limits, company?.planSource || "free");
+}
+
+function fromTier(tier: PlanId | string, limits: any, source: string) {
+  const planKey = (tier as PlanId) || "free";
+  const defaults = PLAN_LIMITS[planKey] || PLAN_LIMITS.free;
+
+  // IA solo premium (ajusta si basic también tiene IA)
+  const aiEnabled = planKey === "premium";
+
+  return {
+    plan: planKey,
+    planStatus: "active",
+    aiEnabled,
+    limits: {
+      aiCaptionsPerMonth:
+        limits?.aiCaptionsPerMonth ?? defaults.aiCaptionsPerMonth ?? 0,
+      aiImagesPerMonth:
+        limits?.aiImagesPerMonth ?? defaults.aiImagesPerMonth ?? 0,
+    },
+    source,
+  };
+}
+
+function buildFromTier(
+  tier: string,
+  limits: any,
+  meta: {
+    source: string;
+    courtesyActive: boolean;
+    partnerActive: boolean;
+    until: string | null;
+  },
+) {
+  const planKey = tier as keyof typeof PLAN_LIMITS;
+  const defaults = PLAN_LIMITS[planKey] || PLAN_LIMITS.premium;
+
+  return {
+    plan: planKey,
+    planStatus: "active",
+    aiEnabled: true,
+    limits: {
+      aiCaptionsPerMonth:
+        limits?.aiCaptionsPerMonth ?? defaults.aiCaptionsPerMonth,
+      aiImagesPerMonth: limits?.aiImagesPerMonth ?? defaults.aiImagesPerMonth,
+    },
+    source: meta.source,
+    courtesyActive: meta.courtesyActive,
+    partnerActive: meta.partnerActive,
+    until: meta.until,
+  };
 }
