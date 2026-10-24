@@ -274,11 +274,19 @@ export default function MediaLibraryPage() {
   };
 
   const downloadFile = async (item: MediaItem) => {
+    if (!companyId || !user) return;
     try {
       setDownloadingId(item.id);
-      const res = await fetch(item.url);
-      if (!res.ok) throw new Error("No se pudo descargar el archivo");
-
+      const qs = new URLSearchParams({
+        mediaId: item.id,
+        companyId,
+        uid: user.uid,
+      });
+      const res = await fetch(`/api/media/download?${qs}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "No se pudo descargar");
+      }
       const blob = await res.blob();
       const objectUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -290,10 +298,7 @@ export default function MediaLibraryPage() {
       a.remove();
       URL.revokeObjectURL(objectUrl);
     } catch (e: any) {
-      window.open(item.url, "_blank", "noopener,noreferrer");
-      setError(
-        e.message || "No se pudo forzar la descarga; se abrió el archivo",
-      );
+      setError(e.message || "No se pudo descargar");
     } finally {
       setDownloadingId(null);
     }
