@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   collection,
   query,
@@ -15,7 +15,7 @@ import { db } from "@/lib/firebase";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { saveMediaToLibrary } from "@/lib/media";
 import { Button } from "@/components/ui/button";
-
+import { Input } from "@/components/ui/input";
 import {
   Card,
   CardContent,
@@ -23,7 +23,29 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { Loader2, ImagePlus, Trash2, Video, Download } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Loader2,
+  ImagePlus,
+  Trash2,
+  Video,
+  Download,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 
 interface MediaItem {
   id: string;
@@ -35,6 +57,15 @@ interface MediaItem {
   createdAt?: Date;
 }
 
+type TypeFilter = "all" | "image" | "video";
+
+function formatSize(bytes: number) {
+  if (!bytes) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export default function MediaLibraryPage() {
   const { companyId, user, memberRole } = useAuthStore();
   const [items, setItems] = useState<MediaItem[]>([]);
@@ -42,6 +73,11 @@ export default function MediaLibraryPage() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const canEdit = memberRole === "admin" || memberRole === "editor";
@@ -90,6 +126,49 @@ export default function MediaLibraryPage() {
     load();
   }, [load]);
 
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return items.filter((item) => {
+      if (typeFilter !== "all" && item.type !== typeFilter) return false;
+      if (!q) return true;
+      return item.fileName.toLowerCase().includes(q);
+    });
+  }, [items, search, typeFilter]);
+
+  const previewItem =
+    previewIndex !== null ? (filtered[previewIndex] ?? null) : null;
+
+  const openPreview = (id: string) => {
+    const idx = filtered.findIndex((i) => i.id === id);
+    if (idx >= 0) setPreviewIndex(idx);
+  };
+
+  const goPrev = useCallback(() => {
+    setPreviewIndex((i) => {
+      if (i === null || filtered.length === 0) return i;
+      return (i - 1 + filtered.length) % filtered.length;
+    });
+  }, [filtered.length]);
+
+  const goNext = useCallback(() => {
+    setPreviewIndex((i) => {
+      if (i === null || filtered.length === 0) return i;
+      return (i + 1) % filtered.length;
+    });
+  }, [filtered.length]);
+
+  // Si el filtro cambia y el índice queda fuera de rango
+  useEffect(() => {
+    if (previewIndex === null) return;
+    if (filtered.length === 0) {
+      setPreviewIndex(null);
+      return;
+    }
+    if (previewIndex >= filtered.length) {
+      setPreviewIndex(filtered.length - 1);
+    }
+  }, [filtered, previewIndex]);
+
   const uploadFile = async (file: File) => {
     if (!companyId || !user) {
       setError("No hay empresa o sesión");
@@ -99,7 +178,6 @@ export default function MediaLibraryPage() {
     setUploading(true);
     setError(null);
     try {
-      // Preferible: upload firmado (mismo que YouTube)
       const signRes = await fetch("/api/upload/sign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -125,7 +203,6 @@ export default function MediaLibraryPage() {
         publicUrl = signed.publicUrl;
         key = signed.key;
       } else {
-        // Fallback: /api/upload con FormData
         const formData = new FormData();
         formData.append("file", file);
         formData.append("platform", "library");
@@ -176,6 +253,12 @@ export default function MediaLibraryPage() {
     try {
       await deleteDoc(doc(db, "media", id));
       setItems((prev) => prev.filter((i) => i.id !== id));
+      setPreviewIndex((idx) => {
+        if (idx === null) return null;
+        const still = filtered.filter((i) => i.id !== id);
+        if (still.length === 0) return null;
+        return Math.min(idx, still.length - 1);
+      });
     } catch (e: any) {
       setError(e.message || "No se pudo eliminar");
     }
@@ -198,7 +281,6 @@ export default function MediaLibraryPage() {
       a.remove();
       URL.revokeObjectURL(objectUrl);
     } catch (e: any) {
-      // Fallback: abrir en nueva pestaña si CORS bloquea el fetch
       window.open(item.url, "_blank", "noopener,noreferrer");
       setError(
         e.message || "No se pudo forzar la descarga; se abrió el archivo",
@@ -218,16 +300,15 @@ export default function MediaLibraryPage() {
 
   return (
     <div className="space-y-6 h-full flex flex-col">
-      {/* Header */}
-      <div className="flex  items-center justify-between bg-zinc-950/50 backdrop-blur">
-        <div className="p-6  text-white">
+      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
+        <div className="p-6 text-white">
           <h1 className="text-2xl font-bold">Media Library</h1>
           <p className="text-sm">
             Archivos de tu empresa para reutilizar en publicaciones
           </p>
         </div>
         {canEdit && (
-          <div>
+          <div className="px-6">
             <input
               ref={inputRef}
               type="file"
@@ -257,35 +338,77 @@ export default function MediaLibraryPage() {
       </div>
 
       {error && (
-        <p className="text-sm text-red-500 bg-red-50 border border-red-100 rounded-lg p-3">
+        <p className="mx-6 text-sm text-red-500 bg-red-50 border border-red-100 rounded-lg p-3">
           {error}
         </p>
       )}
-      <div className="flex-1 flex justify-center p-6">
+
+      <div className="flex-1 flex justify-center p-6 pt-0">
         <Card className="bg-zinc-950/60 w-full flex-1">
-          <CardHeader className="pb-3 ">
-            <CardTitle className="text-white">Archivos</CardTitle>
-            <CardDescription className="text-white">
-              {items.length} elemento{items.length !== 1 ? "s" : ""}
-            </CardDescription>
+          <CardHeader className="pb-3 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <CardTitle className="text-white">Archivos</CardTitle>
+                <CardDescription className="text-white/70">
+                  {filtered.length} de {items.length} elemento
+                  {items.length !== 1 ? "s" : ""}
+                </CardDescription>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <div className="relative flex-1 sm:w-56">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    className="pl-8 bg-white"
+                    placeholder="Buscar por nombre…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+                <Select
+                  value={typeFilter}
+                  onValueChange={(v) => setTypeFilter(v as TypeFilter)}
+                >
+                  <SelectTrigger className="bg-white w-full sm:w-36">
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="image">Imágenes</SelectItem>
+                    <SelectItem value="video">Videos</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="flex-1 w-full flex justify-center py-16">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
-            ) : items.length === 0 ? (
+            ) : filtered.length === 0 ? (
               <p className="text-center text-muted-foreground py-16 text-sm">
-                Aún no hay archivos. Sube una imagen o video para empezar.
+                {items.length === 0
+                  ? "Aún no hay archivos. Sube una imagen o video para empezar."
+                  : "No hay resultados con ese filtro o búsqueda."}
               </p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {items.map((item) => (
+                {filtered.map((item) => (
                   <div
                     key={item.id}
                     className="group relative rounded bg-white overflow-hidden"
                   >
-                    <div className="aspect-square bg-muted flex items-center justify-center">
+                    <div
+                      className="aspect-square bg-muted flex items-center justify-center cursor-pointer"
+                      onClick={() => openPreview(item.id)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          openPreview(item.id);
+                        }
+                      }}
+                    >
                       {item.type === "image" ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
@@ -294,23 +417,28 @@ export default function MediaLibraryPage() {
                           className="h-full w-full object-cover"
                         />
                       ) : (
-                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                          <Video className="h-8 w-8" />
-                          <span className="text-xs px-2 truncate max-w-full">
-                            {item.fileName}
-                          </span>
+                        <div className="relative h-full w-full bg-black">
+                          <video
+                            src={`${item.url}#t=0.1`}
+                            muted
+                            playsInline
+                            preload="metadata"
+                            className="h-full w-full object-cover pointer-events-none"
+                          />
+                          <div className="absolute bottom-1 left-1 rounded bg-black/60 p-1">
+                            <Video className="h-3.5 w-3.5 text-white" />
+                          </div>
                         </div>
                       )}
                     </div>
                     <div className="p-2 flex flex-col items-center justify-between gap-1">
                       <p
-                        className="text-xs truncate flex-1"
+                        className="text-xs truncate w-full text-center"
                         title={item.fileName}
                       >
                         {item.fileName}
                       </p>
                       <div className="flex shrink-0">
-                        {/* solo funciona en producción */}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -345,6 +473,111 @@ export default function MediaLibraryPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Preview Dialog */}
+      <Dialog
+        open={previewIndex !== null && !!previewItem}
+        onOpenChange={(open) => {
+          if (!open) setPreviewIndex(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-3xl w-[95vw] p-0 gap-0 overflow-hidden bg-zinc-950 border-white/10 text-white">
+          {previewItem && (
+            <>
+              <DialogHeader className="px-4 py-3 border-b border-white/10 flex flex-row items-center justify-between space-y-0 shrink-0">
+                <div className="min-w-0 pr-8">
+                  <DialogTitle className="text-base truncate">
+                    {previewItem.fileName}
+                  </DialogTitle>
+                  <p className="text-xs text-white/50 mt-0.5">
+                    {previewItem.type === "video" ? "Video" : "Imagen"}
+                    {" · "}
+                    {formatSize(previewItem.size)}
+                    {filtered.length > 1 && (
+                      <>
+                        {" · "}
+                        {(previewIndex ?? 0) + 1} / {filtered.length}
+                      </>
+                    )}
+                  </p>
+                </div>
+              </DialogHeader>
+
+              {/* Marco fijo: mismo tamaño siempre */}
+              <div className="relative w-full aspect-video bg-black">
+                {filtered.length > 1 && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 z-10 h-9 w-9 rounded-full opacity-90"
+                      onClick={goPrev}
+                      title="Anterior (←)"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 z-10 h-9 w-9 rounded-full opacity-90"
+                      onClick={goNext}
+                      title="Siguiente (→)"
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </Button>
+                  </>
+                )}
+
+                {previewItem.type === "image" ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={previewItem.url}
+                    alt={previewItem.fileName}
+                    className="absolute inset-0 h-full w-full object-contain"
+                  />
+                ) : (
+                  <video
+                    key={previewItem.id}
+                    src={previewItem.url}
+                    controls
+                    autoPlay
+                    playsInline
+                    className="absolute inset-0 h-full w-full object-contain"
+                  />
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-end gap-2 px-4 py-3 border-t border-white/10 shrink-0">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={downloadingId === previewItem.id}
+                  onClick={() => downloadFile(previewItem)}
+                >
+                  {downloadingId === previewItem.id ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
+                  Descargar
+                </Button>
+                {canEdit && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleDelete(previewItem.id)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Eliminar
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

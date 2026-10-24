@@ -18,6 +18,8 @@ interface AuthState {
   aiCaptionsLimit: number;
   aiImagesLimit: number;
 
+  tenantTick: number;
+
   setUser: (user: User | null) => void;
   setAppUser: (appUser: AppUser | null) => void;
   setLoading: (loading: boolean) => void;
@@ -32,6 +34,7 @@ interface AuthState {
     aiCaptionsLimit?: number;
     aiImagesLimit?: number;
   }) => void;
+  invalidateTenant: () => void;
   hasPermission: (allowedRoles: UserRole[]) => boolean;
   canEdit: () => boolean;
   canAdmin: () => boolean;
@@ -45,6 +48,7 @@ const emptyTenant = {
   plan: null as string | null,
   aiEnabled: false,
   aiCaptionsLimit: 0,
+  tentantTick: 0,
   aiImagesLimit: 0,
 };
 
@@ -53,7 +57,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   appUser: null,
   loading: true,
   ...emptyTenant,
-
+  tenantTick: 0,
+  invalidateTenant: () => set((s) => ({ tenantTick: s.tenantTick + 1 })),
   setUser: (user) => set({ user }),
   setAppUser: (appUser) => set({ appUser }),
   setLoading: (loading) => set({ loading }),

@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { LucideLoaderCircle } from "lucide-react";
 import { cn } from "cn";
 import { RequireSectionAccess } from "@/components/auth/RequireAccess";
+import { auth } from "@/lib/firebase";
 
 export default function DashboardLayout({
   children,
@@ -15,6 +16,22 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const { user, loading } = useAuthStore();
+
+  const pathname = usePathname();
+  const invalidateTenant = useAuthStore((s) => s.invalidateTenant);
+
+  useEffect(() => {
+    invalidateTenant();
+  }, [pathname, invalidateTenant]);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (auth.currentUser) {
+        useAuthStore.getState().invalidateTenant();
+      }
+    }, 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     if (!loading && !user) {

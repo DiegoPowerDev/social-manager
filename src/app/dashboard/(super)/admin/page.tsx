@@ -219,6 +219,7 @@ export default function AdminPage() {
       setMsg(`Cortesía activa: ${days} días (${courtesyPlan})`);
       await openCompany(selectedId);
       await loadList();
+      useAuthStore.getState().invalidateTenant();
     } catch (e: any) {
       setMsg(e.message);
     } finally {
@@ -241,6 +242,7 @@ export default function AdminPage() {
       setMsg("Cortesía eliminada");
       await openCompany(selectedId);
       await loadList();
+      useAuthStore.getState().invalidateTenant();
     } catch (e: any) {
       setMsg(e.message);
     } finally {
@@ -248,11 +250,11 @@ export default function AdminPage() {
     }
   };
 
-  const savePartner = async (active: boolean) => {
-    if (!selectedId) return;
+  const savePartner = async (active: boolean): Promise<boolean> => {
+    if (!selectedId) return false;
     if (active && !partnerReason.trim()) {
       setMsg("Indica un motivo para marcar como Socio");
-      return;
+      return false;
     }
     setSaving(true);
     setMsg(null);
@@ -293,8 +295,11 @@ export default function AdminPage() {
       setMsg(active ? "Marcado como Socio" : "Socio desactivado");
       await openCompany(selectedId);
       await loadList();
+      useAuthStore.getState().invalidateTenant();
+      return true;
     } catch (e: any) {
       setMsg(e.message);
+      return false;
     } finally {
       setSaving(false);
     }
@@ -463,7 +468,18 @@ export default function AdminPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => setPartnerModalOpen(true)}
+                    onClick={() => {
+                      if (partnerActive) {
+                        setPartnerReason(partner?.reason || "");
+                        setPartnerTier(
+                          (partner?.tier as "basic" | "premium") || "premium",
+                        );
+                      } else {
+                        setPartnerReason("");
+                        setPartnerTier("premium");
+                      }
+                      setPartnerModalOpen(true);
+                    }}
                   >
                     {partnerActive ? "Editar socio" : "Marcar como socio"}
                   </Button>
@@ -606,6 +622,11 @@ export default function AdminPage() {
                 onChange={(e) => setPartnerReason(e.target.value)}
                 placeholder="amigo / piloto / acuerdo"
               />
+              {!partnerReason.trim() && (
+                <p className="text-xs text-red-600 mt-1">
+                  El motivo es obligatorio
+                </p>
+              )}
             </div>
             <div className="flex flex-wrap gap-2 justify-end">
               {partnerActive && (
@@ -614,19 +635,19 @@ export default function AdminPage() {
                   className="border-red-300 text-red-700"
                   disabled={saving}
                   onClick={async () => {
-                    await savePartner(false);
-                    setPartnerModalOpen(false);
+                    const ok = await savePartner(false);
+                    if (ok) setPartnerModalOpen(false);
                   }}
                 >
                   Quitar socio
                 </Button>
               )}
               <Button
-                disabled={saving}
+                disabled={saving || !partnerReason.trim()}
                 className="bg-violet-600 hover:bg-violet-700 text-white"
                 onClick={async () => {
-                  await savePartner(true);
-                  setPartnerModalOpen(false);
+                  const ok = await savePartner(true);
+                  if (ok) setPartnerModalOpen(false);
                 }}
               >
                 Guardar
