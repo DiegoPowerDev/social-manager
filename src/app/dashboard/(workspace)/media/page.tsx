@@ -220,7 +220,7 @@ export default function MediaLibraryPage() {
         companyId,
         uid: user.uid,
         url: publicUrl,
-        key,
+        key: key,
         fileName: file.name,
         size: file.size,
         mimeType: file.type || "application/octet-stream",
@@ -242,16 +242,25 @@ export default function MediaLibraryPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!canEdit) return;
+    if (!canEdit || !companyId || !user) return;
     if (
-      !confirm(
-        "¿Eliminar de la biblioteca? (no borra el archivo de R2 en esta versión)",
-      )
+      !confirm("¿Eliminar este archivo de la biblioteca y del almacenamiento?")
     ) {
       return;
     }
     try {
-      await deleteDoc(doc(db, "media", id));
+      const res = await fetch("/api/media/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mediaId: id,
+          companyId,
+          uid: user.uid,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo eliminar");
+
       setItems((prev) => prev.filter((i) => i.id !== id));
       setPreviewIndex((idx) => {
         if (idx === null) return null;
