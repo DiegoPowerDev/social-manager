@@ -6,7 +6,7 @@ import { Lock, Sparkles } from "lucide-react";
 
 export function AiLockedOverlay({ reason }: { reason?: string }) {
   return (
-    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-lg bg-background/85 backdrop-blur-sm p-4 text-center">
+    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-lg bg-black/85 backdrop-blur-sm p-4 text-center">
       <div className="flex h-12 w-12 items-center justify-center rounded-full border bg-muted">
         <Lock className="h-5 w-5 text-muted-foreground" />
       </div>
@@ -21,7 +21,7 @@ export function AiLockedOverlay({ reason }: { reason?: string }) {
       </div>
       <Link
         href="/dashboard/membresia"
-        className="inline-flex h-8 items-center justify-center rounded-md border bg-secondary px-3 text-xs font-medium hover:bg-secondary/80"
+        className="inline-flex h-8 items-center justify-center rounded-md border bg-secondary px-3 text-xs font-medium text-black hover:bg-secondary/80"
       >
         Ver planes
       </Link>
