@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { LucideLoaderCircle } from "lucide-react";
+import { ConfirmDialog } from "@/components/layout/ConfirmDialog";
 
 type CompanyRow = {
   id: string;
@@ -105,7 +107,6 @@ export default function AdminPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<any>(null);
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
 
   const [captionsUsed, setCaptionsUsed] = useState(0);
   const [imagesUsed, setImagesUsed] = useState(0);
@@ -119,6 +120,7 @@ export default function AdminPage() {
 
   const [partnerModalOpen, setPartnerModalOpen] = useState(false);
   const [courtesyModalOpen, setCourtesyModalOpen] = useState(false);
+  const [confirmCourtesyOpen, setConfirmCourtesyOpen] = useState(false);
 
   const headers = () => ({
     "Content-Type": "application/json",
@@ -134,7 +136,7 @@ export default function AdminPage() {
       if (!res.ok) throw new Error(data.error || "Error");
       setCompanies(data.companies || []);
     } catch (e: any) {
-      setMsg(e.message);
+      toast.error(e.message || "Error al cargar empresas");
     } finally {
       setLoading(false);
     }
@@ -150,28 +152,29 @@ export default function AdminPage() {
 
   const openCompany = async (id: string) => {
     setSelectedId(id);
-    setMsg(null);
-    const res = await fetch(`/api/admin/companies/${id}`, {
-      headers: headers(),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setMsg(data.error);
-      return;
+    try {
+      const res = await fetch(`/api/admin/companies/${id}`, {
+        headers: headers(),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error");
+      setDetail(data);
+      const c = data.company;
+      setCaptionsUsed(data.usage?.aiCaptions ?? 0);
+      setImagesUsed(data.usage?.aiImages ?? 0);
+      setCourtesyReason(c.courtesy?.reason || "");
+      setCourtesyPlan(c.courtesy?.plan || "premium");
+      setPartnerReason(c.partner?.reason || "");
+      setPartnerTier((c.partner?.tier as "basic" | "premium") || "premium");
+    } catch (e: any) {
+      toast.error(e.message || "No se pudo abrir la empresa");
     }
-    setDetail(data);
-    const c = data.company;
-    setCaptionsUsed(data.usage?.aiCaptions ?? 0);
-    setImagesUsed(data.usage?.aiImages ?? 0);
-    setCourtesyReason(c.courtesy?.reason || "");
-    setCourtesyPlan(c.courtesy?.plan || "premium");
-    setPartnerReason(c.partner?.reason || "");
-    setPartnerTier((c.partner?.tier as "basic" | "premium") || "premium");
   };
 
   const saveUsage = async (reset = false) => {
     if (!selectedId) return;
     setSaving(true);
+    const tid = toast.loading(reset ? "Reseteando uso…" : "Guardando uso…");
     try {
       const res = await fetch(`/api/admin/companies/${selectedId}/usage`, {
         method: "PATCH",
@@ -184,10 +187,12 @@ export default function AdminPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setMsg(reset ? "Uso de IA reseteado" : "Uso de IA actualizado");
+      toast.success(reset ? "Uso de IA reseteado" : "Uso de IA actualizado", {
+        id: tid,
+      });
       await openCompany(selectedId);
     } catch (e: any) {
-      setMsg(e.message);
+      toast.error(e.message || "Error al guardar uso", { id: tid });
     } finally {
       setSaving(false);
     }
@@ -196,7 +201,7 @@ export default function AdminPage() {
   const grantCourtesy = async (days: number) => {
     if (!selectedId) return;
     setSaving(true);
-    setMsg(null);
+    const tid = toast.loading(`Activando cortesía (${days} días)…`);
     try {
       const res = await fetch(`/api/admin/companies/${selectedId}`, {
         method: "PATCH",
@@ -216,12 +221,14 @@ export default function AdminPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setMsg(`Cortesía activa: ${days} días (${courtesyPlan})`);
+      toast.success(`Cortesía activa: ${days} días (${courtesyPlan})`, {
+        id: tid,
+      });
       await openCompany(selectedId);
       await loadList();
-      useAuthStore.getState().invalidateTenant();
+      useAuthStore.getState().invalidateTenant?.();
     } catch (e: any) {
-      setMsg(e.message);
+      toast.error(e.message || "Error al otorgar cortesía", { id: tid });
     } finally {
       setSaving(false);
     }
@@ -229,8 +236,9 @@ export default function AdminPage() {
 
   const clearCourtesy = async () => {
     if (!selectedId) return;
-    if (!confirm("¿Quitar la cortesía de esta empresa?")) return;
+
     setSaving(true);
+    const tid = toast.loading("Quitando cortesía…");
     try {
       const res = await fetch(`/api/admin/companies/${selectedId}`, {
         method: "PATCH",
@@ -239,12 +247,12 @@ export default function AdminPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setMsg("Cortesía eliminada");
+      toast.success("Cortesía eliminada", { id: tid });
       await openCompany(selectedId);
       await loadList();
-      useAuthStore.getState().invalidateTenant();
+      useAuthStore.getState().invalidateTenant?.();
     } catch (e: any) {
-      setMsg(e.message);
+      toast.error(e.message || "Error al quitar cortesía", { id: tid });
     } finally {
       setSaving(false);
     }
@@ -253,11 +261,13 @@ export default function AdminPage() {
   const savePartner = async (active: boolean): Promise<boolean> => {
     if (!selectedId) return false;
     if (active && !partnerReason.trim()) {
-      setMsg("Indica un motivo para marcar como Socio");
+      toast.error("Indica un motivo para marcar como Socio");
       return false;
     }
     setSaving(true);
-    setMsg(null);
+    const tid = toast.loading(
+      active ? "Guardando socio…" : "Desactivando socio…",
+    );
     try {
       const noPaypal = !detail?.company?.paypalSubscriptionId;
       const res = await fetch(`/api/admin/companies/${selectedId}`, {
@@ -292,13 +302,15 @@ export default function AdminPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setMsg(active ? "Marcado como Socio" : "Socio desactivado");
+      toast.success(active ? "Marcado como Socio" : "Socio desactivado", {
+        id: tid,
+      });
       await openCompany(selectedId);
       await loadList();
-      useAuthStore.getState().invalidateTenant();
+      useAuthStore.getState().invalidateTenant?.();
       return true;
     } catch (e: any) {
-      setMsg(e.message);
+      toast.error(e.message || "Error al guardar socio", { id: tid });
       return false;
     } finally {
       setSaving(false);
@@ -333,14 +345,7 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {msg && (
-        <p className="mx-6 text-sm rounded-md border border-white/20 bg-white/10 px-3 py-2">
-          {msg}
-        </p>
-      )}
-
       <div className="p-6 grid gap-6 lg:grid-cols-2">
-        {/* Lista */}
         <Card className="bg-white/70 h-fit">
           <CardHeader>
             <CardTitle>Empresas</CardTitle>
@@ -399,7 +404,6 @@ export default function AdminPage() {
           </CardContent>
         </Card>
 
-        {/* Detalle */}
         <Card className="bg-white/70">
           <CardHeader>
             <CardTitle>Detalle</CardTitle>
@@ -443,7 +447,6 @@ export default function AdminPage() {
                   </p>
                 </div>
 
-                {/* Socio — resumen */}
                 <div className="rounded-lg border border-violet-200/70 bg-violet-50/50 p-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-medium">Socio (acceso manual)</p>
@@ -485,7 +488,6 @@ export default function AdminPage() {
                   </Button>
                 </div>
 
-                {/* Cortesía — resumen */}
                 <div className="rounded-lg border border-amber-200/60 bg-amber-50/50 p-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-medium">Cortesía</p>
@@ -581,7 +583,6 @@ export default function AdminPage() {
         </Card>
       </div>
 
-      {/* Modal Socio */}
       {partnerModalOpen && selectedId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-background rounded-xl shadow-lg max-w-md w-full p-6 space-y-4 border">
@@ -622,11 +623,6 @@ export default function AdminPage() {
                 onChange={(e) => setPartnerReason(e.target.value)}
                 placeholder="amigo / piloto / acuerdo"
               />
-              {!partnerReason.trim() && (
-                <p className="text-xs text-red-600 mt-1">
-                  El motivo es obligatorio
-                </p>
-              )}
             </div>
             <div className="flex flex-wrap gap-2 justify-end">
               {partnerActive && (
@@ -657,7 +653,6 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Modal Cortesía */}
       {courtesyModalOpen && selectedId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-background rounded-xl shadow-lg max-w-md w-full p-6 space-y-4 border">
@@ -720,10 +715,7 @@ export default function AdminPage() {
                 variant="outline"
                 className="border-red-300 text-red-700 w-full"
                 disabled={saving}
-                onClick={async () => {
-                  await clearCourtesy();
-                  setCourtesyModalOpen(false);
-                }}
+                onClick={() => setConfirmCourtesyOpen(true)}
               >
                 Quitar cortesía
               </Button>
@@ -731,6 +723,20 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={confirmCourtesyOpen}
+        onOpenChange={setConfirmCourtesyOpen}
+        title="¿Quitar la cortesía?"
+        description="La empresa volverá al plan de facturación o socio activo."
+        confirmLabel="Quitar cortesía"
+        destructive
+        loading={saving}
+        onConfirm={async () => {
+          await clearCourtesy(); // sin confirm() dentro
+          setConfirmCourtesyOpen(false);
+          setCourtesyModalOpen(false);
+        }}
+      />
     </div>
   );
 }

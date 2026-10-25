@@ -127,6 +127,36 @@ export default function TeamPage() {
     }
   };
 
+  const handleRoleChange = async (
+    targetUid: string,
+    newRole: "editor" | "viewer",
+  ) => {
+    if (!companyId || !user || !isAdmin) return;
+
+    try {
+      const res = await fetch("/api/team/update-role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetUid,
+          companyId,
+          requestedByUid: user.uid,
+          role: newRole,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al cambiar rol");
+
+      setMembers((prev) =>
+        prev.map((m) => (m.uid === targetUid ? { ...m, role: newRole } : m)),
+      );
+      setMessage({ type: "success", text: "Rol actualizado" });
+    } catch (e: any) {
+      setMessage({ type: "error", text: e.message });
+      loadMembers();
+    }
+  };
+
   const handleRemove = async (targetUid: string) => {
     if (!companyId || !user || !isAdmin) return;
     if (!confirm("¿Quitar a este miembro de la empresa?")) return;
@@ -154,7 +184,13 @@ export default function TeamPage() {
       <div className="p-6 text-muted-foreground">No hay empresa asociada.</div>
     );
   }
-
+  if (!isAdmin) {
+    return (
+      <div className="p-6 text-muted-foreground">
+        Solo un administrador puede gestionar el equipo.
+      </div>
+    );
+  }
   return (
     <div>
       <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
@@ -267,36 +303,58 @@ export default function TeamPage() {
             ) : members.length === 0 ? (
               <p className="text-sm text-muted-foreground">Sin miembros</p>
             ) : (
-              members.map((m) => (
-                <div
-                  key={m.id}
-                  className="flex items-center justify-between gap-3 p-3 rounded-lg bg-white/60"
-                >
-                  <div className="min-w-0">
-                    <p className="font-medium truncate">
-                      {m.name || m.email || m.uid}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {m.email}
-                    </p>
+              members.map((m) => {
+                const isSelf = m.uid === user?.uid;
+                const isTargetAdmin = m.role === "admin";
+                return (
+                  <div
+                    key={m.id}
+                    className="flex items-center justify-between gap-3 p-3 rounded-lg bg-white/60"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">
+                        {m.name || m.email || m.uid}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {m.email}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {isSelf || isTargetAdmin ? (
+                        <Badge variant="secondary" className="capitalize">
+                          {m.role}
+                        </Badge>
+                      ) : (
+                        <Select
+                          value={m.role === "viewer" ? "viewer" : "editor"}
+                          onValueChange={(v) =>
+                            handleRoleChange(m.uid, v as "editor" | "viewer")
+                          }
+                        >
+                          <SelectTrigger className="h-8 w-[120px] bg-white text-black text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="editor">Editor</SelectItem>
+                            <SelectItem value="viewer">Viewer</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+
+                      {!isSelf && !isTargetAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemove(m.uid)}
+                          title="Quitar"
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Badge variant="secondary" className="capitalize">
-                      {m.role}
-                    </Badge>
-                    {isAdmin && m.uid !== user?.uid && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemove(m.uid)}
-                        title="Quitar"
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </CardContent>
         </Card>

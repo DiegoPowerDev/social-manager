@@ -8,12 +8,11 @@ import {
   orderBy,
   limit,
   getDocs,
-  deleteDoc,
-  doc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { saveMediaToLibrary } from "@/lib/media";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -46,6 +45,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { ConfirmDialog } from "@/components/layout/ConfirmDialog"; // o la ruta donde lo dejaste
 
 interface MediaItem {
   id: string;
@@ -71,13 +71,14 @@ export default function MediaLibraryPage() {
   const [items, setItems] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
 
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<MediaItem | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const canEdit = memberRole === "admin" || memberRole === "editor";
@@ -88,7 +89,6 @@ export default function MediaLibraryPage() {
       return;
     }
     setLoading(true);
-    setError(null);
     try {
       const q = query(
         collection(db, "media"),
@@ -112,9 +112,9 @@ export default function MediaLibraryPage() {
       setItems(data);
     } catch (e: any) {
       console.error(e);
-      setError(
+      toast.error(
         e.message?.includes("index")
-          ? "Falta un índice en Firestore (companyId + createdAt). Créalo desde el link del error en consola."
+          ? "Falta un índice en Firestore (companyId + createdAt)."
           : e.message || "Error al cargar la biblioteca",
       );
     } finally {
@@ -157,7 +157,6 @@ export default function MediaLibraryPage() {
     });
   }, [filtered.length]);
 
-  // Si el filtro cambia y el índice queda fuera de rango
   useEffect(() => {
     if (previewIndex === null) return;
     if (filtered.length === 0) {
@@ -171,12 +170,12 @@ export default function MediaLibraryPage() {
 
   const uploadFile = async (file: File) => {
     if (!companyId || !user) {
-      setError("No hay empresa o sesión");
+      toast.error("No hay empresa o sesión");
       return;
     }
 
     setUploading(true);
-    setError(null);
+    const tid = toast.loading("Subiendo archivo…");
     try {
       const signRes = await fetch("/api/upload/sign", {
         method: "POST",
@@ -228,8 +227,9 @@ export default function MediaLibraryPage() {
       });
 
       await load();
+      toast.success("Archivo subido", { id: tid });
     } catch (e: any) {
-      setError(e.message || "Error al subir");
+      toast.error(e.message || "Error al subir", { id: tid });
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -241,19 +241,16 @@ export default function MediaLibraryPage() {
     if (file) await uploadFile(file);
   };
 
-  const handleDelete = async (id: string) => {
+  const performDelete = async (item: MediaItem) => {
     if (!canEdit || !companyId || !user) return;
-    if (
-      !confirm("¿Eliminar este archivo de la biblioteca y del almacenamiento?")
-    ) {
-      return;
-    }
+    setDeleting(true);
+    const tid = toast.loading("Eliminando…");
     try {
       const res = await fetch("/api/media/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          mediaId: id,
+          mediaId: item.id,
           companyId,
           uid: user.uid,
         }),
@@ -261,15 +258,19 @@ export default function MediaLibraryPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No se pudo eliminar");
 
-      setItems((prev) => prev.filter((i) => i.id !== id));
+      setItems((prev) => prev.filter((i) => i.id !== item.id));
       setPreviewIndex((idx) => {
         if (idx === null) return null;
-        const still = filtered.filter((i) => i.id !== id);
+        const still = filtered.filter((i) => i.id !== item.id);
         if (still.length === 0) return null;
         return Math.min(idx, still.length - 1);
       });
+      setDeleteTarget(null);
+      toast.success("Archivo eliminado", { id: tid });
     } catch (e: any) {
-      setError(e.message || "No se pudo eliminar");
+      toast.error(e.message || "No se pudo eliminar", { id: tid });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -297,8 +298,9 @@ export default function MediaLibraryPage() {
       a.click();
       a.remove();
       URL.revokeObjectURL(objectUrl);
+      toast.success("Descarga iniciada");
     } catch (e: any) {
-      setError(e.message || "No se pudo descargar");
+      toast.error(e.message || "No se pudo descargar");
     } finally {
       setDownloadingId(null);
     }
@@ -350,12 +352,6 @@ export default function MediaLibraryPage() {
           </div>
         )}
       </div>
-
-      {error && (
-        <p className="mx-6 text-sm text-red-500 bg-red-50 border border-red-100 rounded-lg p-3">
-          {error}
-        </p>
-      )}
 
       <div className="flex-1 flex justify-center p-6 pt-0">
         <Card className="bg-zinc-950/60 w-full flex-1">
@@ -472,7 +468,7 @@ export default function MediaLibraryPage() {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 text-red-500"
-                            onClick={() => handleDelete(item.id)}
+                            onClick={() => setDeleteTarget(item)}
                             title="Eliminar"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -488,7 +484,6 @@ export default function MediaLibraryPage() {
         </Card>
       </div>
 
-      {/* Preview Dialog */}
       <Dialog
         open={previewIndex !== null && !!previewItem}
         onOpenChange={(open) => {
@@ -517,7 +512,6 @@ export default function MediaLibraryPage() {
                 </div>
               </DialogHeader>
 
-              {/* Marco fijo: mismo tamaño siempre */}
               <div className="relative w-full aspect-video bg-black">
                 {filtered.length > 1 && (
                   <>
@@ -527,7 +521,6 @@ export default function MediaLibraryPage() {
                       size="icon"
                       className="absolute left-2 top-1/2 -translate-y-1/2 z-10 h-9 w-9 rounded-full opacity-90"
                       onClick={goPrev}
-                      title="Anterior (←)"
                     >
                       <ChevronLeft className="h-5 w-5" />
                     </Button>
@@ -537,7 +530,6 @@ export default function MediaLibraryPage() {
                       size="icon"
                       className="absolute right-2 top-1/2 -translate-y-1/2 z-10 h-9 w-9 rounded-full opacity-90"
                       onClick={goNext}
-                      title="Siguiente (→)"
                     >
                       <ChevronRight className="h-5 w-5" />
                     </Button>
@@ -581,7 +573,7 @@ export default function MediaLibraryPage() {
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={() => handleDelete(previewItem.id)}
+                    onClick={() => setDeleteTarget(previewItem)}
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Eliminar
@@ -592,6 +584,25 @@ export default function MediaLibraryPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="¿Eliminar archivo?"
+        description={
+          deleteTarget
+            ? `Se eliminará "${deleteTarget.fileName}" de la biblioteca y del almacenamiento.`
+            : undefined
+        }
+        confirmLabel="Eliminar"
+        destructive
+        loading={deleting}
+        onConfirm={async () => {
+          if (deleteTarget) await performDelete(deleteTarget);
+        }}
+      />
     </div>
   );
 }
