@@ -72,7 +72,6 @@ export async function GET(req: NextRequest) {
       const user = await getTikTokUserInfo(accessToken);
       displayName = user.display_name || displayName;
       avatarUrl = user.avatar_url || null;
-      username = user.username || null;
     } catch (e) {
       console.warn("TikTok user info:", e);
     }
