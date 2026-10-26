@@ -1,8 +1,9 @@
 const TIKTOK_API = "https://open.tiktokapis.com";
 
 export async function getTikTokUserInfo(accessToken: string) {
+  // Solo campos de user.info.basic (sin depender de user.info.profile)
   const res = await fetch(
-    `${TIKTOK_API}/v2/user/info/?fields=open_id,union_id,avatar_url,display_name,username`,
+    `${TIKTOK_API}/v2/user/info/?fields=open_id,union_id,avatar_url,display_name`,
     {
       headers: { Authorization: `Bearer ${accessToken}` },
     },
@@ -15,11 +16,9 @@ export async function getTikTokUserInfo(accessToken: string) {
     open_id: string;
     display_name?: string;
     avatar_url?: string;
-    username?: string;
   };
 }
 
-/** Creator info obligatorio antes de Direct Post */
 export async function queryCreatorInfo(accessToken: string) {
   const res = await fetch(`${TIKTOK_API}/v2/post/publish/creator_info/query/`, {
     method: "POST",
@@ -39,23 +38,31 @@ export async function queryCreatorInfo(accessToken: string) {
 }
 
 /**
- * Direct Post con PULL_FROM_URL (video ya en R2 público).
- * En sandbox / unaudited: usa privacy_level SELF_ONLY y cuenta TikTok en privado.
+ * Direct Post + PULL_FROM_URL.
+ * El nivel de privacidad real lo marca creator_info (hasta el audit: suele ser solo SELF_ONLY).
  */
 export async function publishToTikTok(options: {
   accessToken: string;
   title: string;
   videoUrl: string;
-  /** En sandbox casi siempre SELF_ONLY */
   privacyLevel?: string;
 }) {
   const { accessToken, title, videoUrl } = options;
 
   const creator = await queryCreatorInfo(accessToken);
-  const allowed = creator.privacy_level_options || ["SELF_ONLY"];
-  let privacyLevel = options.privacyLevel || "SELF_ONLY";
-  if (!allowed.includes(privacyLevel)) {
-    privacyLevel = allowed.includes("SELF_ONLY") ? "SELF_ONLY" : allowed[0];
+  const allowed = creator.privacy_level_options?.length
+    ? creator.privacy_level_options
+    : ["SELF_ONLY"];
+
+  // Preferencia: la que pide el cliente → pública → primera permitida
+  const preferred = options.privacyLevel;
+  let privacyLevel: string;
+  if (preferred && allowed.includes(preferred)) {
+    privacyLevel = preferred;
+  } else if (allowed.includes("PUBLIC_TO_EVERYONE")) {
+    privacyLevel = "PUBLIC_TO_EVERYONE";
+  } else {
+    privacyLevel = allowed[0];
   }
 
   const initRes = await fetch(`${TIKTOK_API}/v2/post/publish/video/init/`, {
@@ -91,7 +98,6 @@ export async function publishToTikTok(options: {
 
   const publishId = initJson.data?.publish_id as string;
 
-  // Poll status (opcional pero útil)
   let status = "PROCESSING";
   for (let i = 0; i < 20; i++) {
     await new Promise((r) => setTimeout(r, 3000));
@@ -112,7 +118,7 @@ export async function publishToTikTok(options: {
     throw new Error("TikTok no pudo procesar el video");
   }
 
-  return { publishId, status };
+  return { publishId, status, privacyLevel };
 }
 
 export async function refreshTikTokToken(refreshToken: string) {
@@ -129,8 +135,10 @@ export async function refreshTikTokToken(refreshToken: string) {
     body,
   });
   const json = await res.json();
-  if (json.error) {
-    throw new Error(json.error_description || "Error refresh TikTok");
+  if (json.error || !json.access_token) {
+    throw new Error(
+      json.error_description || json.error || "Error refresh TikTok",
+    );
   }
-  return json; // access_token, refresh_token, expires_in, open_id, ...
+  return json;
 }

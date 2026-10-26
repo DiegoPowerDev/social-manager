@@ -45,15 +45,7 @@ export const mainNav: Menu[] = [
     title: "YouTube",
     href: "/dashboard/youtube",
     icon: "",
-    image: (
-      <Image
-        className="bg-white rounded"
-        height={20}
-        width={20}
-        src="/youtube.svg"
-        alt="YouTube"
-      />
-    ),
+    image: <Image height={20} width={20} src="/youtube.svg" alt="YouTube" />,
   },
   {
     title: "LinkedIn",
@@ -61,9 +53,9 @@ export const mainNav: Menu[] = [
     icon: "",
     image: (
       <Image
-        className="bg-white rounded"
         height={20}
         width={20}
+        className="h-5 w-5 object-contain bg-white rounded"
         src="/linkedin.svg"
         alt="LinkedIn"
       />
@@ -77,9 +69,9 @@ export const mainNav: Menu[] = [
       <Image
         height={20}
         width={20}
+        className="h-5 w-5 object-contain"
         src="/tiktok.svg"
         alt="TikTok"
-        className="rounded"
       />
     ),
   },

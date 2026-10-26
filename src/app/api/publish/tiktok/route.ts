@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
       accessToken,
       title: title.trim(),
       videoUrl,
-      privacyLevel: privacyLevel || "SELF_ONLY",
+      privacyLevel: privacyLevel || undefined, // el adapter resuelve
     });
 
     await adminDb.collection("publishedPosts").add({

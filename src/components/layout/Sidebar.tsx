@@ -83,10 +83,11 @@ export function Sidebar() {
           <Image
             src="/logo-horizontal.webp"
             loading="eager"
-            width={120}
-            height={220}
-            alt="logo"
-            className="object-contain rounded"
+            alt="TrendlyStudio"
+            width={160}
+            height={40}
+            priority
+            className="h-10 w-auto object-contain"
           />
         </Link>
         <div className="flex items-center p-3 border-b gap-4 select-none">
@@ -97,10 +98,8 @@ export function Sidebar() {
               alt=""
             />
           )}
-          <div className="min-w-0">
-            <span className="block truncate">
-              {companyName || "Tu empresa"}
-            </span>
+          <div className="min-w-0 flex flex-col">
+            <span className="truncate">{companyName || "Tu empresa"}</span>
             {plan && (
               <span className="text-xs opacity-80 capitalize">{plan}</span>
             )}

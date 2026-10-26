@@ -54,7 +54,7 @@ export default function DashboardLayout({
       ) : (
         <>
           <Sidebar />
-          <div className="flex flex-1 flex-col overflow-hidden">
+          <div className="flex flex-1 flex-col overflow-hidden max-w-[1600px]">
             <main className="flex-1 overflow-y-auto w-full">
               <RequireSectionAccess>{children}</RequireSectionAccess>
             </main>

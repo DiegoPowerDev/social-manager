@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   collection,
   query,
@@ -30,11 +30,12 @@ import {
 } from "date-fns";
 import { es } from "date-fns/locale";
 import Image from "next/image";
-import { ScheduledPostDetailModal } from "@/components/calendar/ScheduledPostDetailModal";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { toast } from "sonner";
 
-interface ScheduledPost {
+export type IgMediaType = "FEED" | "REELS" | "STORIES" | "CAROUSEL";
+
+export interface ScheduledPost {
   id: string;
   title: string;
   message?: string | null;
@@ -49,7 +50,7 @@ interface ScheduledPost {
     youtube?: boolean;
     tiktok?: boolean;
   };
-  instagramMediaType?: "FEED" | "REELS" | "STORIES" | "CAROUSEL" | null;
+  instagramMediaType?: IgMediaType | null;
   youtubeTitle?: string | null;
   youtubePrivacy?: "public" | "unlisted" | "private" | null;
   scheduledAt: Date;
@@ -90,13 +91,14 @@ export default function CalendarPage() {
   const memberRole = useAuthStore((s) => s.memberRole);
   const canEdit = memberRole === "admin" || memberRole === "editor";
 
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
+  // Un solo modal: create (post=null) | detail (post definido)
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedPost, setSelectedPost] = useState<ScheduledPost | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
+  const [modalDate, setModalDate] = useState<Date>(() => new Date());
+  const [modalPost, setModalPost] = useState<ScheduledPost | null>(null);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -104,7 +106,7 @@ export default function CalendarPage() {
   const startPad = (getDay(monthStart) + 6) % 7;
   const paddingDays = Array.from({ length: startPad });
 
-  const loadPosts = async () => {
+  const loadPosts = useCallback(async () => {
     if (!companyId) {
       setPosts([]);
       setLoading(false);
@@ -151,11 +153,11 @@ export default function CalendarPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [companyId, currentMonth]);
 
   useEffect(() => {
     loadPosts();
-  }, [currentMonth, companyId]);
+  }, [loadPosts]);
 
   const postsByDay = useMemo(() => {
     const map = new Map<string, ScheduledPost[]>();
@@ -170,18 +172,25 @@ export default function CalendarPage() {
     return map;
   }, [posts]);
 
-  const openCreateModal = (day: Date) => {
+  const openCreate = (day: Date) => {
     if (!canEdit) {
       toast.error("Solo administradores y editores pueden programar");
       return;
     }
-    setSelectedDate(day);
+    setModalPost(null);
+    setModalDate(day);
     setModalOpen(true);
   };
 
   const openDetail = (post: ScheduledPost) => {
-    setSelectedPost(post);
-    setDetailOpen(true);
+    setModalPost(post);
+    setModalDate(post.scheduledAt);
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setModalPost(null);
   };
 
   if (!companyId) {
@@ -194,7 +203,7 @@ export default function CalendarPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between bg-zinc-950/60 ">
+      <div className="flex items-center justify-between bg-zinc-950/60">
         <div className="p-6 text-white">
           <h1 className="text-2xl font-bold">Calendario</h1>
           <p className="text-sm">
@@ -309,7 +318,7 @@ export default function CalendarPage() {
                           variant="ghost"
                           size="icon"
                           className="h-6 w-6 text-white hover:text-black"
-                          onClick={() => openCreateModal(day)}
+                          onClick={() => openCreate(day)}
                           title="Programar publicación"
                         >
                           <Plus className="h-3.5 w-3.5" />
@@ -400,28 +409,18 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        {modalOpen && selectedDate && canEdit && (
-          <SchedulePostModal
-            date={selectedDate}
-            open={modalOpen}
-            onClose={() => setModalOpen(false)}
-            onSaved={() => {
-              loadPosts();
-              toast.success("Publicación programada");
-            }}
-          />
-        )}
-
-        <ScheduledPostDetailModal
-          post={selectedPost}
-          open={detailOpen}
+        {/* Un solo modal: crear (post=null) o detalle/editar (post definido) */}
+        <SchedulePostModal
+          open={modalOpen}
+          date={modalDate}
+          post={modalPost}
           canEdit={canEdit}
-          onClose={() => {
-            setDetailOpen(false);
-            setSelectedPost(null);
-          }}
-          onUpdated={() => {
+          onClose={closeModal}
+          onSaved={() => {
             loadPosts();
+            if (!modalPost) {
+              toast.success("Publicación programada");
+            }
           }}
         />
       </div>

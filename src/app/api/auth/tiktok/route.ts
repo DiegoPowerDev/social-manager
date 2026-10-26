@@ -17,9 +17,7 @@ export async function GET(req: NextRequest) {
   }
 
   const redirectUri = `${baseUrl}/api/auth/tiktok/callback`;
-  const scope = ["user.info.basic", "user.info.profile", "video.publish"].join(
-    ",",
-  );
+  const scope = ["user.info.basic", "video.publish"].join(",");
 
   const params = new URLSearchParams({
     client_key: clientKey,

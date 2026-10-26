@@ -264,7 +264,9 @@ export async function GET(req: NextRequest) {
                 name: tiktokAccount.name || tiktokAccount.username,
                 title: post.message || post.title || "Video",
                 videoUrl: post.videoUrl,
-                privacyLevel: "SELF_ONLY", // sandbox; en prod ajusta si tienes más niveles
+                // Preferencia del post si la guardas al programar; si no, el adapter usa lo permitido
+                privacyLevel:
+                  post.tiktokPrivacy || post.privacyLevel || undefined,
               }),
             });
             const data = await res.json();
