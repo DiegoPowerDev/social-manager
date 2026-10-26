@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/layout/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,10 +43,8 @@ export default function TeamPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<Member | null>(null);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -77,6 +77,7 @@ export default function TeamPage() {
       );
     } catch (e) {
       console.error(e);
+      toast.error("Error al cargar el equipo");
     } finally {
       setLoading(false);
     }
@@ -89,15 +90,12 @@ export default function TeamPage() {
   const handleInvite = async () => {
     if (!companyId || !user || !isAdmin) return;
     if (!email.trim() || password.length < 6) {
-      setMessage({
-        type: "error",
-        text: "Email y contraseña (mín. 6 caracteres) obligatorios",
-      });
+      toast.error("Email y contraseña (mín. 6 caracteres) obligatorios");
       return;
     }
 
     setSaving(true);
-    setMessage(null);
+    const tid = toast.loading("Añadiendo miembro…");
     try {
       const res = await fetch("/api/team/invite", {
         method: "POST",
@@ -114,14 +112,14 @@ export default function TeamPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al invitar");
 
-      setMessage({ type: "success", text: "Usuario añadido al equipo" });
+      toast.success("Usuario añadido al equipo", { id: tid });
       setEmail("");
       setPassword("");
       setName("");
       setRole("editor");
       loadMembers();
     } catch (e: any) {
-      setMessage({ type: "error", text: e.message });
+      toast.error(e.message || "Error al invitar", { id: tid });
     } finally {
       setSaving(false);
     }
@@ -133,6 +131,7 @@ export default function TeamPage() {
   ) => {
     if (!companyId || !user || !isAdmin) return;
 
+    const tid = toast.loading("Actualizando rol…");
     try {
       const res = await fetch("/api/team/update-role", {
         method: "POST",
@@ -150,32 +149,36 @@ export default function TeamPage() {
       setMembers((prev) =>
         prev.map((m) => (m.uid === targetUid ? { ...m, role: newRole } : m)),
       );
-      setMessage({ type: "success", text: "Rol actualizado" });
+      toast.success("Rol actualizado", { id: tid });
     } catch (e: any) {
-      setMessage({ type: "error", text: e.message });
+      toast.error(e.message || "Error al cambiar rol", { id: tid });
       loadMembers();
     }
   };
 
-  const handleRemove = async (targetUid: string) => {
+  const performRemove = async (member: Member) => {
     if (!companyId || !user || !isAdmin) return;
-    if (!confirm("¿Quitar a este miembro de la empresa?")) return;
-
+    setRemoving(true);
+    const tid = toast.loading("Eliminando miembro…");
     try {
       const res = await fetch("/api/team/remove", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          targetUid,
+          targetUid: member.uid,
           companyId,
           requestedByUid: user.uid,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al eliminar");
+      setRemoveTarget(null);
+      toast.success("Miembro eliminado", { id: tid });
       loadMembers();
     } catch (e: any) {
-      setMessage({ type: "error", text: e.message });
+      toast.error(e.message || "Error al eliminar", { id: tid });
+    } finally {
+      setRemoving(false);
     }
   };
 
@@ -191,104 +194,91 @@ export default function TeamPage() {
       </div>
     );
   }
+
   return (
     <div>
-      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
-        <div className="p-6  text-white">
+      <div className="flex items-center justify-between bg-zinc-950/50 ">
+        <div className="p-6 text-white">
           <h1 className="text-2xl font-bold">Equipo</h1>
-          <p className=" text-sm">
+          <p className="text-sm">
             Gestiona quién puede usar la plataforma en tu empresa
           </p>
         </div>
       </div>
 
       <div className="p-6 max-w-2xl space-y-6">
-        {message && (
-          <div
-            className={`p-3 rounded-md text-sm border ${
-              message.type === "success"
-                ? "bg-green-50 text-green-700 border-green-200"
-                : "bg-red-50 text-red-700 border-red-200"
-            }`}
-          >
-            {message.text}
-          </div>
-        )}
-
-        {isAdmin && (
-          <Card className="bg-zinc-950/50">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-white">
-                <UserPlus className="h-5 w-5" />
-                Añadir miembro
-              </CardTitle>
-              <CardDescription className="text-white/50">
-                Crea acceso con email y contraseña. Ellos entrarán por el login.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label className="text-white">Nombre</Label>
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="bg-white text-black"
-                  disabled={saving}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-white">Email</Label>
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="bg-white text-black"
-                  disabled={saving}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-white">Contraseña temporal</Label>
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="bg-white text-black"
-                  disabled={saving}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-white">Rol</Label>
-                <Select
-                  value={role}
-                  onValueChange={(v) => setRole(v as any)}
-                  disabled={saving}
-                >
-                  <SelectTrigger className="bg-white text-black">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="editor">Editor</SelectItem>
-                    <SelectItem value="viewer">Viewer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button
-                onClick={handleInvite}
+        <Card className="bg-zinc-950/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-white">
+              <UserPlus className="h-5 w-5" />
+              Añadir miembro
+            </CardTitle>
+            <CardDescription className="text-white/50">
+              Crea acceso con email y contraseña. Ellos entrarán por el login.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-white">Nombre</Label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="bg-white text-black"
                 disabled={saving}
-                className="bg-gradient-to-r from-orange-400 to-yellow-500 text-white"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-white">Email</Label>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="bg-white text-black"
+                disabled={saving}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-white">Contraseña temporal</Label>
+              <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="bg-white text-black"
+                disabled={saving}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-white">Rol</Label>
+              <Select
+                value={role}
+                onValueChange={(v) => setRole(v as "editor" | "viewer")}
+                disabled={saving}
               >
-                {saving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Guardando...
-                  </>
-                ) : (
-                  "Añadir al equipo"
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+                <SelectTrigger className="bg-white text-black">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="editor">Editor</SelectItem>
+                  <SelectItem value="viewer">Viewer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={handleInvite}
+              disabled={saving}
+              className="bg-gradient-to-r from-orange-400 to-yellow-500 text-white"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                "Añadir al equipo"
+              )}
+            </Button>
+          </CardContent>
+        </Card>
 
         <Card className="bg-zinc-950/50">
           <CardHeader>
@@ -345,7 +335,7 @@ export default function TeamPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleRemove(m.uid)}
+                          onClick={() => setRemoveTarget(m)}
                           title="Quitar"
                         >
                           <Trash2 className="h-4 w-4 text-red-500" />
@@ -358,13 +348,26 @@ export default function TeamPage() {
             )}
           </CardContent>
         </Card>
-
-        {!isAdmin && (
-          <p className="text-sm text-muted-foreground">
-            Solo un administrador puede añadir o quitar miembros.
-          </p>
-        )}
       </div>
+
+      <ConfirmDialog
+        open={!!removeTarget}
+        onOpenChange={(open) => {
+          if (!open) setRemoveTarget(null);
+        }}
+        title="¿Quitar miembro?"
+        description={
+          removeTarget
+            ? `Se eliminará el acceso de ${removeTarget.name || removeTarget.email || "este usuario"} a la empresa.`
+            : undefined
+        }
+        confirmLabel="Quitar"
+        destructive
+        loading={removing}
+        onConfirm={async () => {
+          if (removeTarget) await performRemove(removeTarget);
+        }}
+      />
     </div>
   );
 }

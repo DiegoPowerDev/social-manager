@@ -5,6 +5,7 @@ import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { getAiUsage } from "@/lib/tenant";
+import { toast } from "sonner";
 import {
   Card,
   CardContent,
@@ -19,17 +20,15 @@ import { Label } from "@/components/ui/label";
 import { Loader2, Upload, X } from "lucide-react";
 
 export default function SettingsPage() {
-  const {
-    companyId,
-    companyName,
-    companyLogo,
-    memberRole,
-    setTenant,
-    aiEnabled,
-    aiCaptionsLimit,
-    aiImagesLimit,
-    plan,
-  } = useAuthStore();
+  const companyId = useAuthStore((s) => s.companyId);
+  const companyName = useAuthStore((s) => s.companyName);
+  const companyLogo = useAuthStore((s) => s.companyLogo);
+  const memberRole = useAuthStore((s) => s.memberRole);
+  const setTenant = useAuthStore((s) => s.setTenant);
+  const aiEnabled = useAuthStore((s) => s.aiEnabled);
+  const aiCaptionsLimit = useAuthStore((s) => s.aiCaptionsLimit);
+  const aiImagesLimit = useAuthStore((s) => s.aiImagesLimit);
+  const plan = useAuthStore((s) => s.plan);
 
   const [name, setName] = useState(companyName || "");
   const [logoUrl, setLogoUrl] = useState<string | null>(companyLogo || null);
@@ -38,10 +37,6 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [message, setMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const canEdit = memberRole === "admin" || memberRole === "editor";
@@ -64,10 +59,11 @@ export default function SettingsPage() {
           const u = await getAiUsage(companyId);
           setUsage({ aiCaptions: u.aiCaptions, aiImages: u.aiImages });
         } catch {
-          // usage opcional
+          /* usage opcional */
         }
       } catch (e) {
         console.error(e);
+        toast.error("Error al cargar la configuración");
       } finally {
         setLoading(false);
       }
@@ -102,20 +98,21 @@ export default function SettingsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      setMessage({ type: "error", text: "Solo imágenes" });
+      toast.error("Solo imágenes");
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
-      setMessage({ type: "error", text: "Máximo 2MB" });
+      toast.error("Máximo 2MB");
       return;
     }
+    setUploading(true);
+    const tid = toast.loading("Subiendo logo…");
     try {
-      setUploading(true);
-      setMessage(null);
       const url = await uploadLogo(file);
-      if (url) setLogoUrl(url);
+      setLogoUrl(url);
+      toast.success("Logo actualizado", { id: tid });
     } catch (err: any) {
-      setMessage({ type: "error", text: err.message });
+      toast.error(err.message || "Error al subir", { id: tid });
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -125,30 +122,36 @@ export default function SettingsPage() {
   const handleSave = async () => {
     if (!companyId || !canEdit) return;
     if (!name.trim()) {
-      setMessage({ type: "error", text: "El nombre es obligatorio" });
+      toast.error("El nombre es obligatorio");
       return;
     }
+
+    // Snapshot del store actual para no pisar plan / límites / rol
+    const current = useAuthStore.getState();
+
+    setSaving(true);
+    const tid = toast.loading("Guardando…");
     try {
-      setSaving(true);
-      setMessage(null);
       await updateDoc(doc(db, "companies", companyId), {
         name: name.trim(),
         logoUrl: logoUrl || null,
         aiInstructions: aiInstructions.trim(),
       });
+
       setTenant({
         companyId,
         companyName: name.trim(),
         companyLogo: logoUrl,
-        memberRole,
-        plan,
-        aiEnabled,
-        aiCaptionsLimit,
-        aiImagesLimit,
+        memberRole: current.memberRole,
+        plan: current.plan,
+        aiEnabled: current.aiEnabled,
+        aiCaptionsLimit: current.aiCaptionsLimit,
+        aiImagesLimit: current.aiImagesLimit,
       });
-      setMessage({ type: "success", text: "Configuración guardada" });
+
+      toast.success("Configuración guardada", { id: tid });
     } catch (err: any) {
-      setMessage({ type: "error", text: err.message || "Error al guardar" });
+      toast.error(err.message || "Error al guardar", { id: tid });
     } finally {
       setSaving(false);
     }
@@ -174,10 +177,10 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
-        <div className="p-6  text-white">
+      <div className="flex items-center justify-between bg-zinc-950/50">
+        <div className="p-6 text-white">
           <h1 className="text-2xl font-bold">Configuración</h1>
-          <p className=" text-sm">
+          <p className="text-sm">
             Datos de tu empresa e instrucciones para la IA
           </p>
         </div>
@@ -187,18 +190,6 @@ export default function SettingsPage() {
         {!name.trim() && (
           <div className="p-3 rounded-md border border-amber-400 bg-black text-amber-400 text-sm">
             Completa el nombre de tu empresa para personalizar la app.
-          </div>
-        )}
-
-        {message && (
-          <div
-            className={`p-3 rounded-md text-sm border ${
-              message.type === "success"
-                ? "bg-green-50 text-green-700 border-green-200"
-                : "bg-red-50 text-red-700 border-red-200"
-            }`}
-          >
-            {message.text}
           </div>
         )}
 
@@ -229,6 +220,7 @@ export default function SettingsPage() {
               <div className="flex items-center gap-4">
                 <div className="h-16 w-16 rounded-md border bg-muted flex items-center justify-center overflow-hidden shrink-0">
                   {logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={logoUrl}
                       alt="Logo"

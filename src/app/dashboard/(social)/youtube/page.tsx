@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getTokenStatus, tokenStatusLabel } from "@/lib/tokenStatus";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   collection,
@@ -21,9 +20,12 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LucideLoaderCircle } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/layout/ConfirmDialog";
 
 export default function YouTubePage() {
   const [activeTab, setActiveTab] = useState("create");
+  const [historyKey, setHistoryKey] = useState(0);
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -35,10 +37,8 @@ export default function YouTubePage() {
   const [account, setAccount] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
-  const [status, setStatus] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
+  const [disconnectOpen, setDisconnectOpen] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -72,6 +72,7 @@ export default function YouTubePage() {
       }
     } catch (e) {
       console.error(e);
+      toast.error("Error al cargar el canal de YouTube");
     } finally {
       setChecking(false);
     }
@@ -86,12 +87,12 @@ export default function YouTubePage() {
     const success = searchParams.get("success");
     const error = searchParams.get("error");
     if (success === "true") {
-      setStatus({ type: "success", text: "Canal de YouTube conectado" });
+      toast.success("Canal de YouTube conectado");
       loadAccount();
       router.replace("/dashboard/youtube");
     }
     if (error) {
-      setStatus({ type: "error", text: `Error al conectar: ${error}` });
+      toast.error(`Error al conectar: ${error}`);
       router.replace("/dashboard/youtube");
     }
   }, [searchParams]);
@@ -99,16 +100,16 @@ export default function YouTubePage() {
   const handlePublish = async () => {
     if (!account || !companyId || !canEdit) return;
     if (!videoUrl) {
-      setStatus({ type: "error", text: "Sube un video" });
+      toast.error("Sube un video");
       return;
     }
     if (!title.trim()) {
-      setStatus({ type: "error", text: "El título es obligatorio" });
+      toast.error("El título es obligatorio");
       return;
     }
 
     setLoading(true);
-    setStatus(null);
+    const tid = toast.loading("Publicando en YouTube…");
     try {
       const res = await fetch("/api/publish/youtube", {
         method: "POST",
@@ -128,22 +129,39 @@ export default function YouTubePage() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Error al publicar");
 
-      setStatus({ type: "success", text: "Video publicado en YouTube" });
+      toast.success("Video publicado en YouTube", { id: tid });
       setTitle("");
       setDescription("");
       setVideoUrl(null);
+      setHistoryKey((k) => k + 1);
     } catch (err: any) {
-      setStatus({ type: "error", text: err.message || "Error al publicar" });
+      const msg = err.message || "Error al publicar";
+      if (msg === "TOKEN_EXPIRED" || msg.toLowerCase().includes("token")) {
+        toast.error("Sesión de YouTube inválida. Reconecta el canal.", {
+          id: tid,
+        });
+      } else {
+        toast.error(msg, { id: tid });
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDisconnect = async () => {
+  const performDisconnect = async () => {
     if (!account || !canConnect) return;
-    if (!confirm("¿Desconectar este canal de YouTube?")) return;
-    await deleteDoc(doc(db, "socialAccounts", account.id));
-    setAccount(null);
+    setDisconnecting(true);
+    const tid = toast.loading("Desconectando…");
+    try {
+      await deleteDoc(doc(db, "socialAccounts", account.id));
+      setAccount(null);
+      setDisconnectOpen(false);
+      toast.success("Canal desconectado", { id: tid });
+    } catch (e: any) {
+      toast.error(e.message || "No se pudo desconectar", { id: tid });
+    } finally {
+      setDisconnecting(false);
+    }
   };
 
   if (checking) {
@@ -167,15 +185,15 @@ export default function YouTubePage() {
       <YouTubeConnectFlow
         companyId={companyId}
         canConnect={canConnect}
-        status={status}
+        status={null}
       />
     );
   }
 
   return (
-    <div className="">
-      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
-        <div className="p-6  text-white">
+    <div>
+      <div className="flex items-center justify-between bg-zinc-950/50">
+        <div className="p-6 text-white">
           <h1 className="text-2xl font-bold">YouTube</h1>
           <p className="text-sm">
             Canal:{" "}
@@ -184,32 +202,32 @@ export default function YouTubePage() {
             </span>
           </p>
         </div>
-        <div className="flex p-6 items-center gap-2 ">
+        <div className="flex p-6 items-center gap-2">
           <Badge variant="secondary">Conectado</Badge>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDisconnect}
-            disabled={!canConnect}
-          >
-            Desconectar
-          </Button>
+          {canConnect && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  window.location.href = `/api/auth/youtube?companyId=${companyId}`;
+                }}
+              >
+                Reconectar
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDisconnectOpen(true)}
+              >
+                Desconectar
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
       <div className="p-6">
-        {status && (
-          <div
-            className={`p-3 rounded-md text-sm mb-4 ${
-              status.type === "success"
-                ? "bg-green-50 text-green-700 border border-green-200"
-                : "bg-red-50 text-red-700 border border-red-200"
-            }`}
-          >
-            {status.text}
-          </div>
-        )}
-
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="create">Subir video</TabsTrigger>
@@ -243,10 +261,21 @@ export default function YouTubePage() {
           <PostHistory
             pageId={account.channelId}
             platform="youtube"
-            key={status?.type === "success" ? Date.now() : "history"}
+            key={historyKey}
           />
         </div>
       </div>
+
+      <ConfirmDialog
+        open={disconnectOpen}
+        onOpenChange={setDisconnectOpen}
+        title="¿Desconectar YouTube?"
+        description="Dejarás de poder subir videos hasta volver a conectar el canal."
+        confirmLabel="Desconectar"
+        destructive
+        loading={disconnecting}
+        onConfirm={performDisconnect}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -82,11 +83,9 @@ export function AIImageGenerator({ onGenerate }: Props) {
   const [style, setStyle] = useState("realistic");
   const [refs, setRefs] = useState<RefItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
 
-  const { aiEnabled, imagesLeft, imagesUsed, imagesLimit, setFromApi } =
-    useAiUsage();
+  const { imagesLeft, imagesUsed, imagesLimit, setFromApi } = useAiUsage();
   const companyId = useAuthStore((s) => s.companyId);
   const memberRole = useAuthStore((s) => s.memberRole);
   const aiEnabledPlan = useAuthStore((s) => s.aiEnabled);
@@ -102,13 +101,12 @@ export function AIImageGenerator({ onGenerate }: Props) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
-    setError(null);
     const next: RefItem[] = [...refs];
 
     for (const file of files) {
       if (next.length >= MAX_REFS) break;
       if (file.size > MAX_REF_SIZE) {
-        setError(`"${file.name}" supera 8MB`);
+        toast.error(`"${file.name}" supera 8MB`);
         continue;
       }
       if (!file.type.startsWith("image/")) continue;
@@ -167,22 +165,27 @@ export function AIImageGenerator({ onGenerate }: Props) {
   };
 
   const handleGenerate = async () => {
+    if (!allowed) return;
     if (!prompt.trim()) {
-      setError("Escribe un prompt descriptivo");
+      toast.error("Escribe un prompt descriptivo");
       return;
     }
     if (!companyId) {
-      setError("No hay empresa asociada");
+      toast.error("No hay empresa asociada");
       return;
     }
     if (!aiEnabledPlan) {
-      setError("Tu plan no incluye IA");
+      toast.error("Tu plan no incluye IA");
+      return;
+    }
+    if (imagesLeft <= 0) {
+      toast.error("Sin imágenes disponibles este mes");
       return;
     }
 
     setLoading(true);
-    setError(null);
     setGeneratedUrl(null);
+    const tid = toast.loading("Generando imagen…");
 
     try {
       const imageUrls: string[] = [];
@@ -195,8 +198,8 @@ export function AIImageGenerator({ onGenerate }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: buildFinalPrompt(),
-          imageUrl: imageUrls[0], // compat
-          imageUrls, // multi
+          imageUrl: imageUrls[0],
+          imageUrls,
           companyId,
         }),
       });
@@ -211,15 +214,21 @@ export function AIImageGenerator({ onGenerate }: Props) {
           aiImages: data.usage.aiImages,
         });
       }
+      toast.success("Imagen generada", { id: tid });
     } catch (err: any) {
-      setError(err.message || "Ocurrió un error al generar la imagen");
+      toast.error(err.message || "Ocurrió un error al generar la imagen", {
+        id: tid,
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleUseImage = () => {
-    if (generatedUrl) onGenerate(generatedUrl);
+    if (generatedUrl) {
+      onGenerate(generatedUrl);
+      toast.success("Imagen aplicada al post");
+    }
   };
 
   return (
@@ -238,12 +247,12 @@ export function AIImageGenerator({ onGenerate }: Props) {
             <Label htmlFor="image-prompt">Describe la imagen</Label>
             <Textarea
               id="image-prompt"
-              className="resize-none  bg-white text-black"
+              className="resize-none bg-white text-black"
               placeholder="Ej: Interior moderno del salón de esta casa, luz natural, mismos materiales..."
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               rows={3}
-              disabled={loading}
+              disabled={loading || !allowed}
             />
           </div>
 
@@ -251,8 +260,8 @@ export function AIImageGenerator({ onGenerate }: Props) {
             <Label>Estilo</Label>
             <Select
               value={style}
-              onValueChange={(s) => setStyle(s as any)}
-              disabled={loading}
+              onValueChange={(v) => setStyle(v as any)}
+              disabled={loading || !allowed}
             >
               <SelectTrigger className="bg-white text-black">
                 <SelectValue placeholder="Selecciona un estilo" />
@@ -278,8 +287,9 @@ export function AIImageGenerator({ onGenerate }: Props) {
               {refs.map((ref, i) => (
                 <div
                   key={ref.preview}
-                  className="relative w-20 h-20 rounded-md overflow-hidden border-white/80"
+                  className="relative w-20 h-20 rounded-md overflow-hidden border border-white/80"
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={ref.preview}
                     alt={`Ref ${i + 1}`}
@@ -292,7 +302,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
                     onClick={() => removeReference(i)}
                     disabled={loading}
                   >
-                    <X className="h-3 w-3 " />
+                    <X className="h-3 w-3" />
                   </Button>
                 </div>
               ))}
@@ -314,7 +324,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
                     size="sm"
                     className="h-20 w-20 flex flex-col gap-1 hover:opacity-80"
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={loading}
+                    disabled={loading || !allowed}
                   >
                     <ImagePlus className="h-5 w-5" color="black" />
                     <span className="text-[10px] text-black">Añadir</span>
@@ -324,7 +334,6 @@ export function AIImageGenerator({ onGenerate }: Props) {
             </div>
           </div>
 
-          {error && <p className="text-sm text-red-500">{error}</p>}
           <p className="text-xs text-white/60 text-center">
             {aiEnabledPlan
               ? `${imagesLeft} imágenes restantes este mes (${imagesUsed}/${imagesLimit})`
@@ -335,8 +344,8 @@ export function AIImageGenerator({ onGenerate }: Props) {
             onClick={handleGenerate}
             disabled={
               loading ||
+              !allowed ||
               !prompt.trim() ||
-              !aiEnabled ||
               imagesLeft <= 0 ||
               !companyId
             }
@@ -359,6 +368,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
           {generatedUrl && (
             <div className="space-y-3 pt-2">
               <div className="rounded-lg overflow-hidden border">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={generatedUrl}
                   alt="Imagen generada"
@@ -371,7 +381,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
             </div>
           )}
         </div>
-      </div>{" "}
+      </div>
     </div>
   );
 }

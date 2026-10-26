@@ -284,7 +284,7 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
+      <div className="flex items-center justify-between bg-zinc-950/50 ">
         <div className="p-6  text-white">
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className=" text-sm">

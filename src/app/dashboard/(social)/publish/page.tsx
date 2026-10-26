@@ -39,6 +39,7 @@ import { AIImageGenerator } from "@/components/social/AIImageGenerator";
 import { Separator } from "@/components/ui/separator";
 import { PostPreview } from "@/components/social/PostPreview";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { toast } from "sonner";
 
 interface SocialAccount {
   id: string;
@@ -125,6 +126,7 @@ export default function BulkPublishPage() {
         setSelectedTikTok(!!data.find((a) => a.platform === "tiktok"));
       } catch (error) {
         console.error(error);
+        toast.error("Error al cargar cuentas");
       } finally {
         setLoadingAccounts(false);
       }
@@ -155,7 +157,7 @@ export default function BulkPublishPage() {
     });
 
     if (!res.ok) {
-      const error = await res.json();
+      const error = await res.json().catch(() => ({}));
       throw new Error(error.error || "Error al subir el archivo");
     }
 
@@ -187,12 +189,13 @@ export default function BulkPublishPage() {
       setImageUrl(null);
       setImageUrls([]);
       setVideoUrl(item.url);
+      toast.success("Video desde biblioteca");
       return;
     }
     setVideoUrl(null);
     if (selectedInstagram && instagramMediaType === "CAROUSEL") {
       if (imageUrls.length >= 10) {
-        alert("Máximo 10 imágenes en el carrusel");
+        toast.error("Máximo 10 imágenes en el carrusel");
         return;
       }
       const next = [...imageUrls, item.url];
@@ -202,28 +205,31 @@ export default function BulkPublishPage() {
       setImageUrls([]);
       setImageUrl(item.url);
     }
+    toast.success("Imagen desde biblioteca");
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files?.length) return;
 
-    const isCarousel = selectedInstagram && instagramMediaType === "CAROUSEL";
+    const isCarouselMode =
+      selectedInstagram && instagramMediaType === "CAROUSEL";
 
     try {
       setUploadingMedia(true);
       setVideoUrl(null);
 
-      if (isCarousel) {
+      if (isCarouselMode) {
         const list = Array.from(files);
         if (imageUrls.length + list.length > 10) {
-          alert("Máximo 10 imágenes en el carrusel");
+          toast.error("Máximo 10 imágenes en el carrusel");
           return;
         }
+        const tid = toast.loading("Subiendo imágenes…");
         const uploaded: string[] = [];
         for (const file of list) {
           if (file.size > 10 * 1024 * 1024) {
-            alert(`"${file.name}" supera 10MB`);
+            toast.error(`"${file.name}" supera 10MB`);
             continue;
           }
           uploaded.push(await uploadToR2(file));
@@ -231,18 +237,21 @@ export default function BulkPublishPage() {
         const next = [...imageUrls, ...uploaded].slice(0, 10);
         setImageUrls(next);
         setImageUrl(next[0] || null);
+        toast.success(`${uploaded.length} imagen(es) listas`, { id: tid });
       } else {
         const file = files[0];
         if (file.size > 10 * 1024 * 1024) {
-          alert("La imagen no puede superar los 10MB");
+          toast.error("La imagen no puede superar los 10MB");
           return;
         }
+        const tid = toast.loading("Subiendo imagen…");
         const url = await uploadToR2(file);
         setImageUrls([]);
         setImageUrl(url);
+        toast.success("Imagen lista", { id: tid });
       }
     } catch (err: any) {
-      alert(err.message || "Error al subir la imagen");
+      toast.error(err.message || "Error al subir la imagen");
     } finally {
       setUploadingMedia(false);
       if (imageInputRef.current) imageInputRef.current.value = "";
@@ -254,18 +263,20 @@ export default function BulkPublishPage() {
     if (!file) return;
 
     if (file.size > 100 * 1024 * 1024) {
-      alert("El video no puede superar los 100MB");
+      toast.error("El video no puede superar los 100MB");
       return;
     }
 
+    const tid = toast.loading("Subiendo video…");
     try {
       setUploadingMedia(true);
       setImageUrl(null);
       setImageUrls([]);
       const url = await uploadToR2(file);
       setVideoUrl(url);
+      toast.success("Video listo", { id: tid });
     } catch (err: any) {
-      alert(err.message || "Error al subir el video");
+      toast.error(err.message || "Error al subir el video", { id: tid });
     } finally {
       setUploadingMedia(false);
       if (videoInputRef.current) videoInputRef.current.value = "";
@@ -293,7 +304,7 @@ export default function BulkPublishPage() {
 
   const handlePublish = async () => {
     if (!companyId || !canEdit) {
-      alert(!canEdit ? "No tienes permiso para publicar" : "Sin empresa");
+      toast.error(!canEdit ? "No tienes permiso para publicar" : "Sin empresa");
       return;
     }
     if (
@@ -303,27 +314,27 @@ export default function BulkPublishPage() {
       !selectedYouTube &&
       !selectedTikTok
     ) {
-      alert("Selecciona al menos una red");
+      toast.error("Selecciona al menos una red");
       return;
     }
 
     if ((selectedYouTube || selectedTikTok) && !videoUrl) {
-      alert("YouTube y TikTok requieren un video");
+      toast.error("YouTube y TikTok requieren un video");
       return;
     }
 
     if (selectedYouTube && !youtubeTitle.trim() && !message.trim()) {
-      alert("YouTube requiere un título");
+      toast.error("YouTube requiere un título");
       return;
     }
 
     if (selectedInstagram) {
       if (instagramMediaType === "CAROUSEL" && imageUrls.length < 2) {
-        alert("El carrusel de Instagram necesita al menos 2 imágenes");
+        toast.error("El carrusel de Instagram necesita al menos 2 imágenes");
         return;
       }
       if (instagramMediaType === "REELS" && !videoUrl) {
-        alert("Los Reels requieren un video");
+        toast.error("Los Reels requieren un video");
         return;
       }
       if (
@@ -332,13 +343,14 @@ export default function BulkPublishPage() {
         !imageUrl &&
         !videoUrl
       ) {
-        alert("Instagram requiere una imagen o un video");
+        toast.error("Instagram requiere una imagen o un video");
         return;
       }
     }
 
     setPublishing(true);
     setResults([]);
+    const tid = toast.loading("Publicando en las redes seleccionadas…");
 
     const publishResults: PublishResult[] = [];
 
@@ -510,8 +522,17 @@ export default function BulkPublishPage() {
     setResults(publishResults);
     setPublishing(false);
 
-    if (publishResults.every((r) => r.success)) {
+    const ok = publishResults.filter((r) => r.success).length;
+    const fail = publishResults.length - ok;
+    if (fail === 0) {
+      toast.success(`Publicado en ${ok} red${ok !== 1 ? "es" : ""}`, {
+        id: tid,
+      });
       clearForm();
+    } else if (ok === 0) {
+      toast.error("No se pudo publicar en ninguna red", { id: tid });
+    } else {
+      toast.warning(`${ok} ok · ${fail} con error`, { id: tid });
     }
   };
 
@@ -526,7 +547,7 @@ export default function BulkPublishPage() {
   if (accounts.length === 0) {
     return (
       <div className="flex flex-1 flex-col h-full w-full">
-        <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
+        <div className="flex items-center justify-between bg-zinc-950/50">
           <div className="p-6 text-white">
             <h1 className="text-2xl font-bold">Publicar en varias redes</h1>
             <p className="text-sm">
@@ -550,7 +571,7 @@ export default function BulkPublishPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
+      <div className="flex items-center justify-between bg-zinc-950/50">
         <div className="p-6 text-white">
           <h1 className="text-2xl font-bold">Publicar en varias redes</h1>
           <p className="text-sm">
@@ -738,7 +759,9 @@ export default function BulkPublishPage() {
                   />
                   <Select
                     value={youtubePrivacy}
-                    onValueChange={(v) => setYoutubePrivacy(v as any)}
+                    onValueChange={(v) =>
+                      setYoutubePrivacy(v as "public" | "unlisted" | "private")
+                    }
                   >
                     <SelectTrigger className="bg-black text-white">
                       <SelectValue />
@@ -797,7 +820,10 @@ export default function BulkPublishPage() {
                   onGenerate={(url) => {
                     setVideoUrl(null);
                     if (isCarousel) {
-                      if (imageUrls.length >= 10) return;
+                      if (imageUrls.length >= 10) {
+                        toast.error("Máximo 10 imágenes");
+                        return;
+                      }
                       const next = [...imageUrls, url];
                       setImageUrls(next);
                       setImageUrl(next[0]);
@@ -884,6 +910,7 @@ export default function BulkPublishPage() {
                             key={`${url}-${i}`}
                             className="relative shrink-0 w-24 h-24 rounded border overflow-hidden"
                           >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={url}
                               alt=""
@@ -912,6 +939,7 @@ export default function BulkPublishPage() {
                       (imageUrl || videoUrl) && (
                         <div className="relative rounded-lg overflow-hidden border bg-muted/30">
                           {imageUrl && (
+                            // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={imageUrl}
                               alt="Preview"
@@ -947,24 +975,25 @@ export default function BulkPublishPage() {
                   )}
                 </div>
               </div>
-
-              <div className="space-y-2">
-                <Label className="text-white font-bold">
-                  Enlace (solo Facebook)
-                </Label>
-                <Input
-                  placeholder="https://ejemplo.com"
-                  value={link}
-                  onChange={(e) => setLink(e.target.value)}
-                  disabled={publishing || uploadingMedia}
-                  className="bg-white text-black"
-                />
-              </div>
+              {selectedFacebook && (
+                <div className="space-y-2">
+                  <Label className="text-white font-bold">
+                    Enlace (solo Facebook)
+                  </Label>
+                  <Input
+                    placeholder="https://ejemplo.com"
+                    value={link}
+                    onChange={(e) => setLink(e.target.value)}
+                    disabled={publishing || uploadingMedia}
+                    className="bg-white text-black"
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
 
-        <div className="space-y-5">
+        <div className="sticky top-6 z-10 self-start space-y-5 w-full">
           <PostPreview
             platform="linkedin"
             message={message}

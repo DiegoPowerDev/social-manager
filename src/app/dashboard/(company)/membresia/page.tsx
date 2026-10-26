@@ -215,7 +215,7 @@ export default function MembresiaPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur p-6">
+      <div className="flex items-center justify-between bg-zinc-950/50  p-6">
         <div className="text-white">
           <h1 className="text-2xl font-bold">Membresía</h1>
           <p className="text-sm">

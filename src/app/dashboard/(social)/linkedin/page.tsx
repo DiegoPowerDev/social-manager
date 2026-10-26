@@ -15,20 +15,21 @@ import { db } from "@/lib/firebase";
 import { LinkedInComposer } from "@/components/social/LinkedInComposer";
 import { LinkedInConnectFlow } from "@/components/social/LinkedInConnectFlow";
 import { PostHistory } from "@/components/social/PostHistory";
-import { PostPreview } from "@/components/social/PostPreview";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LucideLoaderCircle } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/layout/ConfirmDialog";
 
 export default function LinkedInPage() {
   const [activeTab, setActiveTab] = useState("create");
+  const [historyKey, setHistoryKey] = useState(0);
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const plan = useAuthStore((s) => s.plan);
   const companyId = useAuthStore((s) => s.companyId);
   const memberRole = useAuthStore((s) => s.memberRole);
   const canEdit = memberRole === "admin" || memberRole === "editor";
@@ -37,10 +38,8 @@ export default function LinkedInPage() {
   const [account, setAccount] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
-  const [status, setStatus] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
+  const [disconnectOpen, setDisconnectOpen] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   const [text, setText] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -73,6 +72,7 @@ export default function LinkedInPage() {
       }
     } catch (error) {
       console.error(error);
+      toast.error("Error al cargar la cuenta de LinkedIn");
     } finally {
       setChecking(false);
     }
@@ -88,23 +88,26 @@ export default function LinkedInPage() {
     const error = searchParams.get("error");
 
     if (success === "true") {
-      setStatus({ type: "success", text: "Cuenta de LinkedIn conectada" });
+      toast.success("Cuenta de LinkedIn conectada");
       loadAccount();
       router.replace("/dashboard/linkedin");
     }
 
     if (error) {
-      setStatus({ type: "error", text: `Error al conectar: ${error}` });
+      toast.error(`Error al conectar: ${error}`);
       router.replace("/dashboard/linkedin");
     }
   }, [searchParams]);
 
   const handlePublish = async () => {
     if (!account || !companyId || !canEdit) return;
-    if (!text.trim() && !imageUrl && !videoUrl) return;
+    if (!text.trim() && !imageUrl && !videoUrl) {
+      toast.error("Escribe un texto o añade media");
+      return;
+    }
 
     setLoading(true);
-    setStatus(null);
+    const tid = toast.loading("Publicando en LinkedIn…");
 
     try {
       const res = await fetch("/api/publish/linkedin", {
@@ -124,13 +127,11 @@ export default function LinkedInPage() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Error al publicar");
 
-      setStatus({
-        type: "success",
-        text: "Publicado correctamente en LinkedIn",
-      });
+      toast.success("Publicado correctamente en LinkedIn", { id: tid });
       setText("");
       setImageUrl(null);
       setVideoUrl(null);
+      setHistoryKey((k) => k + 1);
     } catch (err: any) {
       const msg = err.message || "Error al publicar";
       if (
@@ -138,23 +139,31 @@ export default function LinkedInPage() {
         msg.toLowerCase().includes("token") ||
         msg.includes("401")
       ) {
-        setStatus({
-          type: "error",
-          text: "El token expiró o es inválido. Reconecta la cuenta.",
+        toast.error("El token expiró o es inválido. Reconecta la cuenta.", {
+          id: tid,
         });
       } else {
-        setStatus({ type: "error", text: msg });
+        toast.error(msg, { id: tid });
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDisconnect = async () => {
+  const performDisconnect = async () => {
     if (!account || !canConnect) return;
-    if (!confirm("¿Desconectar esta cuenta de LinkedIn?")) return;
-    await deleteDoc(doc(db, "socialAccounts", account.id));
-    setAccount(null);
+    setDisconnecting(true);
+    const tid = toast.loading("Desconectando…");
+    try {
+      await deleteDoc(doc(db, "socialAccounts", account.id));
+      setAccount(null);
+      setDisconnectOpen(false);
+      toast.success("Cuenta desconectada", { id: tid });
+    } catch (e: any) {
+      toast.error(e.message || "No se pudo desconectar", { id: tid });
+    } finally {
+      setDisconnecting(false);
+    }
   };
 
   if (checking) {
@@ -178,94 +187,77 @@ export default function LinkedInPage() {
       <LinkedInConnectFlow
         companyId={companyId}
         canConnect={canConnect}
-        status={status}
+        status={null}
       />
     );
   }
 
+  const tokenStatus = getTokenStatus(account.expiresAt);
+
   return (
-    <div className="">
-      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
-        <div className="p-6  text-white">
+    <div>
+      <div className="flex items-center justify-between bg-zinc-950/50 ">
+        <div className="p-6 text-white">
           <h1 className="text-2xl font-bold">LinkedIn</h1>
           <p className="text-sm">
             Publicando como <span className="font-medium">{account.name}</span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {(() => {
-            const s = getTokenStatus(account.expiresAt);
-            if (s === "expired")
-              return <Badge variant="destructive">Token expirado</Badge>;
-            if (s === "expiring_soon")
-              return (
-                <Badge className="bg-amber-500 hover:bg-amber-500">
-                  Por vencer
-                </Badge>
-              );
-            return <Badge variant="secondary">Conectado</Badge>;
-          })()}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDisconnect}
-            disabled={!canConnect}
-          >
-            Desconectar
-          </Button>
+        <div className="flex items-center gap-2 pr-6">
+          {tokenStatus === "expired" ? (
+            <Badge variant="destructive">Token expirado</Badge>
+          ) : tokenStatus === "expiring_soon" ? (
+            <Badge className="bg-amber-500 hover:bg-amber-500">
+              Por vencer
+            </Badge>
+          ) : (
+            <Badge variant="secondary">Conectado</Badge>
+          )}
+          {canConnect && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDisconnectOpen(true)}
+            >
+              Desconectar
+            </Button>
+          )}
         </div>
       </div>
 
-      {(() => {
-        const tokenStatus = getTokenStatus(account.expiresAt);
-        if (tokenStatus === "ok") return null;
-
-        return (
-          <div
-            className={`mx-6 mb-2 p-3 rounded-md text-sm border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
-              tokenStatus === "expired"
-                ? "bg-red-50 text-red-800 border-red-200"
-                : "bg-amber-50 text-amber-900 border-amber-200"
-            }`}
-          >
-            <div>
-              <p className="font-medium">{tokenStatusLabel(tokenStatus)}</p>
-              {account.expiresAt && (
-                <p className="text-xs mt-0.5 opacity-80">
-                  Expira: {account.expiresAt.toLocaleString()}
-                </p>
-              )}
-            </div>
-            {canConnect && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  window.location.href = `/api/auth/linkedin?companyId=${companyId}`;
-                }}
-              >
-                Reconectar LinkedIn
-              </Button>
+      {tokenStatus !== "ok" && (
+        <div
+          className={`mx-6 mt-4 p-3 rounded-md text-sm border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
+            tokenStatus === "expired"
+              ? "bg-red-50 text-red-800 border-red-200"
+              : "bg-amber-50 text-amber-900 border-amber-200"
+          }`}
+        >
+          <div>
+            <p className="font-medium">{tokenStatusLabel(tokenStatus)}</p>
+            {account.expiresAt && (
+              <p className="text-xs mt-0.5 opacity-80">
+                Expira: {account.expiresAt.toLocaleString()}
+              </p>
             )}
           </div>
-        );
-      })()}
+          {canConnect && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                window.location.href = `/api/auth/linkedin?companyId=${companyId}`;
+              }}
+            >
+              Reconectar LinkedIn
+            </Button>
+          )}
+        </div>
+      )}
 
       <div className="w-full h-full p-6">
-        {status && (
-          <div
-            className={`p-3 rounded-md text-sm mb-4 ${
-              status.type === "success"
-                ? "bg-green-50 text-green-700 border border-green-200"
-                : "bg-red-50 text-red-700 border border-red-200"
-            }`}
-          >
-            {status.text}
-          </div>
-        )}
-
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2 bg-yellow-500/60 font-bold backdrop-blur-xs">
+          <TabsList className="grid w-full max-w-md grid-cols-2 bg-yellow-500/60 font-bold -xs">
             <TabsTrigger value="create">Crear contenido</TabsTrigger>
             <TabsTrigger value="history">Historial</TabsTrigger>
           </TabsList>
@@ -274,33 +266,20 @@ export default function LinkedInPage() {
         <div className={cn(activeTab === "create" ? "mt-6 block" : "hidden")}>
           {!canEdit ? (
             <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded-md">
-              Tu rol es solo lectura. No puedes publicar ni desconectar.
+              Tu rol es solo lectura. No puedes publicar contenido.
             </p>
           ) : (
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              <div className="xl:col-span-2">
-                <LinkedInComposer
-                  accountName={account.name}
-                  loading={loading}
-                  text={text}
-                  onTextChange={setText}
-                  imageUrl={imageUrl}
-                  onImageChange={setImageUrl}
-                  videoUrl={videoUrl}
-                  onVideoChange={setVideoUrl}
-                  onPublish={handlePublish}
-                />
-              </div>
-              <div>
-                <PostPreview
-                  platform="linkedin"
-                  accountName={account.name}
-                  message={text}
-                  imageUrl={imageUrl}
-                  videoUrl={videoUrl}
-                />
-              </div>
-            </div>
+            <LinkedInComposer
+              accountName={account.name}
+              loading={loading}
+              text={text}
+              onTextChange={setText}
+              imageUrl={imageUrl}
+              onImageChange={setImageUrl}
+              videoUrl={videoUrl}
+              onVideoChange={setVideoUrl}
+              onPublish={handlePublish}
+            />
           )}
         </div>
 
@@ -308,10 +287,21 @@ export default function LinkedInPage() {
           <PostHistory
             pageId={account.personId}
             platform="linkedin"
-            key={status?.type === "success" ? Date.now() : "history"}
+            key={historyKey}
           />
         </div>
       </div>
+
+      <ConfirmDialog
+        open={disconnectOpen}
+        onOpenChange={setDisconnectOpen}
+        title="¿Desconectar LinkedIn?"
+        description="Dejarás de poder publicar hasta volver a conectar la cuenta."
+        confirmLabel="Desconectar"
+        destructive
+        loading={disconnecting}
+        onConfirm={performDisconnect}
+      />
     </div>
   );
 }

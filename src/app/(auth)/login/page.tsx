@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
@@ -14,58 +14,60 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { LucideLoaderCircle } from "lucide-react";
+import { LucideLoaderCircle, Loader2 } from "lucide-react";
 import HomeHeader from "@/components/layout/homeHeader";
+import { toast } from "sonner";
+import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next") || "/dashboard";
+
   const { user, loading } = useAuthStore();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loadingProcess, setLoadingProcess] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoadingProcess(true);
-    setError("");
+    setSubmitting(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push("/dashboard");
-    } catch (err: any) {
-      setError("Correo o contraseña incorrectos");
+      await signInWithEmailAndPassword(auth, email.trim(), password);
+      toast.success("Bienvenido");
+      router.replace(next.startsWith("/") ? next : "/dashboard");
+    } catch {
+      toast.error("Correo o contraseña incorrectos");
     } finally {
-      setLoadingProcess(false);
+      setSubmitting(false);
     }
   };
 
   useEffect(() => {
     if (!loading && user) {
-      router.replace("/dashboard");
+      router.replace(next.startsWith("/") ? next : "/dashboard");
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, next]);
 
   return (
     <div
       style={{ backgroundImage: `url("/background.webp")` }}
       className={cn(
-        "bg-cover h-screen bg-no-repeat min-h-screen bg-muted/40 px-4 flex flex-col",
+        "bg-cover bg-center bg-no-repeat min-h-screen bg-muted/40 px-4 flex flex-col",
       )}
     >
       <HomeHeader />
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center py-12">
         {loading ? (
-          <div className="flex h-screen w-full items-center justify-center">
-            <LucideLoaderCircle className="animate-spin h-16 w-16 text-orange-400" />
-          </div>
+          <LucideLoaderCircle className="animate-spin h-16 w-16 text-orange-400" />
         ) : (
-          <Card className="w-full max-w-md">
+          <Card className="w-full max-w-md shadow-xl border-white/20 bg-white/95">
             <CardHeader className="space-y-1">
               <CardTitle className="text-2xl font-bold">
-                Social Publisher
+                TrendlyStudio
               </CardTitle>
               <CardDescription>
                 Ingresa a tu cuenta para continuar
@@ -78,10 +80,12 @@ export default function LoginPage() {
                   <Input
                     id="email"
                     type="email"
+                    autoComplete="email"
                     placeholder="david.c@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
+                    disabled={submitting}
                   />
                 </div>
 
@@ -90,17 +94,38 @@ export default function LoginPage() {
                   <Input
                     id="password"
                     type="password"
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    disabled={submitting}
                   />
                 </div>
 
-                {error && <p className="text-sm text-red-500">{error}</p>}
-
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loadingProcess ? "Ingresando..." : "Ingresar"}
+                <Button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-orange-400 to-yellow-500 text-white"
+                  disabled={submitting}
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Ingresando...
+                    </>
+                  ) : (
+                    "Ingresar"
+                  )}
                 </Button>
+
+                <p className="text-center text-sm text-muted-foreground">
+                  <Link href="/" className="underline hover:no-underline">
+                    Volver al inicio
+                  </Link>
+                  {" · "}
+                  <Link href="/plans" className="underline hover:no-underline">
+                    Ver planes
+                  </Link>
+                </p>
               </form>
             </CardContent>
           </Card>

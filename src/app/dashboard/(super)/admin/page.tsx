@@ -338,7 +338,7 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
+      <div className="flex items-center justify-between bg-zinc-950/50">
         <div className="p-6 text-white">
           <h1 className="text-2xl font-bold">Admin</h1>
           <p className="text-sm">Empresas, socios, cortesía y cupos de IA</p>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,7 +31,6 @@ export function AICaptionGenerator({
   const [topic, setTopic] = useState("");
   const [tone, setTone] = useState("profesional y cercano");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const { captionsLeft, captionsUsed, captionsLimit, setFromApi } =
     useAiUsage();
@@ -46,16 +46,20 @@ export function AICaptionGenerator({
   const handleGenerate = async () => {
     if (!allowed) return;
     if (!topic.trim()) {
-      setError("Escribe un tema o idea");
+      toast.error("Escribe un tema o idea");
       return;
     }
     if (!companyId) {
-      setError("No hay empresa asociada");
+      toast.error("No hay empresa asociada");
+      return;
+    }
+    if (captionsLeft <= 0) {
+      toast.error("Sin captions disponibles este mes");
       return;
     }
 
     setLoading(true);
-    setError(null);
+    const tid = toast.loading("Generando caption…");
 
     try {
       const res = await fetch("/api/ai/generate-caption", {
@@ -82,8 +86,9 @@ export function AICaptionGenerator({
         });
       }
       setTopic("");
+      toast.success("Caption generado", { id: tid });
     } catch (err: any) {
-      setError(err.message || "Ocurrió un error");
+      toast.error(err.message || "Ocurrió un error", { id: tid });
     } finally {
       setLoading(false);
     }
@@ -143,7 +148,6 @@ export function AICaptionGenerator({
           </Select>
         </div>
 
-        {error && <p className="text-sm text-red-500">{error}</p>}
         <p className="text-xs text-white/60 text-center">
           {aiEnabledPlan
             ? `${captionsLeft} captions restantes este mes (${captionsUsed}/${captionsLimit})`

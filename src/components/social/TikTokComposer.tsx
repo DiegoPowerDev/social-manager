@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -62,7 +63,6 @@ export function TikTokComposer({
   const companyId = useAuthStore((s) => s.companyId);
   const user = useAuthStore((s) => s.user);
   const [uploading, setUploading] = useState(false);
-  const [mediaError, setMediaError] = useState<string | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const videoInputRef = useRef<HTMLInputElement>(null);
 
@@ -127,22 +127,27 @@ export function TikTokComposer({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setMediaError(null);
+    if (!file.type.startsWith("video/")) {
+      toast.error("Selecciona un archivo de video");
+      return;
+    }
 
     if (file.size > MAX_VIDEO_SIZE) {
-      setMediaError(
+      toast.error(
         `El video es demasiado grande (máximo ${Math.floor(MAX_VIDEO_SIZE / (1024 * 1024))}MB)`,
       );
       if (videoInputRef.current) videoInputRef.current.value = "";
       return;
     }
 
+    const tid = toast.loading("Subiendo video…");
     try {
       setUploading(true);
       const url = await uploadToR2(file);
       onVideoChange(url);
+      toast.success("Video listo", { id: tid });
     } catch (err: any) {
-      setMediaError(err.message || "Error al subir el video");
+      toast.error(err.message || "Error al subir el video", { id: tid });
     } finally {
       setUploading(false);
       if (videoInputRef.current) videoInputRef.current.value = "";
@@ -150,30 +155,32 @@ export function TikTokComposer({
   };
 
   const onLibrarySelect = (item: { url: string; type: "image" | "video" }) => {
-    setMediaError(null);
     if (item.type !== "video") {
-      setMediaError("TikTok solo admite video en este flujo");
+      toast.error("TikTok solo admite video en este flujo");
       return;
     }
     onVideoChange(item.url);
+    toast.success("Video añadido desde la biblioteca");
   };
 
   const removeVideo = () => {
     onVideoChange(null);
-    setMediaError(null);
     if (videoInputRef.current) videoInputRef.current.value = "";
   };
 
   const handleSubmit = async () => {
+    if (!companyId) {
+      toast.error("No hay empresa asociada");
+      return;
+    }
     if (!title.trim()) {
-      setMediaError("El caption / título es obligatorio");
+      toast.error("El caption / título es obligatorio");
       return;
     }
     if (!videoUrl) {
-      setMediaError("Sube un video");
+      toast.error("Sube un video");
       return;
     }
-    setMediaError(null);
     await onPublish();
   };
 
@@ -184,7 +191,7 @@ export function TikTokComposer({
   return (
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
       <div className="xl:col-span-2">
-        <Card className="bg-zinc-950/60 ">
+        <Card className="bg-zinc-950/60">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -234,7 +241,7 @@ export function TikTokComposer({
             </div>
 
             <div className="space-y-2">
-              <Label>Visibilidad</Label>
+              <Label className="text-white">Visibilidad</Label>
               <Select
                 value={privacyLevel}
                 onValueChange={(v) => onPrivacyChange(v as TikTokPrivacy)}
@@ -258,11 +265,14 @@ export function TikTokComposer({
 
             <div className="space-y-3 p-4 bg-zinc-950/50 rounded">
               <Label className="text-white">Video</Label>
-              <p className="text-xs text-white/50">MP4 recomendado.</p>
+              <p className="text-xs text-white/50">
+                MP4 recomendado · máx.{" "}
+                {Math.floor(MAX_VIDEO_SIZE / (1024 * 1024))}MB
+              </p>
 
               <input
                 type="file"
-                accept="video/*"
+                accept="video/mp4,video/quicktime"
                 ref={videoInputRef}
                 onChange={handleVideoChange}
                 className="hidden"
@@ -306,50 +316,34 @@ export function TikTokComposer({
                   </Button>
                 </div>
               )}
-
-              {uploading && (
-                <p className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Subiendo a almacenamiento...
-                </p>
-              )}
-            </div>
-
-            {mediaError && <p className="text-sm text-red-500">{mediaError}</p>}
-
-            <div className="flex w-full items-center justify-center">
-              <Button
-                className="w-full max-w-xs h-12 text-base font-semibold rounded-xl bg-gradient-to-r from-orange-400 to-yellow-500 hover:from-orange-500 hover:to-yellow-500 text-white shadow-lg shadow-orange-500/25 transition-all"
-                onClick={handleSubmit}
-                disabled={
-                  isLoading ||
-                  isTitleOver ||
-                  !title.trim() ||
-                  !videoUrl ||
-                  !companyId
-                }
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    {uploading ? "Subiendo..." : "Publicando en TikTok..."}
-                  </>
-                ) : (
-                  "Publicar en TikTok"
-                )}
-              </Button>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <div>
+      <div className="sticky top-6 z-10 self-start flex flex-col gap-4 w-full">
         <PostPreview
           platform="tiktok"
           accountName={accountName}
           message={title}
           videoUrl={videoUrl}
         />
+        <Button
+          className="w-full h-12 text-base font-semibold rounded-xl bg-gradient-to-r from-orange-400 to-yellow-500 hover:from-orange-500 hover:to-yellow-500 text-white shadow-lg shadow-orange-500/25 transition-all"
+          onClick={handleSubmit}
+          disabled={
+            isLoading || isTitleOver || !title.trim() || !videoUrl || !companyId
+          }
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              {uploading ? "Subiendo..." : "Publicando en TikTok..."}
+            </>
+          ) : (
+            "Publicar en TikTok"
+          )}
+        </Button>
       </div>
 
       <MediaLibraryPicker

@@ -13,6 +13,8 @@ import { db } from "@/lib/firebase";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { Button } from "@/components/ui/button";
 import { Loader2, Video, X, FolderOpen } from "lucide-react";
+import { toast } from "sonner";
+import Link from "next/link";
 
 interface MediaItem {
   id: string;
@@ -65,6 +67,7 @@ export function MediaLibraryPicker({
     } catch (e) {
       console.error(e);
       setItems([]);
+      toast.error("No se pudo cargar la biblioteca");
     } finally {
       setLoading(false);
     }
@@ -74,17 +77,39 @@ export function MediaLibraryPicker({
     if (open) load();
   }, [open, load]);
 
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
 
+  const filterLabel =
+    accept === "image" ? " de imagen" : accept === "video" ? " de video" : "";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div className="bg-background rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between border-b px-4 py-3">
           <div className="flex items-center gap-2">
             <FolderOpen className="h-5 w-5" />
             <h3 className="font-semibold">Biblioteca de medios</h3>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            aria-label="Cerrar"
+          >
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -95,24 +120,33 @@ export function MediaLibraryPicker({
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : items.length === 0 ? (
-            <p className="text-center text-sm text-muted-foreground py-16">
-              No hay archivos
-              {accept === "image"
-                ? " de imagen"
-                : accept === "video"
-                  ? " de video"
-                  : ""}{" "}
-              en la biblioteca. Sube alguno en Media Library.
-            </p>
+            <div className="text-center py-16 space-y-3">
+              <p className="text-sm text-muted-foreground">
+                No hay archivos{filterLabel} en la biblioteca.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                render={<Link href="/dashboard/media" onClick={onClose} />}
+                nativeButton={false}
+              >
+                Ir a Media Library
+              </Button>
+            </div>
           ) : (
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
               {items.map((item) => (
                 <button
                   key={item.id}
                   type="button"
-                  className="rounded-lg border overflow-hidden hover:ring-2 hover:ring-yellow-500 transition text-left"
+                  className="rounded-lg border overflow-hidden hover:ring-2 hover:ring-yellow-500 transition text-left focus:outline-none focus:ring-2 focus:ring-yellow-500"
                   onClick={() => {
                     onSelect({ url: item.url, type: item.type });
+                    toast.success(
+                      item.type === "video"
+                        ? "Video seleccionado"
+                        : "Imagen seleccionada",
+                    );
                     onClose();
                   }}
                 >
@@ -137,7 +171,7 @@ export function MediaLibraryPicker({
           )}
         </div>
 
-        <div className="border-t px-4 py-3 flex justify-end">
+        <div className="border-t px-4 py-3 flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>
             Cerrar
           </Button>

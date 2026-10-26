@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,7 @@ import { AIImageGenerator } from "@/components/social/AIImageGenerator";
 import { Separator } from "@/components/ui/separator";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { saveMediaToLibrary } from "@/lib/media";
+import { PostPreview } from "./PostPreview";
 
 interface Props {
   pageName: string;
@@ -41,6 +43,15 @@ interface Props {
   link: string;
   onLinkChange: (value: string) => void;
   onPublish: () => Promise<void>;
+}
+
+function isValidHttpUrl(value: string) {
+  try {
+    const u = new URL(value);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 export function FacebookComposer({
@@ -58,7 +69,6 @@ export function FacebookComposer({
   onPublish,
 }: Props) {
   const [uploading, setUploading] = useState(false);
-  const [mediaError, setMediaError] = useState<string | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
 
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -111,7 +121,6 @@ export function FacebookComposer({
   };
 
   const onLibrarySelect = (item: { url: string; type: "image" | "video" }) => {
-    setMediaError(null);
     if (item.type === "video") {
       onImageChange(null);
       onVideoChange(item.url);
@@ -119,25 +128,31 @@ export function FacebookComposer({
       onVideoChange(null);
       onImageChange(item.url);
     }
+    toast.success("Media añadido desde la biblioteca");
   };
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setMediaError(null);
+    if (!file.type.startsWith("image/")) {
+      toast.error("Selecciona un archivo de imagen");
+      return;
+    }
     if (file.size > MAX_IMAGE_SIZE) {
-      setMediaError("La imagen es demasiado grande (máximo 10MB)");
+      toast.error("La imagen es demasiado grande (máximo 10MB)");
       return;
     }
 
+    const tid = toast.loading("Subiendo imagen…");
     try {
       setUploading(true);
       onVideoChange(null);
       const url = await uploadToR2(file);
       onImageChange(url);
+      toast.success("Imagen lista", { id: tid });
     } catch (err: any) {
-      setMediaError(err.message || "Error al subir la imagen");
+      toast.error(err.message || "Error al subir la imagen", { id: tid });
     } finally {
       setUploading(false);
       if (imageInputRef.current) imageInputRef.current.value = "";
@@ -148,20 +163,25 @@ export function FacebookComposer({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setMediaError(null);
+    if (!file.type.startsWith("video/")) {
+      toast.error("Selecciona un archivo de video");
+      return;
+    }
     if (file.size > MAX_VIDEO_SIZE) {
-      setMediaError("El video es demasiado grande (máximo 100MB)");
+      toast.error("El video es demasiado grande (máximo 100MB)");
       if (videoInputRef.current) videoInputRef.current.value = "";
       return;
     }
 
+    const tid = toast.loading("Subiendo video…");
     try {
       setUploading(true);
       onImageChange(null);
       const url = await uploadToR2(file);
       onVideoChange(url);
+      toast.success("Video listo", { id: tid });
     } catch (err: any) {
-      setMediaError(err.message || "Error al subir el video");
+      toast.error(err.message || "Error al subir el video", { id: tid });
     } finally {
       setUploading(false);
       if (videoInputRef.current) videoInputRef.current.value = "";
@@ -171,204 +191,238 @@ export function FacebookComposer({
   const removeMedia = () => {
     onImageChange(null);
     onVideoChange(null);
-    setMediaError(null);
     if (imageInputRef.current) imageInputRef.current.value = "";
     if (videoInputRef.current) videoInputRef.current.value = "";
   };
 
   const handleSubmit = async () => {
-    if (!message.trim() && !imageUrl && !videoUrl) return;
+    if (!companyId) {
+      toast.error("No hay empresa asociada");
+      return;
+    }
+    if (!message.trim() && !imageUrl && !videoUrl) {
+      toast.error("Escribe un texto o añade una imagen/video");
+      return;
+    }
+    if (link.trim() && !isValidHttpUrl(link.trim())) {
+      toast.error("El enlace no es una URL válida (usa https://…)");
+      return; // no limpia message/media
+    }
     await onPublish();
   };
 
   const isLoading = loading || uploading;
   const characterCount = message.length;
   const isOverLimit = characterCount > 63206;
+  const hasImageAndLink = !!imageUrl && !!link.trim();
 
   return (
-    <Card className="bg-zinc-950/60 ">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-white">Nueva publicación</CardTitle>
-            <CardDescription className="text-white/60">
-              Publicando en {pageName}
-            </CardDescription>
-          </div>
-          <Badge variant="secondary">Facebook</Badge>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-5">
-        <div className="flex justify-between gap-2 bg-zinc-950/50 text-white rounded">
-          <AICaptionGenerator
-            platform="facebook"
-            onGenerate={(caption) => onMessageChange(caption)}
-          />
-          <Separator orientation="vertical" />
-          <div className="flex flex-col w-full gap-2 p-4">
-            <span>Escribe el texto de la publicación:</span>
-            <Textarea
-              placeholder="¿Qué quieres publicar?"
-              value={message}
-              onChange={(e) => onMessageChange(e.target.value)}
-              rows={4}
-              className="resize-none flex-1 bg-white text-black"
-              disabled={isLoading}
-            />
-            <div className="flex justify-end">
-              <span
-                className={`text-xs ${
-                  isOverLimit ? "text-red-500" : "text-muted-foreground"
-                }`}
-              >
-                {characterCount.toLocaleString()} caracteres
-              </span>
+    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <div className="xl:col-span-2">
+        <Card className="bg-zinc-950/60">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-white">Nueva publicación</CardTitle>
+                <CardDescription className="text-white/60">
+                  Publicando en {pageName}
+                </CardDescription>
+              </div>
+              <Badge variant="secondary">Facebook</Badge>
             </div>
-          </div>
-        </div>
+          </CardHeader>
 
-        <div className="flex justify-between gap-2 bg-zinc-950/50 text-white rounded">
-          <AIImageGenerator
-            onGenerate={(url) => {
-              onImageChange(url);
-              onVideoChange(null);
-            }}
-          />
-          <Separator orientation="vertical" />
-          <div className="flex w-full flex-col gap-2 p-4">
-            <span>Imagen o video para publicar:</span>
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <input
-                type="file"
-                accept="image/*"
-                ref={imageInputRef}
-                onChange={handleImageChange}
-                className="hidden"
-                disabled={isLoading}
+          <CardContent className="space-y-5">
+            <div className="flex justify-between gap-2 bg-zinc-950/50 text-white rounded">
+              <AICaptionGenerator
+                platform="facebook"
+                onGenerate={(caption) => onMessageChange(caption)}
               />
-              <input
-                type="file"
-                accept="video/*"
-                ref={videoInputRef}
-                onChange={handleVideoChange}
-                className="hidden"
-                disabled={isLoading}
-              />
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="text-black"
-                onClick={() => imageInputRef.current?.click()}
-                disabled={!!videoUrl || isLoading}
-              >
-                <ImagePlus className="h-4 w-4 mr-2" />
-                Imagen
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="text-black"
-                onClick={() => videoInputRef.current?.click()}
-                disabled={!!imageUrl || isLoading}
-              >
-                <Video className="h-4 w-4 mr-2" />
-                Video
-              </Button>
-
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => setLibraryOpen(true)}
-                disabled={isLoading}
-              >
-                <FolderOpen className="h-4 w-4 mr-2" />
-                Biblioteca
-              </Button>
+              <Separator orientation="vertical" />
+              <div className="flex flex-col w-full gap-2 p-4">
+                <span>Escribe el texto de la publicación:</span>
+                <Textarea
+                  placeholder="¿Qué quieres publicar?"
+                  value={message}
+                  onChange={(e) => onMessageChange(e.target.value)}
+                  rows={4}
+                  className="resize-none flex-1 bg-white text-black"
+                  disabled={isLoading}
+                />
+                <div className="flex justify-end">
+                  <span
+                    className={`text-xs ${
+                      isOverLimit ? "text-red-500" : "text-muted-foreground"
+                    }`}
+                  >
+                    {characterCount.toLocaleString()} caracteres
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <div className="flex-1 flex items-center justify-center">
-              {(imageUrl || videoUrl) && (
-                <div className="relative rounded-lg overflow-hidden border bg-muted/30">
-                  {imageUrl && (
-                    <img
-                      src={imageUrl}
-                      alt="Preview"
-                      className="w-full max-h-64 object-contain"
-                    />
-                  )}
-                  {videoUrl && (
-                    <video
-                      src={videoUrl}
-                      controls
-                      className="w-full max-h-64"
-                    />
-                  )}
+            <div className="flex justify-between gap-2 bg-zinc-950/50 text-white rounded">
+              <AIImageGenerator
+                onGenerate={(url) => {
+                  onImageChange(url);
+                  onVideoChange(null);
+                }}
+              />
+              <Separator orientation="vertical" />
+              <div className="flex w-full flex-col gap-2 p-4">
+                <span>Imagen o video para publicar:</span>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    ref={imageInputRef}
+                    onChange={handleImageChange}
+                    className="hidden"
+                    disabled={isLoading}
+                  />
+                  <input
+                    type="file"
+                    accept="video/mp4,video/quicktime"
+                    ref={videoInputRef}
+                    onChange={handleVideoChange}
+                    className="hidden"
+                    disabled={isLoading}
+                  />
+
                   <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-black"
+                    onClick={() => imageInputRef.current?.click()}
+                    disabled={!!videoUrl || isLoading}
+                  >
+                    <ImagePlus className="h-4 w-4 mr-2" />
+                    Imagen
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-black"
+                    onClick={() => videoInputRef.current?.click()}
+                    disabled={!!imageUrl || isLoading}
+                  >
+                    <Video className="h-4 w-4 mr-2" />
+                    Video
+                  </Button>
+
+                  <Button
+                    type="button"
                     variant="secondary"
-                    size="icon"
-                    className="absolute top-2 right-2 h-8 w-8 rounded-full"
-                    onClick={removeMedia}
+                    size="sm"
+                    onClick={() => setLibraryOpen(true)}
                     disabled={isLoading}
                   >
-                    <X className="h-4 w-4" />
+                    <FolderOpen className="h-4 w-4 mr-2" />
+                    Biblioteca
                   </Button>
                 </div>
+
+                <div className="flex-1 flex items-center justify-center">
+                  {(imageUrl || videoUrl) && (
+                    <div className="relative rounded-lg overflow-hidden border bg-muted/30">
+                      {imageUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={imageUrl}
+                          alt="Preview"
+                          className="w-full max-h-64 object-contain"
+                        />
+                      )}
+                      {videoUrl && (
+                        <video
+                          src={videoUrl}
+                          controls
+                          className="w-full max-h-64"
+                        />
+                      )}
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="absolute top-2 right-2 h-8 w-8 rounded-full"
+                        onClick={removeMedia}
+                        disabled={isLoading}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-white/50 text-center">
+                  Imagen ≤ 10MB · Video ≤ 100MB (MP4 recomendado)
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label
+                htmlFor="link"
+                className="flex items-center text-white gap-2"
+              >
+                <LinkIcon className="h-4 w-4" />
+                Enlace (opcional)
+              </Label>
+              <Input
+                id="link"
+                placeholder="https://ejemplo.com"
+                value={link}
+                onChange={(e) => onLinkChange(e.target.value)}
+                disabled={isLoading}
+                className="bg-white text-black"
+              />
+              {hasImageAndLink && (
+                <p className="text-xs text-amber-400">
+                  Con imagen, Facebook suele mostrar la foto y no la vista
+                  previa del enlace.
+                </p>
               )}
             </div>
-          </div>
-        </div>
+          </CardContent>
 
-        <div className="space-y-2">
-          <Label htmlFor="link" className="flex items-center text-white gap-2">
-            <LinkIcon className="h-4 w-4" />
-            Enlace (opcional)
-          </Label>
-          <Input
-            id="link"
-            placeholder="https://ejemplo.com"
-            value={link}
-            onChange={(e) => onLinkChange(e.target.value)}
-            disabled={isLoading}
-            className="bg-white text-black"
+          <MediaLibraryPicker
+            open={libraryOpen}
+            onClose={() => setLibraryOpen(false)}
+            accept="all"
+            onSelect={onLibrarySelect}
           />
-        </div>
+        </Card>
+      </div>
 
-        <div className="flex w-full items-center justify-center">
-          <Button
-            className="w-full max-w-xs h-12 text-base font-semibold rounded-xl bg-gradient-to-r from-orange-400 to-yellow-500 hover:from-orange-500 hover:to-yellow-500 text-white shadow-lg shadow-orange-500/25 transition-all"
-            onClick={handleSubmit}
-            disabled={
-              isLoading ||
-              isOverLimit ||
-              (!message.trim() && !imageUrl && !videoUrl)
-            }
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                {uploading ? "Subiendo..." : "Publicando..."}
-              </>
-            ) : (
-              "Publicar ahora"
-            )}
-          </Button>
-        </div>
-
-        {mediaError && <p className="text-sm text-red-500">{mediaError}</p>}
-      </CardContent>
-
-      <MediaLibraryPicker
-        open={libraryOpen}
-        onClose={() => setLibraryOpen(false)}
-        accept="all"
-        onSelect={onLibrarySelect}
-      />
-    </Card>
+      <div className="sticky self-start top-6 flex flex-col gap-4">
+        <PostPreview
+          platform="facebook"
+          accountName={pageName}
+          message={message}
+          imageUrl={imageUrl}
+          videoUrl={videoUrl}
+        />
+        <Button
+          className="w-full h-12 text-base font-semibold rounded-xl bg-gradient-to-r from-orange-400 to-yellow-500 hover:from-orange-500 hover:to-yellow-500 text-white shadow-lg shadow-orange-500/25 transition-all"
+          onClick={handleSubmit}
+          disabled={
+            isLoading ||
+            isOverLimit ||
+            !companyId ||
+            (!message.trim() && !imageUrl && !videoUrl)
+          }
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              {uploading ? "Subiendo..." : "Publicando..."}
+            </>
+          ) : (
+            "Publicar ahora"
+          )}
+        </Button>
+      </div>
+    </div>
   );
 }

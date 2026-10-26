@@ -25,9 +25,12 @@ import { LucideLoaderCircle } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { cn } from "@/lib/utils";
 import { planAtLeast } from "@/content/menu";
+import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/layout/ConfirmDialog";
 
 export default function TikTokPage() {
   const [activeTab, setActiveTab] = useState("create");
+  const [historyKey, setHistoryKey] = useState(0);
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -40,10 +43,8 @@ export default function TikTokPage() {
   const [account, setAccount] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
-  const [status, setStatus] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
+  const [disconnectOpen, setDisconnectOpen] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   const [title, setTitle] = useState("");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -74,6 +75,7 @@ export default function TikTokPage() {
       }
     } catch (e) {
       console.error(e);
+      toast.error("Error al cargar la cuenta de TikTok");
     } finally {
       setChecking(false);
     }
@@ -88,12 +90,12 @@ export default function TikTokPage() {
     const success = searchParams.get("success");
     const error = searchParams.get("error");
     if (success === "true") {
-      setStatus({ type: "success", text: "Cuenta de TikTok conectada" });
+      toast.success("Cuenta de TikTok conectada");
       loadAccount();
       router.replace("/dashboard/tiktok");
     }
     if (error) {
-      setStatus({ type: "error", text: `Error al conectar: ${error}` });
+      toast.error(`Error al conectar: ${error}`);
       router.replace("/dashboard/tiktok");
     }
   }, [searchParams]);
@@ -101,16 +103,16 @@ export default function TikTokPage() {
   const handlePublish = async () => {
     if (!account || !companyId || !canEdit) return;
     if (!videoUrl) {
-      setStatus({ type: "error", text: "Sube un video" });
+      toast.error("Sube un video");
       return;
     }
     if (!title.trim()) {
-      setStatus({ type: "error", text: "El caption es obligatorio" });
+      toast.error("El caption es obligatorio");
       return;
     }
 
     setLoading(true);
-    setStatus(null);
+    const tid = toast.loading("Publicando en TikTok…");
     try {
       const res = await fetch("/api/publish/tiktok", {
         method: "POST",
@@ -122,31 +124,41 @@ export default function TikTokPage() {
           name: account.name || account.username,
           title: title.trim(),
           videoUrl,
-          // Sandbox / unaudited
+          // Sandbox / no auditado: solo privado
           privacyLevel: "SELF_ONLY",
         }),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Error al publicar");
 
-      setStatus({
-        type: "success",
-        text: "Video enviado a TikTok (en sandbox suele quedar solo visible para ti)",
-      });
+      toast.success(
+        "Video enviado a TikTok (en sandbox suele quedar solo visible para ti)",
+        { id: tid },
+      );
       setTitle("");
       setVideoUrl(null);
+      setHistoryKey((k) => k + 1);
     } catch (err: any) {
-      setStatus({ type: "error", text: err.message || "Error al publicar" });
+      toast.error(err.message || "Error al publicar", { id: tid });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDisconnect = async () => {
+  const performDisconnect = async () => {
     if (!account || !canConnect) return;
-    if (!confirm("¿Desconectar esta cuenta de TikTok?")) return;
-    await deleteDoc(doc(db, "socialAccounts", account.id));
-    setAccount(null);
+    setDisconnecting(true);
+    const tid = toast.loading("Desconectando…");
+    try {
+      await deleteDoc(doc(db, "socialAccounts", account.id));
+      setAccount(null);
+      setDisconnectOpen(false);
+      toast.success("Cuenta desconectada", { id: tid });
+    } catch (e: any) {
+      toast.error(e.message || "No se pudo desconectar", { id: tid });
+    } finally {
+      setDisconnecting(false);
+    }
   };
 
   if (checking) {
@@ -172,14 +184,16 @@ export default function TikTokPage() {
       <TikTokConnectFlow
         companyId={companyId}
         canConnect={canConnect}
-        status={status}
+        status={null}
       />
     );
   }
 
+  const tokenStatus = getTokenStatus(account.expiresAt);
+
   return (
-    <div className="">
-      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
+    <div>
+      <div className="flex items-center justify-between bg-zinc-950/50">
         <div className="p-6 text-white">
           <h1 className="text-2xl font-bold">TikTok</h1>
           <p className="text-sm">
@@ -190,69 +204,51 @@ export default function TikTokPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 pr-6">
-          {(() => {
-            const s = getTokenStatus(account.expiresAt);
-            if (s === "expired")
-              return <Badge variant="destructive">Token expirado</Badge>;
-            if (s === "expiring_soon")
-              return (
-                <Badge className="bg-amber-500 hover:bg-amber-500">
-                  Por vencer
-                </Badge>
-              );
-            return <Badge variant="secondary">Conectado</Badge>;
-          })()}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDisconnect}
-            disabled={!canConnect}
-          >
-            Desconectar
-          </Button>
+          {tokenStatus === "expired" ? (
+            <Badge variant="destructive">Token expirado</Badge>
+          ) : tokenStatus === "expiring_soon" ? (
+            <Badge className="bg-amber-500 hover:bg-amber-500">
+              Por vencer
+            </Badge>
+          ) : (
+            <Badge variant="secondary">Conectado</Badge>
+          )}
+          {canConnect && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDisconnectOpen(true)}
+            >
+              Desconectar
+            </Button>
+          )}
         </div>
       </div>
 
-      {(() => {
-        const tokenStatus = getTokenStatus(account.expiresAt);
-        if (tokenStatus === "ok") return null;
-        return (
-          <div
-            className={`mx-6 p-3 mt-4 rounded-md text-sm border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
-              tokenStatus === "expired"
-                ? "bg-red-50 text-red-800 border-red-200"
-                : "bg-amber-50 text-amber-900 border-amber-200"
-            }`}
-          >
-            <p className="font-medium">{tokenStatusLabel(tokenStatus)}</p>
-            {canConnect && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  window.location.href = `/api/auth/tiktok?companyId=${companyId}`;
-                }}
-              >
-                Reconectar TikTok
-              </Button>
-            )}
-          </div>
-        );
-      })()}
+      {tokenStatus !== "ok" && (
+        <div
+          className={`mx-6 p-3 mt-4 rounded-md text-sm border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
+            tokenStatus === "expired"
+              ? "bg-red-50 text-red-800 border-red-200"
+              : "bg-amber-50 text-amber-900 border-amber-200"
+          }`}
+        >
+          <p className="font-medium">{tokenStatusLabel(tokenStatus)}</p>
+          {canConnect && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                window.location.href = `/api/auth/tiktok?companyId=${companyId}`;
+              }}
+            >
+              Reconectar TikTok
+            </Button>
+          )}
+        </div>
+      )}
 
       <div className="p-6">
-        {status && (
-          <div
-            className={`p-3 rounded-md text-sm mb-4 ${
-              status.type === "success"
-                ? "bg-green-50 text-green-700 border border-green-200"
-                : "bg-red-50 text-red-700 border border-red-200"
-            }`}
-          >
-            {status.text}
-          </div>
-        )}
-
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="create">Publicar video</TabsTrigger>
@@ -285,10 +281,21 @@ export default function TikTokPage() {
           <PostHistory
             pageId={account.openId}
             platform="tiktok"
-            key={status?.type === "success" ? Date.now() : "history"}
+            key={historyKey}
           />
         </div>
       </div>
+
+      <ConfirmDialog
+        open={disconnectOpen}
+        onOpenChange={setDisconnectOpen}
+        title="¿Desconectar TikTok?"
+        description="Dejarás de poder publicar hasta volver a conectar la cuenta."
+        confirmLabel="Desconectar"
+        destructive
+        loading={disconnecting}
+        onConfirm={performDisconnect}
+      />
     </div>
   );
 }

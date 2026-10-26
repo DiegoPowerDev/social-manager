@@ -19,18 +19,20 @@ export function InstagramConnectFlow({
   status: { type: "success" | "error"; text: string } | null;
 }) {
   return (
-    <div className="space-y-12  ">
-      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
-        <div className="p-6  text-white">
+    <div className="space-y-8">
+      <div className="bg-zinc-950/50">
+        <div className="p-6 text-white">
           <h1 className="text-2xl font-bold">Instagram</h1>
-          <p className=" text-sm">
-            Conecta la Página de Instagram de tu empresa
+          <p className="text-sm text-white/80">
+            Conecta la cuenta Business/Creator vinculada a una Página de
+            Facebook
           </p>
         </div>
       </div>
+
       {status && (
         <div
-          className={`p-3 rounded-md text-sm border ${
+          className={`mx-6 p-3 rounded-md text-sm border ${
             status.type === "success"
               ? "bg-green-50 text-green-700 border-green-200"
               : "bg-red-50 text-red-700 border-red-200"
@@ -39,17 +41,20 @@ export function InstagramConnectFlow({
           {status.text}
         </div>
       )}
-      <div className="w-full flex justify-center">
-        <Card className="bg-white/70 w-80 ">
+
+      <div className="flex justify-center px-6 pb-12">
+        <Card className="bg-white/70 w-full max-w-sm">
           <CardHeader>
-            <CardTitle>Conectar página</CardTitle>
+            <CardTitle>Conectar Instagram</CardTitle>
             <CardDescription>
-              Usa una cuenta con rol de administrador en la Página.
+              Necesitas una cuenta profesional vinculada a una Página de
+              Facebook donde seas administrador.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex justify-center">
+          <CardContent className="flex flex-col items-center gap-3">
             <Button
-              disabled={!canConnect}
+              className="w-full bg-gradient-to-r from-orange-400 to-yellow-500 text-white"
+              disabled={!canConnect || !companyId}
               onClick={() => {
                 window.location.href = `/api/auth/instagram?companyId=${companyId}`;
               }}
@@ -57,7 +62,7 @@ export function InstagramConnectFlow({
               Conectar Instagram
             </Button>
             {!canConnect && (
-              <p className="text-xs text-muted-foreground mt-2">
+              <p className="text-xs text-muted-foreground text-center">
                 Solo un administrador puede conectar redes
               </p>
             )}

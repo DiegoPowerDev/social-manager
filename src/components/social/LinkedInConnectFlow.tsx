@@ -19,19 +19,19 @@ export function LinkedInConnectFlow({
   status: { type: "success" | "error"; text: string } | null;
 }) {
   return (
-    <div className="h-full flex flex-col space-y-12 w-full">
-      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
-        <div className="p-6  text-white">
+    <div className="space-y-8">
+      <div className="bg-zinc-950/50">
+        <div className="p-6 text-white">
           <h1 className="text-2xl font-bold">LinkedIn</h1>
-          <p className=" text-sm">
-            Conecta el perfil de LinkedIn desde el que publicarás
+          <p className="text-sm text-white/80">
+            Conecta el perfil desde el que publicarás
           </p>
         </div>
       </div>
 
       {status && (
         <div
-          className={`p-3 rounded-md text-sm border ${
+          className={`mx-6 p-3 rounded-md text-sm border ${
             status.type === "success"
               ? "bg-green-50 text-green-700 border-green-200"
               : "bg-red-50 text-red-700 border-red-200"
@@ -40,8 +40,9 @@ export function LinkedInConnectFlow({
           {status.text}
         </div>
       )}
-      <div className="w-full flex justify-center">
-        <Card className="bg-white/70 w-80 ">
+
+      <div className="flex justify-center px-6 pb-12">
+        <Card className="bg-white/70 w-full max-w-sm">
           <CardHeader>
             <CardTitle>Conectar perfil</CardTitle>
             <CardDescription>
@@ -49,9 +50,10 @@ export function LinkedInConnectFlow({
               w_member_social).
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex justify-center">
+          <CardContent className="flex flex-col items-center gap-3">
             <Button
-              disabled={!canConnect}
+              className="w-full bg-gradient-to-r from-orange-400 to-yellow-500 text-white"
+              disabled={!canConnect || !companyId}
               onClick={() => {
                 window.location.href = `/api/auth/linkedin?companyId=${companyId}`;
               }}
@@ -59,7 +61,7 @@ export function LinkedInConnectFlow({
               Conectar LinkedIn
             </Button>
             {!canConnect && (
-              <p className="text-xs text-muted-foreground mt-2">
+              <p className="text-xs text-muted-foreground text-center">
                 Solo un administrador puede conectar redes
               </p>
             )}

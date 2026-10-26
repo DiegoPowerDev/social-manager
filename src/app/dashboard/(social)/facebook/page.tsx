@@ -14,20 +14,22 @@ import {
 import { db } from "@/lib/firebase";
 import { FacebookComposer } from "@/components/social/FacebookComposer";
 import { PostHistory } from "@/components/social/PostHistory";
-import { PostPreview } from "@/components/social/PostPreview";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LucideLoaderCircle } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { FacebookConnectFlow } from "@/components/social/FacebookConnectFlow";
+import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/layout/ConfirmDialog";
 
 export default function FacebookPage() {
   const [activeTab, setActiveTab] = useState("create");
+  const [historyKey, setHistoryKey] = useState(0);
 
   const memberRole = useAuthStore((s) => s.memberRole);
-  const canEdit = memberRole === "admin" || memberRole === "editor";
   const canConnect = memberRole === "admin";
+  const companyId = useAuthStore((s) => s.companyId);
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -35,12 +37,9 @@ export default function FacebookPage() {
   const [account, setAccount] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
-  const [status, setStatus] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
-  const companyId = useAuthStore((s) => s.companyId);
-  // Estado del post (controlado)
+  const [disconnectOpen, setDisconnectOpen] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+
   const [message, setMessage] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -48,9 +47,7 @@ export default function FacebookPage() {
 
   const loadAccount = async () => {
     try {
-      if (!companyId) {
-        return;
-      }
+      if (!companyId) return;
       const q = query(
         collection(db, "socialAccounts"),
         where("companyId", "==", companyId),
@@ -74,6 +71,7 @@ export default function FacebookPage() {
       }
     } catch (error) {
       console.error(error);
+      toast.error("Error al cargar la cuenta de Facebook");
     } finally {
       setChecking(false);
     }
@@ -89,13 +87,13 @@ export default function FacebookPage() {
     const error = searchParams.get("error");
 
     if (success === "true") {
-      setStatus({ type: "success", text: "Cuenta de Facebook conectada" });
+      toast.success("Cuenta de Facebook conectada");
       loadAccount();
       router.replace("/dashboard/facebook");
     }
 
     if (error) {
-      setStatus({ type: "error", text: "Error al conectar la cuenta" });
+      toast.error("Error al conectar la cuenta");
       router.replace("/dashboard/facebook");
     }
   }, [searchParams]);
@@ -105,8 +103,7 @@ export default function FacebookPage() {
     if (!message.trim() && !imageUrl && !videoUrl) return;
 
     setLoading(true);
-    setStatus(null);
-
+    const tid = toast.loading("Publicando en Facebook…");
     try {
       const res = await fetch("/api/publish/facebook", {
         method: "POST",
@@ -126,16 +123,12 @@ export default function FacebookPage() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Error al publicar");
 
-      setStatus({
-        type: "success",
-        text: "Publicado correctamente en Facebook",
-      });
-
-      // Limpiar solo después de publicar exitosamente
+      toast.success("Publicado correctamente en Facebook", { id: tid });
       setMessage("");
       setImageUrl(null);
       setVideoUrl(null);
       setLink("");
+      setHistoryKey((k) => k + 1);
     } catch (err: any) {
       const msg = err.message || "Error al publicar";
       if (
@@ -143,22 +136,31 @@ export default function FacebookPage() {
         msg.toLowerCase().includes("token") ||
         msg.includes("401")
       ) {
-        setStatus({
-          type: "error",
-          text: "El token expiró o es inválido. Reconecta la cuenta.",
+        toast.error("El token expiró o es inválido. Reconecta la cuenta.", {
+          id: tid,
         });
       } else {
-        setStatus({ type: "error", text: err.message });
+        toast.error(msg, { id: tid });
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDisconnect = async () => {
-    if (!account || !confirm("¿Desconectar esta cuenta de Facebook?")) return;
-    await deleteDoc(doc(db, "socialAccounts", account.id));
-    setAccount(null);
+  const performDisconnect = async () => {
+    if (!account) return;
+    setDisconnecting(true);
+    const tid = toast.loading("Desconectando…");
+    try {
+      await deleteDoc(doc(db, "socialAccounts", account.id));
+      setAccount(null);
+      setDisconnectOpen(false);
+      toast.success("Cuenta desconectada", { id: tid });
+    } catch (e: any) {
+      toast.error(e.message || "No se pudo desconectar", { id: tid });
+    } finally {
+      setDisconnecting(false);
+    }
   };
 
   if (checking) {
@@ -179,87 +181,76 @@ export default function FacebookPage() {
       <FacebookConnectFlow
         companyId={companyId}
         canConnect={canConnect}
-        status={status}
+        status={null}
       />
     );
   }
 
+  const tokenStatus = getTokenStatus(account.expiresAt);
+
   return (
-    <div className="">
-      {/* Header */}
-      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
-        <div className="p-6  text-white">
+    <div>
+      <div className="flex items-center justify-between bg-zinc-950/50">
+        <div className="p-6 text-white">
           <h1 className="text-2xl font-bold">Facebook</h1>
           <p className="text-sm">
             Publicando como{" "}
             <span className="font-bold text-white">{account.name}</span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {(() => {
-            const s = getTokenStatus(account.expiresAt);
-            if (s === "expired")
-              return <Badge variant="destructive">Token expirado</Badge>;
-            if (s === "expiring_soon")
-              return (
-                <Badge className="bg-amber-500 hover:bg-amber-500">
-                  Por vencer
-                </Badge>
-              );
-            return <Badge variant="secondary">Conectado</Badge>;
-          })()}
-          <Button variant="outline" size="sm" onClick={handleDisconnect}>
-            Desconectar
-          </Button>
+        <div className="flex items-center gap-2 px-6">
+          {tokenStatus === "expired" ? (
+            <Badge variant="destructive">Token expirado</Badge>
+          ) : tokenStatus === "expiring_soon" ? (
+            <Badge className="bg-amber-500 hover:bg-amber-500">
+              Por vencer
+            </Badge>
+          ) : (
+            <Badge variant="secondary">Conectado</Badge>
+          )}
+          {canConnect && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDisconnectOpen(true)}
+            >
+              Desconectar
+            </Button>
+          )}
         </div>
       </div>
 
-      {(() => {
-        const tokenStatus = getTokenStatus(account.expiresAt);
-        if (tokenStatus === "ok") return null;
-
-        return (
-          <div
-            className={`mx-6 mb-2 p-3 rounded-md text-sm border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
-              tokenStatus === "expired"
-                ? "bg-red-50 text-red-800 border-red-200"
-                : "bg-amber-50 text-amber-900 border-amber-200"
-            }`}
-          >
-            <div>
-              <p className="font-medium">{tokenStatusLabel(tokenStatus)}</p>
-              {account.expiresAt && (
-                <p className="text-xs mt-0.5 opacity-80">
-                  Expira: {account.expiresAt.toLocaleString()}
-                </p>
-              )}
-            </div>
+      {tokenStatus !== "ok" && (
+        <div
+          className={`mx-6 mt-4 p-3 rounded-md text-sm border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
+            tokenStatus === "expired"
+              ? "bg-red-50 text-red-800 border-red-200"
+              : "bg-amber-50 text-amber-900 border-amber-200"
+          }`}
+        >
+          <div>
+            <p className="font-medium">{tokenStatusLabel(tokenStatus)}</p>
+            {account.expiresAt && (
+              <p className="text-xs mt-0.5 opacity-80">
+                Expira: {account.expiresAt.toLocaleString()}
+              </p>
+            )}
+          </div>
+          {canConnect && (
             <Button
               size="sm"
               variant="outline"
-              onClick={() =>
-                (window.location.href =
-                  "/api/auth/facebook?companyId=${companyId}")
-              }
+              onClick={() => {
+                window.location.href = `/api/auth/facebook?companyId=${companyId}`;
+              }}
             >
-              Reconectar LinkedIn
+              Reconectar Facebook
             </Button>
-          </div>
-        );
-      })()}
-      <div className="w-full h-full p-6">
-        {status && (
-          <div
-            className={`p-3 rounded-md text-sm ${
-              status.type === "success"
-                ? "bg-green-50 text-green-700 border border-green-200"
-                : "bg-red-50 text-red-700 border border-red-200"
-            }`}
-          >
-            {status.text}
-          </div>
-        )}
+          )}
+        </div>
+      )}
 
+      <div className="w-full h-full p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="create">Crear contenido</TabsTrigger>
@@ -267,47 +258,42 @@ export default function FacebookPage() {
           </TabsList>
         </Tabs>
 
-        {/* Crear - siempre montado, solo se oculta */}
         <div className={activeTab === "create" ? "mt-6 block" : "hidden"}>
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <div className="xl:col-span-2">
-              <FacebookComposer
-                pageName={account.name}
-                loading={loading}
-                message={message}
-                onMessageChange={setMessage}
-                imageUrl={imageUrl}
-                onImageChange={setImageUrl}
-                videoUrl={videoUrl}
-                onVideoChange={setVideoUrl}
-                link={link}
-                companyId={companyId}
-                onLinkChange={setLink}
-                onPublish={handlePublish}
-              />
-            </div>
-
-            <div>
-              <PostPreview
-                platform="facebook"
-                accountName={account.name}
-                message={message}
-                imageUrl={imageUrl}
-                videoUrl={videoUrl}
-              />
-            </div>
-          </div>
+          <FacebookComposer
+            pageName={account.name}
+            loading={loading}
+            message={message}
+            onMessageChange={setMessage}
+            imageUrl={imageUrl}
+            onImageChange={setImageUrl}
+            videoUrl={videoUrl}
+            onVideoChange={setVideoUrl}
+            link={link}
+            companyId={companyId}
+            onLinkChange={setLink}
+            onPublish={handlePublish}
+          />
         </div>
 
-        {/* Historial - siempre montado, solo se oculta */}
         <div className={activeTab === "history" ? "mt-6 block" : "hidden"}>
           <PostHistory
             pageId={account.pageId}
             platform="facebook"
-            key={status?.type === "success" ? Date.now() : "history"}
+            key={historyKey}
           />
         </div>
       </div>
+
+      <ConfirmDialog
+        open={disconnectOpen}
+        onOpenChange={setDisconnectOpen}
+        title="¿Desconectar Facebook?"
+        description="Dejarás de poder publicar hasta volver a conectar la página."
+        confirmLabel="Desconectar"
+        destructive
+        loading={disconnecting}
+        onConfirm={performDisconnect}
+      />
     </div>
   );
 }

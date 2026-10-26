@@ -22,11 +22,14 @@ import { LucideLoaderCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { InstagramConnectFlow } from "@/components/social/InstagramConnectFlow";
+import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/layout/ConfirmDialog";
 
 type IgMediaType = "FEED" | "REELS" | "STORIES" | "CAROUSEL";
 
 export default function InstagramPage() {
   const [activeTab, setActiveTab] = useState("create");
+  const [historyKey, setHistoryKey] = useState(0);
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -34,10 +37,8 @@ export default function InstagramPage() {
   const [account, setAccount] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
-  const [status, setStatus] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
+  const [disconnectOpen, setDisconnectOpen] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   const companyId = useAuthStore((s) => s.companyId);
   const memberRole = useAuthStore((s) => s.memberRole);
@@ -77,6 +78,7 @@ export default function InstagramPage() {
       }
     } catch (error) {
       console.error(error);
+      toast.error("Error al cargar la cuenta de Instagram");
     } finally {
       setChecking(false);
     }
@@ -92,20 +94,19 @@ export default function InstagramPage() {
     const error = searchParams.get("error");
 
     if (success === "true") {
-      setStatus({ type: "success", text: "Cuenta de Instagram conectada" });
+      toast.success("Cuenta de Instagram conectada");
       loadAccount();
       router.replace("/dashboard/instagram");
     }
 
     if (error) {
-      setStatus({ type: "error", text: "Error al conectar la cuenta" });
+      toast.error("Error al conectar la cuenta");
       router.replace("/dashboard/instagram");
     }
   }, [searchParams]);
 
   const handleMediaTypeChange = (value: IgMediaType) => {
     setMediaType(value);
-    setStatus(null);
 
     if (value === "REELS") {
       setImageUrl(null);
@@ -130,33 +131,28 @@ export default function InstagramPage() {
     if (!account || !companyId || !canEdit) return;
 
     if (mediaType === "CAROUSEL" && imageUrls.length < 2) {
-      setStatus({
-        type: "error",
-        text: "El carrusel necesita al menos 2 imágenes",
-      });
+      toast.error("El carrusel necesita al menos 2 imágenes");
       return;
     }
     if (mediaType === "REELS" && !videoUrl) {
-      setStatus({ type: "error", text: "Los Reels requieren un video" });
+      toast.error("Los Reels requieren un video");
       return;
     }
     if (mediaType === "STORIES" && !imageUrl && !videoUrl) {
-      setStatus({
-        type: "error",
-        text: "Las Historias requieren imagen o video",
-      });
+      toast.error("Las Historias requieren imagen o video");
       return;
     }
     if (mediaType === "FEED" && !imageUrl && !videoUrl) {
-      setStatus({
-        type: "error",
-        text: "Instagram requiere una imagen o un video",
-      });
+      toast.error("Instagram requiere una imagen o un video");
       return;
     }
 
     setLoading(true);
-    setStatus(null);
+    const tid = toast.loading(
+      mediaType === "CAROUSEL"
+        ? "Publicando carrusel…"
+        : "Publicando en Instagram…",
+    );
 
     try {
       const res = await fetch("/api/publish/instagram", {
@@ -179,14 +175,14 @@ export default function InstagramPage() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Error al publicar");
 
-      setStatus({
-        type: "success",
-        text:
-          mediaType === "CAROUSEL"
-            ? "Carrusel publicado en Instagram"
-            : "Publicado correctamente en Instagram",
-      });
+      toast.success(
+        mediaType === "CAROUSEL"
+          ? "Carrusel publicado en Instagram"
+          : "Publicado correctamente en Instagram",
+        { id: tid },
+      );
       clearComposer();
+      setHistoryKey((k) => k + 1);
     } catch (err: any) {
       const msg = err.message || "Error al publicar";
       if (
@@ -194,22 +190,31 @@ export default function InstagramPage() {
         msg.toLowerCase().includes("token") ||
         msg.includes("401")
       ) {
-        setStatus({
-          type: "error",
-          text: "El token expiró o es inválido. Reconecta la cuenta.",
+        toast.error("El token expiró o es inválido. Reconecta la cuenta.", {
+          id: tid,
         });
       } else {
-        setStatus({ type: "error", text: msg });
+        toast.error(msg, { id: tid });
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDisconnect = async () => {
-    if (!account || !confirm("¿Desconectar esta cuenta de Instagram?")) return;
-    await deleteDoc(doc(db, "socialAccounts", account.id));
-    setAccount(null);
+  const performDisconnect = async () => {
+    if (!account) return;
+    setDisconnecting(true);
+    const tid = toast.loading("Desconectando…");
+    try {
+      await deleteDoc(doc(db, "socialAccounts", account.id));
+      setAccount(null);
+      setDisconnectOpen(false);
+      toast.success("Cuenta desconectada", { id: tid });
+    } catch (e: any) {
+      toast.error(e.message || "No se pudo desconectar", { id: tid });
+    } finally {
+      setDisconnecting(false);
+    }
   };
 
   if (checking) {
@@ -233,14 +238,16 @@ export default function InstagramPage() {
       <InstagramConnectFlow
         companyId={companyId}
         canConnect={canConnect}
-        status={status}
+        status={null}
       />
     );
   }
 
+  const tokenStatus = getTokenStatus(account.expiresAt);
+
   return (
-    <div className="">
-      <div className="flex items-center justify-between bg-zinc-950/50 backdrop-blur">
+    <div>
+      <div className="flex items-center justify-between bg-zinc-950/50 ">
         <div className="p-6 text-white">
           <h1 className="text-2xl font-bold">Instagram</h1>
           <p className="text-sm">
@@ -249,49 +256,44 @@ export default function InstagramPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 pr-6">
-          {(() => {
-            const s = getTokenStatus(account.expiresAt);
-            if (s === "expired")
-              return <Badge variant="destructive">Token expirado</Badge>;
-            if (s === "expiring_soon")
-              return (
-                <Badge className="bg-amber-500 hover:bg-amber-500">
-                  Por vencer
-                </Badge>
-              );
-            return <Badge variant="secondary">Conectado</Badge>;
-          })()}
-          <Button
-            disabled={!canConnect}
-            variant="outline"
-            size="sm"
-            onClick={handleDisconnect}
-          >
-            Desconectar
-          </Button>
+          {tokenStatus === "expired" ? (
+            <Badge variant="destructive">Token expirado</Badge>
+          ) : tokenStatus === "expiring_soon" ? (
+            <Badge className="bg-amber-500 hover:bg-amber-500">
+              Por vencer
+            </Badge>
+          ) : (
+            <Badge variant="secondary">Conectado</Badge>
+          )}
+          {canConnect && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDisconnectOpen(true)}
+            >
+              Desconectar
+            </Button>
+          )}
         </div>
       </div>
 
-      {(() => {
-        const tokenStatus = getTokenStatus(account.expiresAt);
-        if (tokenStatus === "ok") return null;
-
-        return (
-          <div
-            className={`mx-6 mb-2 p-3 rounded-md text-sm border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
-              tokenStatus === "expired"
-                ? "bg-red-50 text-red-800 border-red-200"
-                : "bg-amber-50 text-amber-900 border-amber-200"
-            }`}
-          >
-            <div>
-              <p className="font-medium">{tokenStatusLabel(tokenStatus)}</p>
-              {account.expiresAt && (
-                <p className="text-xs mt-0.5 opacity-80">
-                  Expira: {account.expiresAt.toLocaleString()}
-                </p>
-              )}
-            </div>
+      {tokenStatus !== "ok" && (
+        <div
+          className={`mx-6 mt-4 p-3 rounded-md text-sm border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
+            tokenStatus === "expired"
+              ? "bg-red-50 text-red-800 border-red-200"
+              : "bg-amber-50 text-amber-900 border-amber-200"
+          }`}
+        >
+          <div>
+            <p className="font-medium">{tokenStatusLabel(tokenStatus)}</p>
+            {account.expiresAt && (
+              <p className="text-xs mt-0.5 opacity-80">
+                Expira: {account.expiresAt.toLocaleString()}
+              </p>
+            )}
+          </div>
+          {canConnect && (
             <Button
               size="sm"
               variant="outline"
@@ -301,31 +303,19 @@ export default function InstagramPage() {
             >
               Reconectar Instagram
             </Button>
-          </div>
-        );
-      })()}
+          )}
+        </div>
+      )}
 
       {!canEdit && (
-        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded-md mx-6 mb-4">
+        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded-md mx-6 mt-4">
           Tu rol es solo lectura. No puedes publicar ni desconectar.
         </p>
       )}
 
       <div className="w-full h-full p-6">
-        {status && (
-          <div
-            className={`mb-4 p-3 rounded-md text-sm ${
-              status.type === "success"
-                ? "bg-green-50 text-green-700 border border-green-200"
-                : "bg-red-50 text-red-700 border border-red-200"
-            }`}
-          >
-            {status.text}
-          </div>
-        )}
-
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2 bg-yellow-500/60 font-bold backdrop-blur-xs">
+          <TabsList className="grid w-full max-w-md grid-cols-2 bg-yellow-500/60 font-bold -xs">
             <TabsTrigger value="create">Crear contenido</TabsTrigger>
             <TabsTrigger value="history">Historial</TabsTrigger>
           </TabsList>
@@ -333,37 +323,21 @@ export default function InstagramPage() {
 
         <div className={cn(activeTab === "create" ? "mt-6 block" : "hidden")}>
           {canEdit && (
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              <div className="xl:col-span-2">
-                <InstagramComposer
-                  username={account.username}
-                  loading={loading}
-                  caption={caption}
-                  onCaptionChange={setCaption}
-                  imageUrl={imageUrl}
-                  onImageChange={setImageUrl}
-                  imageUrls={imageUrls}
-                  onImageUrlsChange={setImageUrls}
-                  videoUrl={videoUrl}
-                  onVideoChange={setVideoUrl}
-                  mediaType={mediaType}
-                  onMediaTypeChange={handleMediaTypeChange}
-                  onPublish={handlePublish}
-                />
-              </div>
-
-              <div>
-                <PostPreview
-                  platform="instagram"
-                  accountName={account.username}
-                  message={caption}
-                  imageUrl={
-                    mediaType === "CAROUSEL" ? imageUrls[0] || null : imageUrl
-                  }
-                  videoUrl={videoUrl}
-                />
-              </div>
-            </div>
+            <InstagramComposer
+              username={account.username}
+              loading={loading}
+              caption={caption}
+              onCaptionChange={setCaption}
+              imageUrl={imageUrl}
+              onImageChange={setImageUrl}
+              imageUrls={imageUrls}
+              onImageUrlsChange={setImageUrls}
+              videoUrl={videoUrl}
+              onVideoChange={setVideoUrl}
+              mediaType={mediaType}
+              onMediaTypeChange={handleMediaTypeChange}
+              onPublish={handlePublish}
+            />
           )}
         </div>
 
@@ -371,10 +345,21 @@ export default function InstagramPage() {
           <PostHistory
             pageId={account.igUserId}
             platform="instagram"
-            key={status?.type === "success" ? Date.now() : "history"}
+            key={historyKey}
           />
         </div>
       </div>
+
+      <ConfirmDialog
+        open={disconnectOpen}
+        onOpenChange={setDisconnectOpen}
+        title="¿Desconectar Instagram?"
+        description="Dejarás de poder publicar hasta volver a conectar la cuenta."
+        confirmLabel="Desconectar"
+        destructive
+        loading={disconnecting}
+        onConfirm={performDisconnect}
+      />
     </div>
   );
 }

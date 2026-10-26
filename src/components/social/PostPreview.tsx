@@ -19,7 +19,7 @@ export function PostPreview({
   videoUrl,
 }: Props) {
   return (
-    <Card className="h-fit sticky top-6 bg-zinc-950/60 text-white">
+    <Card className="h-fit bg-zinc-950/60 text-white">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="">Vista previa</CardTitle>

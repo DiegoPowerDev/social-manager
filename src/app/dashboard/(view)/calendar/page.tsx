@@ -32,7 +32,7 @@ import { es } from "date-fns/locale";
 import Image from "next/image";
 import { ScheduledPostDetailModal } from "@/components/calendar/ScheduledPostDetailModal";
 import { useAuthStore } from "@/stores/useAuthStore";
-import TitleComponent from "@/components/layout/titleComponent";
+import { toast } from "sonner";
 
 interface ScheduledPost {
   id: string;
@@ -116,7 +116,6 @@ export default function CalendarPage() {
       const start = startOfMonth(currentMonth);
       const end = endOfMonth(currentMonth);
 
-      // Índice: companyId ASC, scheduledAt ASC
       const q = query(
         collection(db, "scheduledPosts"),
         where("companyId", "==", companyId),
@@ -148,6 +147,7 @@ export default function CalendarPage() {
       setPosts(data);
     } catch (error) {
       console.error("Error cargando posts programados:", error);
+      toast.error("No se pudo cargar el calendario");
     } finally {
       setLoading(false);
     }
@@ -171,9 +171,17 @@ export default function CalendarPage() {
   }, [posts]);
 
   const openCreateModal = (day: Date) => {
-    if (!canEdit) return;
+    if (!canEdit) {
+      toast.error("Solo administradores y editores pueden programar");
+      return;
+    }
     setSelectedDate(day);
     setModalOpen(true);
+  };
+
+  const openDetail = (post: ScheduledPost) => {
+    setSelectedPost(post);
+    setDetailOpen(true);
   };
 
   if (!companyId) {
@@ -185,16 +193,27 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="">
-      <div className="flex items-center justify-between bg-zinc-950/60 backdrop-blur">
-        <div className="p-6  text-white">
+    <div>
+      <div className="flex items-center justify-between bg-zinc-950/60 ">
+        <div className="p-6 text-white">
           <h1 className="text-2xl font-bold">Calendario</h1>
-          <p className=" text-sm">Programa publicaciones por día y hora</p>
+          <p className="text-sm">
+            {canEdit
+              ? "Programa publicaciones por día y hora"
+              : "Vista de publicaciones programadas (solo lectura)"}
+          </p>
         </div>
       </div>
 
-      <div className="w-full h-full px-6">
-        <div className="flex items-center justify-between">
+      {!canEdit && (
+        <p className="mx-6 mt-4 text-sm text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded-md">
+          Tu rol es solo lectura. Puedes ver el calendario, pero no crear ni
+          editar publicaciones.
+        </p>
+      )}
+
+      <div className="w-full h-full px-6 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
@@ -203,7 +222,7 @@ export default function CalendarPage() {
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <h3 className="text-lg font-semibold min-w-[180px] text-center capitalize">
+            <h3 className="text-lg font-semibold min-w-[180px] text-center capitalize text-white">
               {format(currentMonth, "MMMM yyyy", { locale: es })}
             </h3>
             <Button
@@ -214,7 +233,8 @@ export default function CalendarPage() {
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-xs text-black bg-white p-2 rounded-full mt-3 mb-2">
+
+          <div className="flex flex-wrap items-center gap-3 text-xs text-black bg-white p-2 rounded-full">
             <span className="flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-full bg-sky-500" /> Programado
             </span>
@@ -228,12 +248,19 @@ export default function CalendarPage() {
               <span className="h-2 w-2 rounded-full bg-red-500" /> Falló
             </span>
           </div>
+
           <Button variant="outline" onClick={() => setCurrentMonth(new Date())}>
             Hoy
           </Button>
         </div>
 
-        <div className="rounded-lg overflow-hidden">
+        <div className="rounded-lg overflow-hidden mt-4 relative">
+          {loading && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/20">
+              <LucideLoaderCircle className="animate-spin h-10 w-10 text-yellow-200" />
+            </div>
+          )}
+
           <div className="grid grid-cols-7 border-b bg-zinc-950/60">
             {WEEKDAYS.map((day) => (
               <div
@@ -262,30 +289,36 @@ export default function CalendarPage() {
                     isToday ? "bg-yellow-500/20" : "bg-zinc-950/60 text-white"
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full">
+                  <div className="flex items-center justify-between gap-1">
+                    <span
+                      className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full ${
+                        isToday ? "bg-yellow-500 text-black" : ""
+                      }`}
+                    >
                       {format(day, "d")}
                     </span>
-                    {dayPosts.length !== 0 && (
-                      <span className="text-black/50 select-none flex gap-2 items-center">
-                        {dayPosts.length}
-                        <Clock size={15} />
-                      </span>
-                    )}
-                    {canEdit && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => openCreateModal(day)}
-                        title="Programar publicación"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {dayPosts.length > 0 && (
+                        <span className="text-white/50 select-none flex gap-1 items-center text-[10px]">
+                          {dayPosts.length}
+                          <Clock size={12} />
+                        </span>
+                      )}
+                      {canEdit && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-white hover:text-black"
+                          onClick={() => openCreateModal(day)}
+                          title="Programar publicación"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="flex-1 space-y-1 overflow-y-auto max-h-24 pr-2">
+                  <div className="flex-1 space-y-1 overflow-y-auto max-h-28 pr-0.5">
                     {dayPosts.map((post) => {
                       const style =
                         statusStyles[post.status] || statusStyles.scheduled;
@@ -295,11 +328,8 @@ export default function CalendarPage() {
                           key={post.id}
                           type="button"
                           className={`w-full text-left px-1.5 py-1 rounded text-[11px] leading-tight border transition-colors ${style.card}`}
-                          onClick={() => {
-                            setSelectedPost(post);
-                            setDetailOpen(true);
-                          }}
-                          title={style.label}
+                          onClick={() => openDetail(post)}
+                          title={`${style.label} · ${format(post.scheduledAt, "HH:mm")}`}
                         >
                           <div className="flex items-center gap-1 truncate">
                             <span
@@ -312,16 +342,16 @@ export default function CalendarPage() {
                           <div className="flex items-center gap-1 mt-0.5">
                             {post.platforms.facebook && (
                               <Image
-                                height={16}
-                                width={16}
+                                height={14}
+                                width={14}
                                 src="/facebook-icon.svg"
                                 alt="Facebook"
                               />
                             )}
                             {post.platforms.instagram && (
                               <Image
-                                height={16}
-                                width={16}
+                                height={14}
+                                width={14}
                                 src="/instagram-icon.svg"
                                 alt="Instagram"
                               />
@@ -334,24 +364,24 @@ export default function CalendarPage() {
                               )}
                             {post.platforms.linkedin && (
                               <Image
-                                height={16}
-                                width={16}
+                                height={14}
+                                width={14}
                                 src="/linkedin.svg"
                                 alt="LinkedIn"
                               />
                             )}
                             {post.platforms.youtube && (
                               <Image
-                                height={16}
-                                width={16}
-                                src="/youtube.svg" // o la ruta que uses en el menú
+                                height={14}
+                                width={14}
+                                src="/youtube.svg"
                                 alt="YouTube"
                               />
                             )}
                             {post.platforms.tiktok && (
                               <Image
-                                height={16}
-                                width={16}
+                                height={14}
+                                width={14}
                                 src="/tiktok.svg"
                                 alt="TikTok"
                               />
@@ -370,19 +400,14 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        {loading && (
-          <div className="flex justify-center py-12">
-            <LucideLoaderCircle className="animate-spin h-10 w-10 text-yellow-200" />
-          </div>
-        )}
-
-        {modalOpen && selectedDate && (
+        {modalOpen && selectedDate && canEdit && (
           <SchedulePostModal
             date={selectedDate}
             open={modalOpen}
             onClose={() => setModalOpen(false)}
             onSaved={() => {
               loadPosts();
+              toast.success("Publicación programada");
             }}
           />
         )}
@@ -390,6 +415,7 @@ export default function CalendarPage() {
         <ScheduledPostDetailModal
           post={selectedPost}
           open={detailOpen}
+          canEdit={canEdit}
           onClose={() => {
             setDetailOpen(false);
             setSelectedPost(null);

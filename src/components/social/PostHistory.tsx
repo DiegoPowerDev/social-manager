@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { collection, query, where, limit, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
-import { Video, FileText, ExternalLink } from "lucide-react";
+import { Video, FileText, ExternalLink, Loader2 } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { toast } from "sonner";
 
 interface Post {
   id: string;
@@ -35,22 +36,21 @@ interface Props {
 }
 
 function getPostUrl(post: Post): string | null {
-  // 1. Permalink real (Instagram / LinkedIn)
   if (post.permalink) return post.permalink;
 
-  // 2. Facebook
   if (post.platform === "facebook" && post.facebookPostId) {
     return `https://www.facebook.com/${post.facebookPostId}`;
   }
 
-  // 3. LinkedIn (URN)
   if (post.platform === "linkedin" && post.linkedinPostId) {
     return `https://www.linkedin.com/feed/update/${post.linkedinPostId}/`;
   }
+
   if (post.platform === "youtube" && post.youtubeVideoId) {
     return `https://www.youtube.com/watch?v=${post.youtubeVideoId}`;
   }
-  // 4. Instagram SIN permalink → no inventar /p/{mediaId}/
+
+  // TikTok a veces solo tiene publish id; sin permalink público no inventamos URL
   return null;
 }
 
@@ -58,11 +58,15 @@ export function PostHistory({ pageId, platform = "facebook" }: Props) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const companyId = useAuthStore((s) => s.companyId);
-  const fetchPosts = async () => {
+
+  const fetchPosts = useCallback(async () => {
+    if (!companyId) {
+      setPosts([]);
+      setLoading(false);
+      return;
+    }
+
     try {
-      if (!companyId) {
-        return;
-      }
       setLoading(true);
       const q = query(
         collection(db, "publishedPosts"),
@@ -74,10 +78,10 @@ export function PostHistory({ pageId, platform = "facebook" }: Props) {
       const snapshot = await getDocs(q);
 
       const data = snapshot.docs
-        .map((doc) => {
-          const d = doc.data();
+        .map((docSnap) => {
+          const d = docSnap.data();
           return {
-            id: doc.id,
+            id: docSnap.id,
             pageId:
               d.pageId ||
               d.igUserId ||
@@ -102,7 +106,6 @@ export function PostHistory({ pageId, platform = "facebook" }: Props) {
         })
         .filter((post) => {
           if (!pageId) return true;
-          // YouTube / TikTok: si el post no trae id de cuenta, no ocultarlo
           if (
             (platform === "youtube" || platform === "tiktok") &&
             !post.pageId
@@ -117,51 +120,50 @@ export function PostHistory({ pageId, platform = "facebook" }: Props) {
       setPosts(data);
     } catch (error) {
       console.error("Error cargando historial:", error);
+      toast.error("No se pudo cargar el historial");
     } finally {
       setLoading(false);
     }
-  };
+  }, [companyId, pageId, platform]);
 
   useEffect(() => {
-    if (companyId) fetchPosts();
-    else {
-      setPosts([]);
-      setLoading(false);
-    }
-  }, [pageId, platform, companyId]);
-
-  if (loading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Últimas publicaciones</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">Cargando historial...</p>
-        </CardContent>
-      </Card>
-    );
-  }
+    fetchPosts();
+  }, [fetchPosts]);
 
   return (
-    <Card className="h-fit sticky top-6">
+    <Card className="h-fit sticky top-6 self-start w-full">
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-lg">Últimas publicaciones</CardTitle>
-          <Button variant="ghost" size="sm" onClick={fetchPosts}>
-            Actualizar
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => fetchPosts()}
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              "Actualizar"
+            )}
           </Button>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-3">
-        {posts.length === 0 ? (
+        {loading && posts.length === 0 ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Cargando historial…
+          </div>
+        ) : posts.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Aún no hay publicaciones.
           </p>
         ) : (
           posts.map((post) => {
             const postUrl = getPostUrl(post);
+            const text = post.message || post.title;
 
             return (
               <div
@@ -170,9 +172,10 @@ export function PostHistory({ pageId, platform = "facebook" }: Props) {
               >
                 <div className="w-14 h-14 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
                   {post.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={post.imageUrl}
-                      alt="Post"
+                      alt=""
                       className="w-full h-full object-cover"
                     />
                   ) : post.videoUrl ? (
@@ -184,23 +187,25 @@ export function PostHistory({ pageId, platform = "facebook" }: Props) {
 
                 <div className="flex-1 min-w-0">
                   <p className="text-sm line-clamp-2 leading-snug">
-                    {post.message || (
+                    {text ? (
+                      text
+                    ) : (
                       <span className="text-muted-foreground italic">
                         Sin texto
                       </span>
                     )}
                   </p>
 
-                  <div className="flex items-center justify-between mt-2">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-xs">
+                  <div className="flex items-center justify-between mt-2 gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Badge variant="outline" className="text-xs shrink-0">
                         {post.imageUrl
                           ? "Imagen"
                           : post.videoUrl
                             ? "Video"
                             : "Texto"}
                       </Badge>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground truncate">
                         {formatDistanceToNow(post.publishedAt, {
                           addSuffix: true,
                           locale: es,
@@ -213,7 +218,7 @@ export function PostHistory({ pageId, platform = "facebook" }: Props) {
                         href={postUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-muted-foreground hover:text-foreground"
+                        className="text-muted-foreground hover:text-foreground shrink-0"
                         title="Ver publicación"
                       >
                         <ExternalLink className="h-4 w-4" />
