@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { PLAN_CARDS, type PlanId } from "@/content/plans";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { toast } from "sonner";
 
 type Variant = "light" | "dark";
-type Interval = "month" | "year";
 
 interface Props {
   variant?: Variant;
@@ -17,48 +16,22 @@ interface Props {
   compact?: boolean;
 }
 
-function toPayPalPlanKey(
-  planId: "basic" | "premium",
-  interval: Interval,
-): string {
-  if (planId === "basic") {
-    return interval === "year" ? "basic_yearly" : "basic_monthly";
-  }
-  return interval === "year" ? "premium_yearly" : "premium_monthly";
+function toPayPalPlanKey(planId: "basic" | "premium"): string {
+  return planId === "basic" ? "basic_monthly" : "premium_monthly";
 }
 
 export function PricingSection({
   variant = "light",
   title = "Planes",
-  subtitle = "Empieza gratis y escala cuando tu equipo publique más.",
+  subtitle = "Empieza gratis y escala cuando tu equipo publique más. Facturación mensual.",
 }: Props) {
   const router = useRouter();
-  // Selectores finos → menos re-renders
   const user = useAuthStore((s) => s.user);
   const companyId = useAuthStore((s) => s.companyId);
   const memberRole = useAuthStore((s) => s.memberRole);
 
   const [loadingPlan, setLoadingPlan] = useState<PlanId | null>(null);
-  const [interval, setInterval] = useState<Interval>("month");
-
   const isDark = variant === "dark";
-
-  const cards = useMemo(
-    () =>
-      PLAN_CARDS.map((plan) => {
-        const displayPrice =
-          !plan.paid || interval === "month"
-            ? plan.priceMonthly
-            : plan.priceYearly;
-        const displayPeriod = !plan.paid
-          ? ""
-          : interval === "year"
-            ? plan.periodYearly
-            : plan.periodMonthly;
-        return { ...plan, displayPrice, displayPeriod };
-      }),
-    [interval],
-  );
 
   const handleSelect = async (planId: PlanId, paid: boolean) => {
     if (!paid) {
@@ -86,7 +59,7 @@ export function PricingSection({
       }
     }
 
-    const planKey = toPayPalPlanKey(planId, interval);
+    const planKey = toPayPalPlanKey(planId);
     setLoadingPlan(planId);
 
     try {
@@ -95,7 +68,7 @@ export function PricingSection({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           planKey,
-          companyId: companyId || "new",
+          companyId: companyId || undefined,
           email: user?.email || undefined,
         }),
       });
@@ -136,39 +109,10 @@ export function PricingSection({
           >
             {subtitle}
           </p>
-
-          <div className="mt-6 inline-flex rounded-full border border-white/20 bg-black/10 p-1 text-sm">
-            <button
-              type="button"
-              onClick={() => setInterval("month")}
-              className={`rounded-full px-4 py-1.5 font-medium transition ${
-                interval === "month"
-                  ? "bg-amber-400 text-slate-900"
-                  : isDark
-                    ? "text-zinc-300"
-                    : "text-slate-600"
-              }`}
-            >
-              Mensual
-            </button>
-            <button
-              type="button"
-              onClick={() => setInterval("year")}
-              className={`rounded-full px-4 py-1.5 font-medium transition ${
-                interval === "year"
-                  ? "bg-amber-400 text-slate-900"
-                  : isDark
-                    ? "text-zinc-300"
-                    : "text-slate-600"
-              }`}
-            >
-              Anual
-            </button>
-          </div>
         </div>
 
         <div className="mt-12 grid gap-6 lg:grid-cols-3">
-          {cards.map((plan) => (
+          {PLAN_CARDS.map((plan) => (
             <div
               key={plan.id}
               className={
@@ -195,20 +139,11 @@ export function PricingSection({
               </p>
 
               <p className="mt-6">
-                <span className="text-4xl font-bold">{plan.displayPrice}</span>
+                <span className="text-4xl font-bold">{plan.price}</span>
                 <span className={isDark ? "text-zinc-500" : "text-slate-500"}>
-                  {plan.displayPeriod}
+                  {plan.period}
                 </span>
               </p>
-              {plan.paid && interval === "year" && (
-                <p
-                  className={`text-xs ${
-                    isDark ? "text-zinc-500" : "text-slate-500"
-                  }`}
-                >
-                  Facturación anual vía PayPal
-                </p>
-              )}
 
               <ul
                 className={`mt-6 flex-1 space-y-2 text-sm ${
