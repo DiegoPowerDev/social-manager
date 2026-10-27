@@ -40,6 +40,10 @@ import { Separator } from "@/components/ui/separator";
 import { PostPreview } from "@/components/social/PostPreview";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { toast } from "sonner";
+import {
+  TIKTOK_PRIVACY_OPTIONS,
+  type TikTokPrivacy,
+} from "@/components/social/TikTokComposer";
 
 interface SocialAccount {
   id: string;
@@ -92,6 +96,9 @@ export default function BulkPublishPage() {
   const [youtubePrivacy, setYoutubePrivacy] = useState<
     "public" | "unlisted" | "private"
   >("public");
+
+  const [tiktokPrivacy, setTiktokPrivacy] =
+    useState<TikTokPrivacy>("PUBLIC_TO_EVERYONE");
 
   const [publishing, setPublishing] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
@@ -501,7 +508,7 @@ export default function BulkPublishPage() {
             name: tiktokAccount.name || tiktokAccount.username,
             title: message.trim() || "Video",
             videoUrl,
-            privacyLevel: "SELF_ONLY",
+            privacyLevel: tiktokPrivacy,
           }),
         });
         const data = await res.json();
@@ -774,7 +781,32 @@ export default function BulkPublishPage() {
                   </Select>
                 </div>
               )}
-
+              {selectedTikTok && (
+                <div className="space-y-2">
+                  <Label className="text-white">Visibilidad TikTok</Label>
+                  <Select
+                    value={tiktokPrivacy}
+                    onValueChange={(v) => setTiktokPrivacy(v as TikTokPrivacy)}
+                    disabled={publishing}
+                  >
+                    <SelectTrigger className="bg-black text-white max-w-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PUBLIC_TO_EVERYONE">
+                        Público
+                      </SelectItem>
+                      <SelectItem value="MUTUAL_FOLLOW_FRIENDS">
+                        Amigos
+                      </SelectItem>
+                      <SelectItem value="FOLLOWER_OF_CREATOR">
+                        Seguidores
+                      </SelectItem>
+                      <SelectItem value="SELF_ONLY">Solo yo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               {!(selectedInstagram && instagramMediaType === "STORIES") && (
                 <div className="flex justify-between gap-2 bg-zinc-950/50 text-white rounded">
                   <AICaptionGenerator

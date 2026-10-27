@@ -28,11 +28,14 @@ import { Separator } from "@/components/ui/separator";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { saveMediaToLibrary } from "@/lib/media";
 
-export type TikTokPrivacy =
-  | "SELF_ONLY"
-  | "PUBLIC_TO_EVERYONE"
-  | "MUTUAL_FOLLOW_FRIENDS"
-  | "FOLLOWER_OF_CREATOR";
+export const TIKTOK_PRIVACY_OPTIONS = [
+  { value: "PUBLIC_TO_EVERYONE", label: "Público" },
+  { value: "MUTUAL_FOLLOW_FRIENDS", label: "Amigos" },
+  { value: "FOLLOWER_OF_CREATOR", label: "Seguidores" },
+  { value: "SELF_ONLY", label: "Solo yo" },
+] as const;
+
+export type TikTokPrivacy = (typeof TIKTOK_PRIVACY_OPTIONS)[number]["value"];
 
 interface Props {
   accountName: string;
@@ -44,7 +47,7 @@ interface Props {
   privacyLevel: TikTokPrivacy;
   onPrivacyChange: (value: TikTokPrivacy) => void;
   onPublish: () => Promise<void>;
-  /** true en sandbox / app sin audit */
+  /** Solo si quieres forzar “Solo yo” (p. ej. pruebas internas) */
   forcePrivate?: boolean;
 }
 
@@ -58,7 +61,7 @@ export function TikTokComposer({
   privacyLevel,
   onPrivacyChange,
   onPublish,
-  forcePrivate = true,
+  forcePrivate = false,
 }: Props) {
   const companyId = useAuthStore((s) => s.companyId);
   const user = useAuthStore((s) => s.user);
@@ -67,6 +70,10 @@ export function TikTokComposer({
   const videoInputRef = useRef<HTMLInputElement>(null);
 
   const MAX_VIDEO_SIZE = 256 * 1024 * 1024;
+
+  const effectivePrivacy: TikTokPrivacy = forcePrivate
+    ? "SELF_ONLY"
+    : privacyLevel;
 
   const uploadToR2 = async (file: File) => {
     if (!companyId) {
@@ -181,6 +188,10 @@ export function TikTokComposer({
       toast.error("Sube un video");
       return;
     }
+    // Asegura que el padre tenga el valor efectivo si forcePrivate
+    if (forcePrivate && privacyLevel !== "SELF_ONLY") {
+      onPrivacyChange("SELF_ONLY");
+    }
     await onPublish();
   };
 
@@ -207,9 +218,9 @@ export function TikTokComposer({
           <CardContent className="space-y-5">
             {forcePrivate && (
               <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                App en sandbox / sin audit: usa privacidad{" "}
-                <strong>Solo yo (SELF_ONLY)</strong> y cuenta TikTok en modo
-                privado. Si no, TikTok rechaza el post.
+                Visibilidad fija en <strong>Solo yo</strong> (modo restringido).
+                Cuando TikTok apruebe el audit de Direct Post, podrás publicar
+                en público.
               </p>
             )}
 
@@ -243,24 +254,25 @@ export function TikTokComposer({
             <div className="space-y-2">
               <Label className="text-white">Visibilidad</Label>
               <Select
-                value={privacyLevel}
+                value={effectivePrivacy}
                 onValueChange={(v) => onPrivacyChange(v as TikTokPrivacy)}
                 disabled={isLoading || forcePrivate}
               >
                 <SelectTrigger className="bg-white max-w-xs">
-                  <SelectValue />
+                  <SelectValue placeholder="Visibilidad" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="SELF_ONLY">Solo yo (sandbox)</SelectItem>
-                  <SelectItem value="MUTUAL_FOLLOW_FRIENDS">
-                    Amigos mutuos
-                  </SelectItem>
-                  <SelectItem value="FOLLOWER_OF_CREATOR">
-                    Seguidores
-                  </SelectItem>
-                  <SelectItem value="PUBLIC_TO_EVERYONE">Público</SelectItem>
+                  {TIKTOK_PRIVACY_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-white/50">
+                Si TikTok aún limita tu app, el servidor usará el nivel
+                permitido más cercano.
+              </p>
             </div>
 
             <div className="space-y-3 p-4 bg-zinc-950/50 rounded">

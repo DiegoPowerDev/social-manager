@@ -265,8 +265,7 @@ export async function GET(req: NextRequest) {
                 title: post.message || post.title || "Video",
                 videoUrl: post.videoUrl,
                 // Preferencia del post si la guardas al programar; si no, el adapter usa lo permitido
-                privacyLevel:
-                  post.tiktokPrivacy || post.privacyLevel || undefined,
+                privacyLevel: post.tiktokPrivacy || undefined,
               }),
             });
             const data = await res.json();

@@ -107,7 +107,12 @@ export function SchedulePostModal({
   const [youtubePrivacy, setYoutubePrivacy] = useState<
     "public" | "unlisted" | "private"
   >("public");
-
+  const [tiktokPrivacy, setTiktokPrivacy] = useState<
+    | "PUBLIC_TO_EVERYONE"
+    | "MUTUAL_FOLLOW_FRIENDS"
+    | "FOLLOWER_OF_CREATOR"
+    | "SELF_ONLY"
+  >("PUBLIC_TO_EVERYONE");
   const [dateStr, setDateStr] = useState("");
   const [time, setTime] = useState("10:00");
   const [saving, setSaving] = useState(false);
@@ -146,6 +151,7 @@ export function SchedulePostModal({
     setYoutubeTitle(p.youtubeTitle || "");
     setYoutubePrivacy(p.youtubePrivacy || "public");
     setDateStr(format(p.scheduledAt, "yyyy-MM-dd"));
+    setTiktokPrivacy((p as any).tiktokPrivacy || "PUBLIC_TO_EVERYONE");
     setTime(format(p.scheduledAt, "HH:mm"));
   };
 
@@ -162,6 +168,7 @@ export function SchedulePostModal({
     setYoutubePrivacy("public");
     setInstagramMediaType("FEED");
     setEditing(true);
+    setTiktokPrivacy("PUBLIC_TO_EVERYONE");
   };
 
   // Cargar cuentas
@@ -438,6 +445,7 @@ export function SchedulePostModal({
         ? youtubeTitle.trim() || message.slice(0, 100)
         : null,
       youtubePrivacy: selectedYouTube ? youtubePrivacy : null,
+      tiktokPrivacy: selectedTikTok ? tiktokPrivacy : null,
       scheduledAt: Timestamp.fromDate(scheduledAt),
       updatedAt: Timestamp.now(),
     };
@@ -732,7 +740,40 @@ export function SchedulePostModal({
                   </div>
                 </div>
               )}
-
+              {selectedTikTok && (
+                <div className="space-y-2">
+                  <Label className="text-white">Visibilidad TikTok</Label>
+                  <Select
+                    value={tiktokPrivacy}
+                    onValueChange={(v) =>
+                      setTiktokPrivacy(
+                        v as
+                          | "PUBLIC_TO_EVERYONE"
+                          | "MUTUAL_FOLLOW_FRIENDS"
+                          | "FOLLOWER_OF_CREATOR"
+                          | "SELF_ONLY",
+                      )
+                    }
+                    disabled={locked || saving}
+                  >
+                    <SelectTrigger className="bg-white max-w-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PUBLIC_TO_EVERYONE">
+                        Público
+                      </SelectItem>
+                      <SelectItem value="MUTUAL_FOLLOW_FRIENDS">
+                        Amigos
+                      </SelectItem>
+                      <SelectItem value="FOLLOWER_OF_CREATOR">
+                        Seguidores
+                      </SelectItem>
+                      <SelectItem value="SELF_ONLY">Solo yo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               {isCarousel && (
                 <p className="text-xs text-amber-200">
                   Carrusel: {imageUrls.length}/10 (mín. 2). FB/LI usarán la 1ª

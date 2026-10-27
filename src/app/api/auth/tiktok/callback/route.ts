@@ -76,7 +76,6 @@ export async function GET(req: NextRequest) {
       console.warn("TikTok user info:", e);
     }
 
-    // Doc id estable por empresa + open_id
     const docId = `${companyId}_tiktok_${openId}`;
 
     await adminDb

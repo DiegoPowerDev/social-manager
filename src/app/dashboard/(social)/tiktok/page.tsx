@@ -48,7 +48,8 @@ export default function TikTokPage() {
 
   const [title, setTitle] = useState("");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [privacyLevel, setPrivacyLevel] = useState<TikTokPrivacy>("SELF_ONLY");
+  const [privacyLevel, setPrivacyLevel] =
+    useState<TikTokPrivacy>("PUBLIC_TO_EVERYONE");
 
   const loadAccount = async () => {
     try {
@@ -124,17 +125,13 @@ export default function TikTokPage() {
           name: account.name || account.username,
           title: title.trim(),
           videoUrl,
-          // Sandbox / no auditado: solo privado
-          privacyLevel: "SELF_ONLY",
+          privacyLevel,
         }),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Error al publicar");
 
-      toast.success(
-        "Video enviado a TikTok (en sandbox suele quedar solo visible para ti)",
-        { id: tid },
-      );
+      toast.success("Video enviado a TikTok", { id: tid });
       setTitle("");
       setVideoUrl(null);
       setHistoryKey((k) => k + 1);
@@ -272,7 +269,6 @@ export default function TikTokPage() {
               privacyLevel={privacyLevel}
               onPrivacyChange={setPrivacyLevel}
               onPublish={handlePublish}
-              forcePrivate
             />
           )}
         </div>

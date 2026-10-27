@@ -53,6 +53,12 @@ export interface ScheduledPost {
   instagramMediaType?: IgMediaType | null;
   youtubeTitle?: string | null;
   youtubePrivacy?: "public" | "unlisted" | "private" | null;
+  tiktokPrivacy?:
+    | "PUBLIC_TO_EVERYONE"
+    | "MUTUAL_FOLLOW_FRIENDS"
+    | "FOLLOWER_OF_CREATOR"
+    | "SELF_ONLY"
+    | null;
   scheduledAt: Date;
   status: "scheduled" | "publishing" | "published" | "failed";
   results?: Record<string, { success: boolean; message?: string }>;
