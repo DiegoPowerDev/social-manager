@@ -3,6 +3,7 @@ import { getPayPalAccessToken, paypalBase } from "@/lib/paypal";
 import {
   provisionFromPayPal,
   cancelPayPalSubscription,
+  suspendPayPalSubscription,
 } from "@/lib/billing-provision";
 
 export const maxDuration = 60;
@@ -38,6 +39,16 @@ async function verifyWebhook(headers: Headers, body: string) {
   return data.verification_status === "SUCCESS";
 }
 
+/** Si no viene custom_id, intenta mapear plan_id de PayPal → planKey */
+function planKeyFromPayPalPlanId(planId?: string): string | null {
+  if (!planId) return null;
+  const map: Record<string, string> = {
+    [process.env.PAYPAL_PLAN_BASIC_MONTHLY || ""]: "basic_monthly",
+    [process.env.PAYPAL_PLAN_PREMIUM_MONTHLY || ""]: "premium_monthly",
+  };
+  return map[planId] || null;
+}
+
 export async function POST(req: NextRequest) {
   const raw = await req.text();
 
@@ -52,7 +63,11 @@ export async function POST(req: NextRequest) {
 
     console.log("PayPal webhook:", type, resource.id);
 
-    if (type === "BILLING.SUBSCRIPTION.ACTIVATED") {
+    // Activación / creación de suscripción
+    if (
+      type === "BILLING.SUBSCRIPTION.ACTIVATED" ||
+      type === "BILLING.SUBSCRIPTION.CREATED"
+    ) {
       let meta: {
         companyId?: string;
         planKey?: string;
@@ -66,10 +81,17 @@ export async function POST(req: NextRequest) {
 
       const email = resource.subscriber?.email_address || meta.email || null;
 
+      const planKey =
+        meta.planKey ||
+        planKeyFromPayPalPlanId(resource.plan_id) ||
+        "premium_monthly";
+
+      // CREATED a veces llega antes de estar ACTIVE; provisionar igual
+      // (idempotente por merge). Si falla por estado, ACTIVATED reintenta.
       const result = await provisionFromPayPal({
         email,
         subscriptionId: resource.id,
-        planKey: meta.planKey || "premium_monthly",
+        planKey,
         companyId: meta.companyId,
       });
 
@@ -81,6 +103,36 @@ export async function POST(req: NextRequest) {
       type === "BILLING.SUBSCRIPTION.EXPIRED"
     ) {
       await cancelPayPalSubscription(resource.id);
+    }
+
+    if (type === "BILLING.SUBSCRIPTION.SUSPENDED") {
+      await suspendPayPalSubscription(resource.id);
+    }
+
+    // Opcional: reactivación tras past_due (algunos flujos PayPal)
+    if (type === "BILLING.SUBSCRIPTION.RE-ACTIVATED") {
+      let meta: {
+        companyId?: string;
+        planKey?: string;
+        email?: string | null;
+      } = {};
+      try {
+        if (resource.custom_id) meta = JSON.parse(resource.custom_id);
+      } catch {
+        /* ignore */
+      }
+      const email = resource.subscriber?.email_address || meta.email || null;
+      const planKey =
+        meta.planKey ||
+        planKeyFromPayPalPlanId(resource.plan_id) ||
+        "premium_monthly";
+
+      await provisionFromPayPal({
+        email,
+        subscriptionId: resource.id,
+        planKey,
+        companyId: meta.companyId,
+      });
     }
 
     return NextResponse.json({ received: true });

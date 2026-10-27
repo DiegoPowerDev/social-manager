@@ -32,18 +32,12 @@ export async function getPayPalAccessToken(): Promise<string> {
   return data.access_token as string;
 }
 
-export type PlanKey =
-  | "basic_monthly"
-  | "basic_yearly"
-  | "premium_monthly"
-  | "premium_yearly";
+export type PlanKey = "basic_monthly" | "premium_monthly";
 
 export function getPlanId(key: PlanKey): string | undefined {
   const map: Record<PlanKey, string | undefined> = {
     basic_monthly: process.env.PAYPAL_PLAN_BASIC_MONTHLY,
-    basic_yearly: process.env.PAYPAL_PLAN_BASIC_YEARLY,
     premium_monthly: process.env.PAYPAL_PLAN_PREMIUM_MONTHLY,
-    premium_yearly: process.env.PAYPAL_PLAN_PREMIUM_YEARLY,
   };
   return map[key];
 }

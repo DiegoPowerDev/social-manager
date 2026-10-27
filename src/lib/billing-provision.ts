@@ -3,17 +3,13 @@ import { adminDb, FieldValue } from "@/lib/firebase-admin";
 import { findAuthUserByEmail, createAuthUser } from "@/lib/firebase-auth-rest";
 import { sendHostingerEmail } from "@/lib/hostinger-mail";
 
-export type PayPalPlanKey =
-  | "basic_monthly"
-  | "basic_yearly"
-  | "premium_monthly"
-  | "premium_yearly";
+export type PayPalPlanKey = "basic_monthly" | "premium_monthly";
 
 const PLAN_CONFIG: Record<
   PayPalPlanKey,
   {
     plan: "basic" | "premium";
-    interval: "month" | "year";
+    interval: "month";
     aiEnabled: boolean;
     aiCaptionsPerMonth: number;
     aiImagesPerMonth: number;
@@ -26,26 +22,12 @@ const PLAN_CONFIG: Record<
     aiCaptionsPerMonth: 0,
     aiImagesPerMonth: 0,
   },
-  basic_yearly: {
-    plan: "basic",
-    interval: "year",
-    aiEnabled: false,
-    aiCaptionsPerMonth: 0,
-    aiImagesPerMonth: 0,
-  },
   premium_monthly: {
     plan: "premium",
     interval: "month",
     aiEnabled: true,
     aiCaptionsPerMonth: 100,
     aiImagesPerMonth: 30,
-  },
-  premium_yearly: {
-    plan: "premium",
-    interval: "year",
-    aiEnabled: true,
-    aiCaptionsPerMonth: 150,
-    aiImagesPerMonth: 50,
   },
 };
 
@@ -57,6 +39,18 @@ function membershipId(uid: string, companyId: string) {
   return `${uid}_${companyId}`;
 }
 
+function resolvePlanKey(raw: string): PayPalPlanKey {
+  // compat por si aún llega un yearly viejo
+  if (raw === "basic_yearly" || raw === "basic_monthly") return "basic_monthly";
+  if (raw === "premium_yearly" || raw === "premium_monthly")
+    return "premium_monthly";
+  if (raw === "basic") return "basic_monthly";
+  if (raw === "premium") return "premium_monthly";
+  return PLAN_CONFIG[raw as PayPalPlanKey]
+    ? (raw as PayPalPlanKey)
+    : "premium_monthly";
+}
+
 async function sendWelcomeEmail(opts: {
   to: string;
   password: string | null;
@@ -66,22 +60,22 @@ async function sendWelcomeEmail(opts: {
   const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL}/login`;
   const subject = opts.isNew
     ? "Tu cuenta en TrendlyStudio está lista"
-    : "Tu suscripción en TrendlyStudio se activó";
+    : "Tu suscripción en TrendlyStudio se actualizó";
 
   const passwordBlock =
     opts.isNew && opts.password
       ? `<p><strong>Email:</strong> ${opts.to}<br/>
          <strong>Contraseña temporal:</strong> ${opts.password}</p>
          <p>Te recomendamos cambiarla después de entrar.</p>`
-      : `<p>Usa el mismo email con el que pagaste para iniciar sesión.</p>`;
+      : `<p>Usa el mismo email con el que pagaste para iniciar sesión. Tu plan ya está activo.</p>`;
 
   await sendHostingerEmail({
     to: opts.to,
     subject,
     html: `
       <div style="font-family:sans-serif;max-width:520px">
-        <h2>Bienvenido a TrendlyStudio</h2>
-        <p>Tu plan <strong>${opts.plan}</strong> ya está activo.</p>
+        <h2>TrendlyStudio</h2>
+        <p>Tu plan <strong>${opts.plan}</strong> está activo.</p>
         ${passwordBlock}
         <p><a href="${loginUrl}">Iniciar sesión</a></p>
       </div>
@@ -90,20 +84,53 @@ async function sendWelcomeEmail(opts: {
   });
 }
 
+/** Empresa del usuario si no viene companyId en el checkout */
+async function resolveCompanyIdForUser(
+  uid: string,
+  preferredCompanyId?: string,
+): Promise<string | null> {
+  if (preferredCompanyId) {
+    const mem = await adminDb
+      .collection("memberships")
+      .doc(membershipId(uid, preferredCompanyId))
+      .get();
+    if (mem.exists) return preferredCompanyId;
+  }
+
+  const userSnap = await adminDb.collection("users").doc(uid).get();
+  const active = userSnap.data()?.activeCompanyId as string | undefined;
+  if (active) {
+    const mem = await adminDb
+      .collection("memberships")
+      .doc(membershipId(uid, active))
+      .get();
+    if (mem.exists) return active;
+  }
+
+  const mems = await adminDb
+    .collection("memberships")
+    .where("uid", "==", uid)
+    .limit(1)
+    .get();
+  if (!mems.empty) return mems.docs[0].data().companyId as string;
+
+  return null;
+}
+
 export async function provisionFromPayPal(params: {
   email: string | null;
   subscriptionId: string;
   planKey: string;
   companyId?: string;
 }) {
-  const { email, subscriptionId, companyId: existingCompanyId } = params;
+  const { email, subscriptionId } = params;
 
   if (!email) {
     throw new Error("No email in PayPal subscription");
   }
 
-  const planKey = (params.planKey || "premium_monthly") as PayPalPlanKey;
-  const config = PLAN_CONFIG[planKey] || PLAN_CONFIG.premium_monthly;
+  const planKey = resolvePlanKey(params.planKey || "premium_monthly");
+  const config = PLAN_CONFIG[planKey];
 
   let uid: string;
   let plainPassword: string | null = null;
@@ -123,7 +150,6 @@ export async function provisionFromPayPal(params: {
     isNewUser = true;
   }
 
-  // users/{uid}
   await adminDb
     .collection("users")
     .doc(uid)
@@ -138,7 +164,21 @@ export async function provisionFromPayPal(params: {
       { merge: true },
     );
 
-  let companyId = existingCompanyId;
+  let companyId =
+    (await resolveCompanyIdForUser(uid, params.companyId)) || null;
+
+  const companyPayload = {
+    plan: config.plan,
+    planStatus: "active" as const,
+    planSource: "billing" as const,
+    features: { aiEnabled: config.aiEnabled },
+    limits: {
+      aiCaptionsPerMonth: config.aiCaptionsPerMonth,
+      aiImagesPerMonth: config.aiImagesPerMonth,
+    },
+    paypalSubscriptionId: subscriptionId,
+    updatedAt: FieldValue.serverTimestamp(),
+  };
 
   if (!companyId) {
     const companyRef = adminDb.collection("companies").doc();
@@ -150,15 +190,7 @@ export async function provisionFromPayPal(params: {
       aiInstructions: "",
       createdAt: FieldValue.serverTimestamp(),
       createdBy: uid,
-      plan: config.plan,
-      planStatus: "active",
-      features: { aiEnabled: config.aiEnabled },
-      limits: {
-        aiCaptionsPerMonth: config.aiCaptionsPerMonth,
-        aiImagesPerMonth: config.aiImagesPerMonth,
-      },
-      paypalSubscriptionId: subscriptionId,
-      updatedAt: FieldValue.serverTimestamp(),
+      ...companyPayload,
     });
 
     await adminDb
@@ -171,37 +203,16 @@ export async function provisionFromPayPal(params: {
         email,
         createdAt: FieldValue.serverTimestamp(),
       });
-
-    await adminDb.collection("users").doc(uid).set(
-      {
-        activeCompanyId: companyId,
-      },
-      { merge: true },
-    );
   } else {
     await adminDb
       .collection("companies")
       .doc(companyId)
-      .set(
-        {
-          plan: config.plan,
-          planStatus: "active",
-          features: { aiEnabled: config.aiEnabled },
-          limits: {
-            aiCaptionsPerMonth: config.aiCaptionsPerMonth,
-            aiImagesPerMonth: config.aiImagesPerMonth,
-          },
-          paypalSubscriptionId: subscriptionId,
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true },
-      );
+      .set(companyPayload, { merge: true });
 
     const memRef = adminDb
       .collection("memberships")
       .doc(membershipId(uid, companyId));
-    const memSnap = await memRef.get();
-    if (!memSnap.exists) {
+    if (!(await memRef.get()).exists) {
       await memRef.set({
         uid,
         companyId,
@@ -210,11 +221,14 @@ export async function provisionFromPayPal(params: {
         createdAt: FieldValue.serverTimestamp(),
       });
     }
-    await adminDb
-      .collection("users")
-      .doc(uid)
-      .set({ activeCompanyId: companyId }, { merge: true });
   }
+
+  await adminDb.collection("users").doc(uid).set(
+    {
+      activeCompanyId: companyId,
+    },
+    { merge: true },
+  );
 
   await adminDb.collection("subscriptions").doc(subscriptionId).set(
     {
@@ -243,7 +257,30 @@ export async function provisionFromPayPal(params: {
     console.error("Welcome email failed (user already provisioned):", e);
   }
 
-  return { ok: true, companyId, uid, isNewUser };
+  return { ok: true, companyId, uid, isNewUser, plan: config.plan };
+}
+
+async function setCompanyInactive(
+  companyId: string,
+  planStatus: "cancelled" | "past_due",
+) {
+  await adminDb
+    .collection("companies")
+    .doc(companyId)
+    .set(
+      {
+        plan: "free",
+        planStatus,
+        planSource: "billing",
+        features: { aiEnabled: false },
+        limits: {
+          aiCaptionsPerMonth: 15,
+          aiImagesPerMonth: 3,
+        },
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
 }
 
 export async function cancelPayPalSubscription(subscriptionId: string) {
@@ -258,18 +295,23 @@ export async function cancelPayPalSubscription(subscriptionId: string) {
   });
 
   if (data.companyId) {
-    await adminDb
-      .collection("companies")
-      .doc(data.companyId)
-      .update({
-        plan: "free",
-        planStatus: "cancelled",
-        features: { aiEnabled: false },
-        limits: {
-          aiCaptionsPerMonth: 15,
-          aiImagesPerMonth: 3,
-        },
-        updatedAt: FieldValue.serverTimestamp(),
-      });
+    await setCompanyInactive(data.companyId, "cancelled");
+  }
+}
+
+/** Pago fallido / suspendido por PayPal → free + past_due (cron no publica) */
+export async function suspendPayPalSubscription(subscriptionId: string) {
+  const ref = adminDb.collection("subscriptions").doc(subscriptionId);
+  const snap = await ref.get();
+  if (!snap.exists) return;
+
+  const data = snap.data()!;
+  await ref.update({
+    status: "suspended",
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
+  if (data.companyId) {
+    await setCompanyInactive(data.companyId, "past_due");
   }
 }

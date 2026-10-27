@@ -256,6 +256,14 @@ export default function MembresiaPage() {
                 {error}
               </p>
             )}
+            {(planStatus === "past_due" ||
+              (subInfo?.status || "").toLowerCase() === "suspended") && (
+              <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-md p-3">
+                Hay un problema con el pago. Actualiza el método en PayPal o
+                vuelve a contratar un plan. Mientras tanto el acceso queda en
+                plan gratuito.
+              </p>
+            )}
 
             <Card className="bg-zinc-950/50 p-6">
               <CardHeader>

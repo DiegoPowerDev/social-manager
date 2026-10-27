@@ -6,19 +6,20 @@ import {
   type PlanKey,
 } from "@/lib/paypal";
 
-const VALID: PlanKey[] = [
-  "basic_monthly",
-  "basic_yearly",
-  "premium_monthly",
-  "premium_yearly",
-];
+const VALID: PlanKey[] = ["basic_monthly", "premium_monthly"];
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const planKey = body.planKey as PlanKey;
-    const companyId = (body.companyId as string) || "new";
-    const email = (body.email as string) || undefined;
+    const companyId =
+      typeof body.companyId === "string" && body.companyId.trim()
+        ? body.companyId.trim()
+        : undefined;
+    const email =
+      typeof body.email === "string" && body.email.trim()
+        ? body.email.trim()
+        : undefined;
 
     if (!VALID.includes(planKey)) {
       return NextResponse.json({ error: "Plan inválido" }, { status: 400 });
@@ -40,6 +41,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const customPayload: {
+      planKey: string;
+      companyId?: string;
+      email?: string | null;
+    } = {
+      planKey,
+      email: email || null,
+    };
+    if (companyId) customPayload.companyId = companyId;
+
     const token = await getPayPalAccessToken();
     const res = await fetch(`${paypalBase()}/v1/billing/subscriptions`, {
       method: "POST",
@@ -50,7 +61,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         plan_id: planId,
-        custom_id: JSON.stringify({ companyId, planKey, email: email || null }),
+        custom_id: JSON.stringify(customPayload),
         application_context: {
           brand_name: "TrendlyStudio",
           locale: "es-ES",
