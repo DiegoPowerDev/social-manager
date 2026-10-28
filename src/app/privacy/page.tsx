@@ -27,12 +27,14 @@ export default function PrivacyPage() {
 
         <h2>1. Responsable del tratamiento</h2>
         <p>
-          El responsable del tratamiento de los datos personales es el operador
-          de TrendlyStudio.
+          El responsable del tratamiento de los datos personales es{" "}
+          <strong>TORRES PACHERRES DIEGO ARTURO</strong>, operador de la
+          plataforma comercialmente conocida como TrendlyStudio, accesible en{" "}
+          <a href="https://www.trendly.studio">https://www.trendly.studio</a>.
         </p>
         <p>
           Contacto de privacidad y soporte:{" "}
-          <strong>business_manager@trendly.studio</strong>
+          <strong>bussiness_manager@trendly.studio</strong>
         </p>
         <p>
           (Si usas otro buzón de soporte, sustituye este email por el definitivo

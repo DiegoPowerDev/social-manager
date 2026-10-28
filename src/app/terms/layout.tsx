@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+
 export default function RootLayout({
   children,
 }: {
@@ -5,8 +7,8 @@ export default function RootLayout({
 }) {
   return (
     <div
-      style={{ backgroundImage: `url("/background.webp")` }}
-      className="bg-cover bg-no-repeat"
+      style={{ backgroundImage: `url("/home-background.webp")` }}
+      className={cn("bg-cover bg-no-repeat min-h-screen ")}
     >
       {children}
     </div>

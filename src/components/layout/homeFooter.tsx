@@ -1,5 +1,4 @@
 import Link from "next/link";
-import React from "react";
 
 export default function HomeFooter() {
   return (
@@ -9,6 +8,10 @@ export default function HomeFooter() {
           <p className="font-semibold">TrendlyStudio</p>
           <p className="mt-1 text-sm text-zinc-300">
             Publicación y programación para equipos de marketing.
+          </p>
+          <p className="mt-2 text-sm text-zinc-400">
+            Operado por{" "}
+            <span className="text-zinc-200">TORRES PACHERRES DIEGO ARTURO</span>
           </p>
         </div>
         <div className="flex flex-col flex-wrap gap-4 text-sm text-zinc-400">
@@ -21,8 +24,9 @@ export default function HomeFooter() {
         </div>
       </div>
       <p className="mx-auto mt-8 max-w-6xl px-4 text-center text-xs text-zinc-400 sm:px-6">
-        © {new Date().getFullYear()} TrendlyStudio. Facebook, Instagram,
-        LinkedIn y YouTube son marcas de sus respectivos propietarios.
+        © {new Date().getFullYear()} TORRES PACHERRES DIEGO ARTURO ·
+        TrendlyStudio. Facebook, Instagram, LinkedIn y YouTube son marcas de sus
+        respectivos propietarios.
       </p>
     </footer>
   );

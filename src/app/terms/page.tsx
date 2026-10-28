@@ -12,15 +12,18 @@ export default function TermsPage() {
         <p>Última actualización: 20 de octubre de 2026</p>
 
         <p>
-          Estos Términos del servicio (“Términos”) regulan el acceso y uso de{" "}
-          <strong>TrendlyStudio</strong> (“el Servicio”, “la Plataforma”,
-          “nosotros”), disponible en{" "}
+          Estos Términos del servicio (“Términos”) regulan el acceso y uso de la
+          plataforma comercialmente conocida como <strong>TrendlyStudio</strong>{" "}
+          (“el Servicio”, “la Plataforma”), operada por{" "}
+          <strong>TORRES PACHERRES DIEGO ARTURO</strong>, disponible en{" "}
           <a href="https://www.trendly.studio">https://www.trendly.studio</a>.
         </p>
         <p>
           Al crear una cuenta, contratar un plan o utilizar el Servicio, aceptas
           estos Términos y nuestra{" "}
-          <a href="https://www.trendly.studio/policy">Política de privacidad</a>
+          <a href="https://www.trendly.studio/privacy">
+            Política de privacidad
+          </a>
           . Si no estás de acuerdo, no uses el Servicio.
         </p>
 
@@ -199,10 +202,11 @@ export default function TermsPage() {
 
         <h2>9. Propiedad intelectual de TrendlyStudio</h2>
         <p>
-          El software, diseño, marcas, textos de la interfaz y demás elementos
-          del Servicio (excluyendo tu contenido) son propiedad de TrendlyStudio
-          o de sus licenciantes. No se concede ninguna licencia salvo la de uso
-          del Servicio según estos Términos.
+          El software, diseño, marcas y textos de la interfaz del Servicio
+          (excluyendo tu contenido) son propiedad de TORRES PACHERRES DIEGO
+          ARTURO o de sus licenciantes, bajo la marca TrendlyStudio. No se
+          concede ninguna licencia salvo la de uso del Servicio según estos
+          Términos.
         </p>
 
         <h2>10. Disponibilidad y cambios</h2>
@@ -234,7 +238,7 @@ export default function TermsPage() {
 
         <h2>12. Indemnidad</h2>
         <p>
-          Te comprometes a indennizar y mantener indemne a TrendlyStudio frente
+          Te comprometes a indemnizar y mantener indemne a TrendlyStudio frente
           a reclamaciones de terceros derivadas de tu contenido, de tu uso del
           Servicio o del incumplimiento de estos Términos o de las normas de
           plataformas externas.
