@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import { getAuth } from "firebase-admin/auth";
 import { adminDb } from "@/lib/firebase-admin";
 
 export type EffectivePlan = {
@@ -19,12 +18,11 @@ const DEFAULT_LIMITS = {
 } as const;
 
 function isUntilValid(until?: string | null) {
-  if (!until) return true; // sin fecha = vigente hasta que lo quites
+  if (!until) return true;
   const t = new Date(until).getTime();
   return !Number.isNaN(t) && t > Date.now();
 }
 
-/** Prioridad: cortesía → socio → plan de facturación */
 export function getEffectivePlanFromCompany(company: any): EffectivePlan {
   const courtesy = company?.courtesy;
   if (courtesy?.active && isUntilValid(courtesy.until)) {
@@ -51,7 +49,7 @@ export function getEffectivePlanFromCompany(company: any): EffectivePlan {
     const base = DEFAULT_LIMITS[plan];
     return {
       plan,
-      aiEnabled: partner.tier === "basic" ? base.aiEnabled : true,
+      aiEnabled: true,
       limits: {
         aiCaptionsPerMonth:
           partner.limits?.aiCaptionsPerMonth ?? (plan === "basic" ? 100 : 150),
@@ -81,6 +79,41 @@ export function getEffectivePlanFromCompany(company: any): EffectivePlan {
   };
 }
 
+/** Verifica ID token sin firebase-admin/auth (evita crash jose/ESM en Vercel) */
+async function verifyFirebaseIdToken(
+  idToken: string,
+): Promise<{ uid: string; email?: string }> {
+  const apiKey =
+    process.env.FIREBASE_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+
+  if (!apiKey) {
+    throw Object.assign(
+      new Error("FIREBASE_API_KEY no configurada en el servidor"),
+      { status: 500 },
+    );
+  }
+
+  const res = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken }),
+    },
+  );
+
+  const data = await res.json();
+
+  if (!res.ok || !data.users?.[0]?.localId) {
+    throw Object.assign(new Error("Token inválido o expirado"), {
+      status: 401,
+    });
+  }
+
+  const u = data.users[0];
+  return { uid: u.localId as string, email: u.email as string | undefined };
+}
+
 export async function requireCompanyMember(
   req: NextRequest,
   companyId: string,
@@ -94,16 +127,9 @@ export async function requireCompanyMember(
     throw Object.assign(new Error("No autenticado"), { status: 401 });
   }
 
-  let decoded: { uid: string };
-  try {
-    decoded = await getAuth().verifyIdToken(token);
-  } catch {
-    throw Object.assign(new Error("Token inválido o expirado"), {
-      status: 401,
-    });
-  }
+  const { uid } = await verifyFirebaseIdToken(token);
 
-  const membershipId = `${decoded.uid}_${companyId}`;
+  const membershipId = `${uid}_${companyId}`;
   const memSnap = await adminDb
     .collection("memberships")
     .doc(membershipId)
@@ -116,18 +142,17 @@ export async function requireCompanyMember(
   }
 
   const role = memSnap.data()?.role as string | undefined;
-  // Solo admin/editor gastan IA (viewer no)
   if (role !== "admin" && role !== "editor") {
     throw Object.assign(new Error("Tu rol no puede usar IA"), {
       status: 403,
     });
   }
 
-  return { uid: decoded.uid, role };
+  return { uid, role };
 }
 
 export function jsonError(error: any) {
-  const status = error?.status || 500;
+  const status = typeof error?.status === "number" ? error.status : 500;
   return {
     status,
     body: { error: error?.message || "Error interno" },
