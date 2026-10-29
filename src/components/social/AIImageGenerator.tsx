@@ -18,9 +18,20 @@ import { useAiUsage } from "@/app/hooks/useAiUsage";
 import { canUseAi } from "@/content/access";
 import { AiLockedOverlay } from "../auth/AiLockedOverlay";
 import { cn } from "@/lib/utils";
+import { auth } from "@/lib/firebase";
 
 interface Props {
   onGenerate: (imageUrl: string) => void;
+}
+
+async function authHeaders(): Promise<HeadersInit> {
+  const user = auth.currentUser;
+  if (!user) throw new Error("No autenticado");
+  const token = await user.getIdToken();
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
 }
 
 const MAX_REFS = 3;
@@ -195,7 +206,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
 
       const res = await fetch("/api/ai/generate-image", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await authHeaders(),
         body: JSON.stringify({
           prompt: buildFinalPrompt(),
           imageUrl: imageUrls[0],
@@ -203,7 +214,6 @@ export function AIImageGenerator({ onGenerate }: Props) {
           companyId,
         }),
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al generar la imagen");
 

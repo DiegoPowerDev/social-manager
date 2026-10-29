@@ -4,8 +4,12 @@ import {
   consumeAiCreditAdmin,
   getCompanyAdmin,
   getAiUsageAdmin,
-} from "@/lib/tenant-admin"; // o donde tengas las funciones Admin
-import { PLAN_LIMITS } from "@/lib/tenant";
+} from "@/lib/tenant-admin";
+import {
+  getEffectivePlanFromCompany,
+  requireCompanyMember,
+  jsonError,
+} from "@/lib/ai-route-helpers";
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,12 +18,14 @@ export async function POST(req: NextRequest) {
     if (!companyId) {
       return NextResponse.json({ error: "Falta companyId" }, { status: 400 });
     }
-    if (!topic || topic.trim().length < 3) {
+    if (!topic || typeof topic !== "string" || topic.trim().length < 3) {
       return NextResponse.json(
         { error: "Escribe al menos un tema o idea" },
         { status: 400 },
       );
     }
+
+    await requireCompanyMember(req, companyId);
 
     const company = await getCompanyAdmin(companyId);
     if (!company) {
@@ -28,16 +34,18 @@ export async function POST(req: NextRequest) {
         { status: 404 },
       );
     }
-    if (company.features?.aiEnabled === false) {
+
+    const effective = getEffectivePlanFromCompany(company);
+    if (!effective.aiEnabled) {
       return NextResponse.json(
         { error: "Tu plan no incluye IA" },
         { status: 403 },
       );
     }
 
-    const limits = company.limits || PLAN_LIMITS.free;
+    const limit = effective.limits.aiCaptionsPerMonth;
+    const imagesLimit = effective.limits.aiImagesPerMonth;
     const usage = await getAiUsageAdmin(companyId);
-    const limit = limits.aiCaptionsPerMonth ?? 15;
 
     if (usage.aiCaptions >= limit) {
       return NextResponse.json(
@@ -48,31 +56,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const safePlatform =
+      platform === "facebook" || platform === "instagram"
+        ? platform
+        : "general";
+
     const caption = await generateCaption({
-      topic,
-      platform,
-      tone,
+      topic: topic.trim(),
+      platform: safePlatform,
+      tone: typeof tone === "string" ? tone : undefined,
       brandInstructions: company.aiInstructions || "",
     });
 
     await consumeAiCreditAdmin(companyId, "caption");
 
-    const used = usage.aiCaptions + 1;
-
     return NextResponse.json({
       caption,
       usage: {
-        aiCaptions: used,
+        aiCaptions: usage.aiCaptions + 1,
         aiCaptionsLimit: limit,
         aiImages: usage.aiImages,
-        aiImagesLimit: limits.aiImagesPerMonth ?? 3,
+        aiImagesLimit: imagesLimit,
       },
     });
   } catch (error: any) {
     console.error("Error generando caption:", error);
-    return NextResponse.json(
-      { error: error.message || "Error al generar el texto con IA" },
-      { status: 500 },
-    );
+    const { status, body } = jsonError(error);
+    return NextResponse.json(body, { status });
   }
 }

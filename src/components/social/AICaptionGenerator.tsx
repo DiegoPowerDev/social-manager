@@ -18,10 +18,20 @@ import { useAiUsage } from "@/app/hooks/useAiUsage";
 import { canUseAi } from "@/content/access";
 import { AiLockedOverlay } from "@/components/auth/AiLockedOverlay";
 import { cn } from "@/lib/utils";
+import { auth } from "@/lib/firebase";
 
 interface Props {
   platform?: "facebook" | "instagram" | "general";
   onGenerate: (caption: string) => void;
+}
+async function authHeaders(): Promise<HeadersInit> {
+  const user = auth.currentUser;
+  if (!user) throw new Error("No autenticado");
+  const token = await user.getIdToken();
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
 }
 
 export function AICaptionGenerator({
@@ -64,13 +74,8 @@ export function AICaptionGenerator({
     try {
       const res = await fetch("/api/ai/generate-caption", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          topic,
-          platform,
-          tone,
-          companyId,
-        }),
+        headers: await authHeaders(),
+        body: JSON.stringify({ topic, platform, tone, companyId }),
       });
 
       const data = await res.json();

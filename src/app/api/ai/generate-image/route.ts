@@ -5,21 +5,27 @@ import {
   getCompanyAdmin,
   getAiUsageAdmin,
 } from "@/lib/tenant-admin";
-import { PLAN_LIMITS } from "@/lib/tenant";
+import {
+  getEffectivePlanFromCompany,
+  requireCompanyMember,
+  jsonError,
+} from "@/lib/ai-route-helpers";
 
 export async function POST(req: NextRequest) {
   try {
     const { prompt, imageUrl, imageUrls, companyId } = await req.json();
+
     if (!companyId) {
       return NextResponse.json({ error: "Falta companyId" }, { status: 400 });
     }
-
-    if (!prompt || prompt.trim().length < 3) {
+    if (!prompt || typeof prompt !== "string" || prompt.trim().length < 3) {
       return NextResponse.json(
         { error: "Escribe un prompt descriptivo" },
         { status: 400 },
       );
     }
+
+    await requireCompanyMember(req, companyId);
 
     const company = await getCompanyAdmin(companyId);
     if (!company) {
@@ -29,17 +35,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (company.features?.aiEnabled === false) {
+    const effective = getEffectivePlanFromCompany(company);
+    if (!effective.aiEnabled) {
       return NextResponse.json(
         { error: "Tu plan no incluye IA" },
         { status: 403 },
       );
     }
 
-    const limits = company.limits || PLAN_LIMITS.free;
+    const imagesLimit = effective.limits.aiImagesPerMonth;
+    const captionsLimit = effective.limits.aiCaptionsPerMonth;
     const usage = await getAiUsageAdmin(companyId);
-    const imagesLimit = limits.aiImagesPerMonth ?? 3;
-    const captionsLimit = limits.aiCaptionsPerMonth ?? 15;
 
     if (usage.aiImages >= imagesLimit) {
       return NextResponse.json(
@@ -56,18 +62,19 @@ export async function POST(req: NextRequest) {
       : prompt.trim();
 
     const refs: string[] = Array.isArray(imageUrls)
-      ? imageUrls.filter((u: string) => typeof u === "string" && u.length > 0)
-      : imageUrl
+      ? imageUrls.filter(
+          (u: unknown) => typeof u === "string" && (u as string).length > 0,
+        )
+      : typeof imageUrl === "string" && imageUrl
         ? [imageUrl]
         : [];
 
     const generatedImageUrl = await generateImage({
-      prompt,
+      prompt: finalPrompt,
       imageUrl: refs[0],
       imageUrls: refs,
     });
 
-    // Solo si la generación salió bien
     await consumeAiCreditAdmin(companyId, "image");
 
     return NextResponse.json({
@@ -81,9 +88,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error("Error generando imagen:", error);
-    return NextResponse.json(
-      { error: error.message || "Error al generar la imagen" },
-      { status: 500 },
-    );
+    const { status, body } = jsonError(error);
+    return NextResponse.json(body, { status });
   }
 }
