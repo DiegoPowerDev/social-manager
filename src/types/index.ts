@@ -86,3 +86,54 @@ export interface Membership {
   role: MemberRole;
   createdAt: Date;
 }
+export type CompanyPlan = "free" | "basic" | "premium";
+
+export type CompanyCourtesy = {
+  active?: boolean;
+  plan?: CompanyPlan | string;
+  until?: unknown; // Timestamp | string | Date
+  reason?: string | null;
+  limits?: {
+    aiCaptionsPerMonth?: number;
+    aiImagesPerMonth?: number;
+  };
+  grantedBy?: string | null;
+  grantedAt?: string | null;
+};
+
+export type CompanyPartner = {
+  active?: boolean;
+  tier?: "basic" | "premium" | string;
+  until?: unknown;
+  reason?: string | null;
+  limits?: {
+    aiCaptionsPerMonth?: number;
+    aiImagesPerMonth?: number;
+  };
+  grantedBy?: string | null;
+  grantedAt?: string | null;
+};
+
+export type CompanyDoc = {
+  id: string;
+  name?: string | null;
+  logoUrl?: string | null;
+  aiInstructions?: string | null;
+  plan?: CompanyPlan | string;
+  planStatus?: string;
+  planSource?: string;
+  features?: {
+    aiEnabled?: boolean;
+  };
+  limits?: {
+    aiCaptionsPerMonth?: number;
+    aiImagesPerMonth?: number;
+  };
+  courtesy?: CompanyCourtesy | null;
+  partner?: CompanyPartner | null;
+  paypalSubscriptionId?: string | null;
+  nextBillingTime?: string | null;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+  [key: string]: unknown; // resto de campos de Firestore
+};

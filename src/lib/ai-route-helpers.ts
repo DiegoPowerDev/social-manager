@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
+import { CompanyDoc } from "@/types";
 
 export type EffectivePlan = {
   plan: "free" | "basic" | "premium";
@@ -17,36 +18,67 @@ const DEFAULT_LIMITS = {
   premium: { aiCaptionsPerMonth: 100, aiImagesPerMonth: 30, aiEnabled: true },
 } as const;
 
-function isUntilValid(until?: string | null) {
-  if (!until) return true;
-  const t = new Date(until).getTime();
-  return !Number.isNaN(t) && t > Date.now();
+function toDate(value: unknown): Date | null {
+  if (value == null || value === "") return null;
+  if (value instanceof Date) return value;
+  if (typeof value === "string" || typeof value === "number") {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  // Firestore Timestamp (admin o client)
+  if (typeof value === "object" && value !== null) {
+    const v = value as {
+      toDate?: () => Date;
+      seconds?: number;
+      _seconds?: number;
+    };
+    if (typeof v.toDate === "function") {
+      try {
+        return v.toDate();
+      } catch {
+        /* ignore */
+      }
+    }
+    const sec = v.seconds ?? v._seconds;
+    if (typeof sec === "number") return new Date(sec * 1000);
+  }
+  return null;
 }
 
-export function getEffectivePlanFromCompany(company: any): EffectivePlan {
+/** true si no hay fecha o aún no venció */
+function isUntilValid(until: unknown): boolean {
+  const d = toDate(until);
+  if (!d) return true; // sin hasta = vigente
+  return d.getTime() > Date.now();
+}
+
+export function getEffectivePlanFromCompany(
+  company: CompanyDoc,
+): EffectivePlan {
+  // 1) Cortesía
   const courtesy = company?.courtesy;
-  if (courtesy?.active && isUntilValid(courtesy.until)) {
+  if (courtesy?.active === true && isUntilValid(courtesy.until)) {
     const plan = (courtesy.plan || "premium") as EffectivePlan["plan"];
     const base = DEFAULT_LIMITS[plan] || DEFAULT_LIMITS.premium;
     return {
       plan,
-      aiEnabled: true,
+      aiEnabled: true, // cortesía premium/basic → IA sí
       limits: {
         aiCaptionsPerMonth:
-          courtesy.limits?.aiCaptionsPerMonth ?? base.aiCaptionsPerMonth,
+          courtesy.limits?.aiCaptionsPerMonth ?? base.aiCaptionsPerMonth ?? 150,
         aiImagesPerMonth:
-          courtesy.limits?.aiImagesPerMonth ?? base.aiImagesPerMonth,
+          courtesy.limits?.aiImagesPerMonth ?? base.aiImagesPerMonth ?? 50,
       },
       source: "courtesy",
     };
   }
 
+  // 2) Socio
   const partner = company?.partner;
-  if (partner?.active && isUntilValid(partner.until)) {
+  if (partner?.active === true && isUntilValid(partner.until)) {
     const plan = (partner.tier === "basic" ? "basic" : "premium") as
       | "basic"
       | "premium";
-    const base = DEFAULT_LIMITS[plan];
     return {
       plan,
       aiEnabled: true,
@@ -60,11 +92,16 @@ export function getEffectivePlanFromCompany(company: any): EffectivePlan {
     };
   }
 
+  // 3) Facturación
   const plan = (company?.plan || "free") as EffectivePlan["plan"];
   const base = DEFAULT_LIMITS[plan] || DEFAULT_LIMITS.free;
-  const featuresAi = company?.features?.aiEnabled;
-  const aiEnabled =
-    featuresAi === false ? false : featuresAi === true ? true : base.aiEnabled;
+
+  // Solo el plan de cobro mira features; cortesía/socio ya salieron arriba
+  let aiEnabled = base.aiEnabled;
+  if (company?.features?.aiEnabled === false) aiEnabled = false;
+  if (company?.features?.aiEnabled === true) aiEnabled = true;
+  // premium de pago siempre IA
+  if (plan === "premium") aiEnabled = true;
 
   return {
     plan,

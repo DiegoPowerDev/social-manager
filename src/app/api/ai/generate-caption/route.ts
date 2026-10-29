@@ -36,6 +36,13 @@ export async function POST(req: NextRequest) {
     }
 
     const effective = getEffectivePlanFromCompany(company);
+    console.log("AI effective plan", {
+      companyId,
+      billingPlan: company.plan,
+      courtesy: company.courtesy,
+      partner: company.partner,
+      effective,
+    });
     if (!effective.aiEnabled) {
       return NextResponse.json(
         { error: "Tu plan no incluye IA" },
@@ -43,8 +50,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const limit = effective.limits.aiCaptionsPerMonth;
+    const limit = effective.limits.aiCaptionsPerMonth; // o aiImages    const imagesLimit = effective.limits.aiImagesPerMonth;
+
     const imagesLimit = effective.limits.aiImagesPerMonth;
+
     const usage = await getAiUsageAdmin(companyId);
 
     if (usage.aiCaptions >= limit) {

@@ -1,21 +1,13 @@
 import { adminDb, FieldValue } from "@/lib/firebase-admin";
 import { PLAN_LIMITS, usagePeriodKey } from "@/lib/tenant";
+import type { CompanyDoc } from "@/types/index"; // ajusta la ruta
 
-export async function getCompanyAdmin(companyId: string) {
+export async function getCompanyAdmin(
+  companyId: string,
+): Promise<CompanyDoc | null> {
   const snap = await adminDb.collection("companies").doc(companyId).get();
   if (!snap.exists) return null;
-  const data = snap.data()!;
-  return {
-    id: snap.id,
-    name: data.name || "",
-    logoUrl: data.logoUrl || null,
-    aiInstructions: data.aiInstructions || "",
-    plan: data.plan || "free",
-    planStatus: data.planStatus || "active",
-    features: data.features || { aiEnabled: true },
-    limits: data.limits || PLAN_LIMITS.free,
-    ...data,
-  };
+  return { id: snap.id, ...snap.data() } as CompanyDoc;
 }
 
 export async function getAiUsageAdmin(companyId: string) {

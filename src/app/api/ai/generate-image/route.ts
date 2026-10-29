@@ -36,6 +36,15 @@ export async function POST(req: NextRequest) {
     }
 
     const effective = getEffectivePlanFromCompany(company);
+
+    console.log("AI effective plan", {
+      companyId,
+      billingPlan: company.plan,
+      courtesy: company.courtesy,
+      partner: company.partner,
+      effective,
+    });
+
     if (!effective.aiEnabled) {
       return NextResponse.json(
         { error: "Tu plan no incluye IA" },
