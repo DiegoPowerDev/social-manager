@@ -1,6 +1,7 @@
 import { adminDb, FieldValue } from "@/lib/firebase-admin";
-import { PLAN_LIMITS, usagePeriodKey } from "@/lib/tenant";
-import type { CompanyDoc } from "@/types/index"; // ajusta la ruta
+import { usagePeriodKey } from "@/lib/tenant";
+import type { CompanyDoc } from "@/types/index";
+import { getEffectivePlanFromCompany } from "@/lib/ai-route-helpers";
 
 export async function getCompanyAdmin(
   companyId: string,
@@ -38,11 +39,13 @@ export async function consumeAiCreditAdmin(
   const company = await getCompanyAdmin(companyId);
   if (!company) throw new Error("Empresa no encontrada");
 
-  if (company.features?.aiEnabled === false) {
+  // Plan efectivo: cortesía → socio → facturación
+  const effective = getEffectivePlanFromCompany(company);
+
+  if (!effective.aiEnabled) {
     throw new Error("Tu plan no incluye IA");
   }
 
-  const limits = company.limits || PLAN_LIMITS.free;
   const usage = await getAiUsageAdmin(companyId);
   const period = usagePeriodKey();
   const usageRef = adminDb
@@ -52,7 +55,7 @@ export async function consumeAiCreditAdmin(
     .doc(period);
 
   if (type === "caption") {
-    const limit = limits.aiCaptionsPerMonth ?? 15;
+    const limit = effective.limits.aiCaptionsPerMonth;
     if (usage.aiCaptions >= limit) {
       throw new Error(
         `Límite de captions alcanzado (${limit}/mes). Mejora tu plan o espera al próximo mes.`,
@@ -67,7 +70,7 @@ export async function consumeAiCreditAdmin(
       { merge: true },
     );
   } else {
-    const limit = limits.aiImagesPerMonth ?? 3;
+    const limit = effective.limits.aiImagesPerMonth;
     if (usage.aiImages >= limit) {
       throw new Error(
         `Límite de imágenes IA alcanzado (${limit}/mes). Mejora tu plan o espera al próximo mes.`,
