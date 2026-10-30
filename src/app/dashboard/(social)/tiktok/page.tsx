@@ -11,7 +11,7 @@ import {
   deleteDoc,
   doc,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { TikTokConnectFlow } from "@/components/social/TikTokConnectFlow";
 import {
   TikTokComposer,
@@ -102,6 +102,12 @@ export default function TikTokPage() {
   }, [searchParams]);
 
   const handlePublish = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      toast.error("Sesión expirada. Vuelve a iniciar sesión.");
+      return;
+    }
+    const idToken = await user.getIdToken();
     if (!account || !companyId || !canEdit) return;
     if (!videoUrl) {
       toast.error("Sube un video");
@@ -117,7 +123,10 @@ export default function TikTokPage() {
     try {
       const res = await fetch("/api/publish/tiktok", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify({
           companyId,
           accessToken: account.accessToken,

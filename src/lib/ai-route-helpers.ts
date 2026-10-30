@@ -13,7 +13,7 @@ export type EffectivePlan = {
 };
 
 const DEFAULT_LIMITS = {
-  free: { aiCaptionsPerMonth: 15, aiImagesPerMonth: 3, aiEnabled: true },
+  free: { aiCaptionsPerMonth: 0, aiImagesPerMonth: 0, aiEnabled: false },
   basic: { aiCaptionsPerMonth: 0, aiImagesPerMonth: 0, aiEnabled: false },
   premium: { aiCaptionsPerMonth: 100, aiImagesPerMonth: 30, aiEnabled: true },
 } as const;
@@ -62,12 +62,12 @@ export function getEffectivePlanFromCompany(
     const base = DEFAULT_LIMITS[plan] || DEFAULT_LIMITS.premium;
     return {
       plan,
-      aiEnabled: true, // cortesía premium/basic → IA sí
+      aiEnabled: plan === "premium",
       limits: {
         aiCaptionsPerMonth:
-          courtesy.limits?.aiCaptionsPerMonth ?? base.aiCaptionsPerMonth ?? 150,
+          courtesy.limits?.aiCaptionsPerMonth ?? base.aiCaptionsPerMonth,
         aiImagesPerMonth:
-          courtesy.limits?.aiImagesPerMonth ?? base.aiImagesPerMonth ?? 50,
+          courtesy.limits?.aiImagesPerMonth ?? base.aiImagesPerMonth,
       },
       source: "courtesy",
     };
@@ -79,21 +79,22 @@ export function getEffectivePlanFromCompany(
     const plan = (partner.tier === "basic" ? "basic" : "premium") as
       | "basic"
       | "premium";
+    const base = DEFAULT_LIMITS[plan];
     return {
       plan,
-      aiEnabled: true,
+      aiEnabled: plan === "premium",
       limits: {
         aiCaptionsPerMonth:
-          partner.limits?.aiCaptionsPerMonth ?? (plan === "basic" ? 100 : 150),
+          partner.limits?.aiCaptionsPerMonth ?? base.aiCaptionsPerMonth,
         aiImagesPerMonth:
-          partner.limits?.aiImagesPerMonth ?? (plan === "basic" ? 30 : 50),
+          partner.limits?.aiImagesPerMonth ?? base.aiImagesPerMonth,
       },
       source: "partner",
     };
   }
 
   // 3) Facturación
-  const plan = (company?.plan || "free") as EffectivePlan["plan"];
+  const plan = (company?.plan || "free") as "free" | "basic" | "premium";
   const base = DEFAULT_LIMITS[plan] || DEFAULT_LIMITS.free;
 
   // Solo el plan de cobro mira features; cortesía/socio ya salieron arriba
@@ -103,15 +104,26 @@ export function getEffectivePlanFromCompany(
   // premium de pago siempre IA
   if (plan === "premium") aiEnabled = true;
 
+  if (plan === "premium") {
+    return {
+      plan: "premium",
+      aiEnabled: true,
+      limits: {
+        aiCaptionsPerMonth: company?.limits?.aiCaptionsPerMonth ?? 100,
+        aiImagesPerMonth: company?.limits?.aiImagesPerMonth ?? 30,
+      },
+      source: "billing",
+    };
+  }
+
   return {
     plan,
     aiEnabled,
     limits: {
-      aiCaptionsPerMonth:
-        company?.limits?.aiCaptionsPerMonth ?? base.aiCaptionsPerMonth,
-      aiImagesPerMonth:
-        company?.limits?.aiImagesPerMonth ?? base.aiImagesPerMonth,
+      aiCaptionsPerMonth: 0,
+      aiImagesPerMonth: 0,
     },
+
     source: "billing",
   };
 }

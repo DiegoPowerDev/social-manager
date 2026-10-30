@@ -11,10 +11,9 @@ import {
   deleteDoc,
   doc,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { InstagramComposer } from "@/components/social/InstagramComposer";
 import { PostHistory } from "@/components/social/PostHistory";
-import { PostPreview } from "@/components/social/PostPreview";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -128,6 +127,13 @@ export default function InstagramPage() {
   };
 
   const handlePublish = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      toast.error("Sesión expirada. Vuelve a iniciar sesión.");
+      return;
+    }
+    const idToken = await user.getIdToken();
+
     if (!account || !companyId || !canEdit) return;
 
     if (mediaType === "CAROUSEL" && imageUrls.length < 2) {
@@ -157,10 +163,13 @@ export default function InstagramPage() {
     try {
       const res = await fetch("/api/publish/instagram", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify({
           igUserId: account.igUserId,
-          accessToken: account.accessToken,
+          accessToken: account.accessToken, // opcional si la API solo usa el de Firestore
           username: account.username,
           companyId,
           caption: mediaType === "STORIES" ? undefined : caption || undefined,

@@ -1,31 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { publishPost } from "@/adapters/facebook";
 import { adminDb } from "@/lib/firebase-admin";
+import { requireCompanyMember, jsonError } from "@/lib/ai-route-helpers";
 
 export async function POST(req: NextRequest) {
   try {
-    const {
-      pageId,
-      accessToken,
-      message,
-      link,
-      imageUrl,
-      videoUrl,
-      pageName,
-      companyId,
-    } = await req.json();
+    const { pageId, message, link, imageUrl, videoUrl, pageName, companyId } =
+      await req.json();
 
-    if (!pageId || !accessToken) {
+    if (!companyId) {
+      return NextResponse.json({ error: "Falta companyId" }, { status: 400 });
+    }
+    if (!pageId) {
       return NextResponse.json(
         { error: "Faltan datos de la cuenta" },
         { status: 400 },
       );
     }
-
-    if (!companyId) {
-      return NextResponse.json({ error: "Falta companyId" }, { status: 400 });
-    }
-
     if (!message && !imageUrl && !videoUrl) {
       return NextResponse.json(
         { error: "Debes enviar al menos un mensaje, imagen o video" },
@@ -33,7 +24,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = await publishPost(pageId, accessToken, {
+    await requireCompanyMember(req, companyId);
+
+    const accSnap = await adminDb
+      .collection("socialAccounts")
+      .where("companyId", "==", companyId)
+      .where("platform", "==", "facebook")
+      .where("pageId", "==", pageId)
+      .limit(1)
+      .get();
+
+    if (accSnap.empty) {
+      return NextResponse.json(
+        { error: "Cuenta de Facebook no vinculada a esta empresa" },
+        { status: 403 },
+      );
+    }
+
+    const account = accSnap.docs[0].data();
+    const token = account.accessToken as string;
+
+    const result = await publishPost(pageId, token, {
       message,
       link,
       imageUrl,
@@ -46,7 +57,7 @@ export async function POST(req: NextRequest) {
       companyId,
       platform: "facebook",
       pageId,
-      pageName: pageName || "",
+      pageName: pageName || account.name || "",
       message: message || "",
       imageUrl: imageUrl || null,
       videoUrl: videoUrl || null,
@@ -65,9 +76,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error("Error publicando en Facebook:", error);
-    return NextResponse.json(
-      { error: error.message || "Error al publicar" },
-      { status: 500 },
-    );
+    const { status, body } = jsonError(error);
+    return NextResponse.json(body, { status });
   }
 }

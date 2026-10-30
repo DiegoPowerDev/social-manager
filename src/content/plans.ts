@@ -19,7 +19,12 @@ export const PLAN_CARDS: PlanCard[] = [
     description: "Para probar el panel con límites básicos.",
     price: "$0",
     period: "",
-    features: ["FB, IG y YouTube", "Publicación manual limitada", "Sin IA"],
+    features: [
+      "FB, IG y YouTube",
+      "Publicación manual",
+      "Sin calendario avanzado", // o quita esta línea si free sí tiene calendario
+      "Sin IA",
+    ],
     cta: "Empezar gratis",
     paid: false,
     highlighted: false,
@@ -35,6 +40,7 @@ export const PLAN_CARDS: PlanCard[] = [
       "Calendario y programación",
       "Publicar en masa",
       "Equipo básico",
+      "Sin IA",
     ],
     cta: "Contratar Básico",
     paid: true,
@@ -49,8 +55,8 @@ export const PLAN_CARDS: PlanCard[] = [
     features: [
       "Todo lo del Básico",
       "LinkedIn y TikTok",
-      "IA textos e imágenes",
-      "Límites de IA ampliados",
+      "IA para textos e imágenes",
+      "Hasta 100 captions y 30 imágenes IA / mes",
     ],
     cta: "Contratar Premium",
     paid: true,

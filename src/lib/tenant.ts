@@ -210,13 +210,13 @@ export function getEffectivePlan(company: any) {
   const now = Date.now();
 
   const courtesy = company?.courtesy;
-  if (
-    courtesy?.active &&
-    courtesy?.until &&
-    new Date(courtesy.until).getTime() > now
-  ) {
-    const tier = (courtesy.plan || "premium") as PlanId;
-    return fromTier(tier, courtesy.limits, "courtesy");
+  if (courtesy?.active) {
+    const untilOk =
+      !courtesy.until || new Date(courtesy.until).getTime() > Date.now();
+    if (untilOk) {
+      const tier = (courtesy.plan || "premium") as PlanId;
+      return fromTier(tier, courtesy.limits, "courtesy");
+    }
   }
 
   const partner = company?.partner;
@@ -228,8 +228,24 @@ export function getEffectivePlan(company: any) {
     return fromTier(tier, partner.limits, "partner");
   }
 
-  const plan = (company?.plan || "free") as PlanId;
-  return fromTier(plan, company?.limits, company?.planSource || "free");
+  const plan = (company?.plan || "free") as "free" | "basic" | "premium";
+  if (plan === "premium") {
+    return {
+      plan: "premium",
+      aiEnabled: true,
+      limits: {
+        aiCaptionsPerMonth: company?.limits?.aiCaptionsPerMonth ?? 100,
+        aiImagesPerMonth: company?.limits?.aiImagesPerMonth ?? 30,
+      },
+      source: "billing",
+    };
+  }
+  return {
+    plan, // free | basic
+    aiEnabled: false,
+    limits: { aiCaptionsPerMonth: 0, aiImagesPerMonth: 0 },
+    source: "billing",
+  };
 }
 
 function fromTier(tier: PlanId | string, limits: any, source: string) {

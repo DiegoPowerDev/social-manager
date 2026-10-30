@@ -10,7 +10,7 @@ import {
   deleteDoc,
   doc,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { YouTubeConnectFlow } from "@/components/social/YouTubeConnectFlow";
 import { YouTubeComposer } from "@/components/social/YouTubeComposer";
 import { PostHistory } from "@/components/social/PostHistory";
@@ -98,6 +98,12 @@ export default function YouTubePage() {
   }, [searchParams]);
 
   const handlePublish = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      toast.error("Sesión expirada. Vuelve a iniciar sesión.");
+      return;
+    }
+    const idToken = await user.getIdToken();
     if (!account || !companyId || !canEdit) return;
     if (!videoUrl) {
       toast.error("Sube un video");
@@ -113,7 +119,10 @@ export default function YouTubePage() {
     try {
       const res = await fetch("/api/publish/youtube", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify({
           companyId,
           channelId: account.channelId,

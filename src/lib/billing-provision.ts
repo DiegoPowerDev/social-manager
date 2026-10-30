@@ -272,11 +272,11 @@ async function setCompanyInactive(
         plan: "free",
         planStatus,
         planSource: "billing",
-        features: { aiEnabled: false },
         limits: {
-          aiCaptionsPerMonth: 15,
-          aiImagesPerMonth: 3,
+          aiCaptionsPerMonth: 0,
+          aiImagesPerMonth: 0,
         },
+        features: { aiEnabled: false },
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true },
@@ -291,6 +291,11 @@ export async function cancelPayPalSubscription(subscriptionId: string) {
   const data = snap.data()!;
   await ref.update({
     status: "cancelled",
+    features: { aiEnabled: false },
+    limits: {
+      aiCaptionsPerMonth: 0,
+      aiImagesPerMonth: 0,
+    },
     updatedAt: FieldValue.serverTimestamp(),
   });
 
@@ -308,6 +313,11 @@ export async function suspendPayPalSubscription(subscriptionId: string) {
   const data = snap.data()!;
   await ref.update({
     status: "suspended",
+    features: { aiEnabled: false },
+    limits: {
+      aiCaptionsPerMonth: 0,
+      aiImagesPerMonth: 0,
+    },
     updatedAt: FieldValue.serverTimestamp(),
   });
 

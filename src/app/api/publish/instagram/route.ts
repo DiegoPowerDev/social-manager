@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { publishToInstagram } from "@/adapters/instagram";
 import { adminDb } from "@/lib/firebase-admin";
+import { requireCompanyMember, jsonError } from "@/lib/ai-route-helpers"; // o muévelos a lib/api-auth.ts
 
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
+    const body = await req.json();
     const {
       igUserId,
       accessToken,
@@ -16,8 +18,11 @@ export async function POST(req: NextRequest) {
       username,
       mediaType,
       companyId,
-    } = await req.json();
+    } = body;
 
+    if (!companyId) {
+      return NextResponse.json({ error: "Falta companyId" }, { status: 400 });
+    }
     if (!igUserId || !accessToken) {
       return NextResponse.json(
         { error: "Faltan datos de la cuenta" },
@@ -25,9 +30,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!companyId) {
-      return NextResponse.json({ error: "Falta companyId" }, { status: 400 });
+    // 1) Usuario logueado + miembro editor/admin de la empresa
+    await requireCompanyMember(req, companyId);
+
+    // 2) La cuenta social debe ser de ESA empresa
+    const accSnap = await adminDb
+      .collection("socialAccounts")
+      .where("companyId", "==", companyId)
+      .where("platform", "==", "instagram")
+      .where("igUserId", "==", igUserId)
+      .limit(1)
+      .get();
+
+    if (accSnap.empty) {
+      return NextResponse.json(
+        { error: "Cuenta de Instagram no vinculada a esta empresa" },
+        { status: 403 },
+      );
     }
+
+    const account = accSnap.docs[0].data();
+    // Usar token guardado en servidor (no confiar solo en el del cliente)
+    const token = (account.accessToken as string) || accessToken;
 
     if (mediaType === "CAROUSEL") {
       const urls = imageUrls?.length ? imageUrls : imageUrl ? [imageUrl] : [];
@@ -44,7 +68,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = await publishToInstagram(igUserId, accessToken, {
+    const result = await publishToInstagram(igUserId, token, {
       caption,
       imageUrl,
       imageUrls,
@@ -56,7 +80,7 @@ export async function POST(req: NextRequest) {
       companyId,
       platform: "instagram",
       igUserId,
-      username: username || "",
+      username: username || account.username || "",
       message: caption || "",
       imageUrl: imageUrl || imageUrls?.[0] || null,
       imageUrls: imageUrls || null,
@@ -75,9 +99,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error("Error publicando en Instagram:", error);
-    return NextResponse.json(
-      { error: error.message || "Error al publicar" },
-      { status: 500 },
-    );
+    const { status, body } = jsonError(error);
+    return NextResponse.json(body, { status });
   }
 }

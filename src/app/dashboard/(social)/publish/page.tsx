@@ -5,7 +5,7 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { FolderOpen } from "lucide-react";
 import { MediaLibraryPicker } from "@/components/social/MediaLibraryPicker";
 import { saveMediaToLibrary } from "@/lib/media";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -310,6 +310,12 @@ export default function BulkPublishPage() {
   };
 
   const handlePublish = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      toast.error("Sesión expirada. Vuelve a iniciar sesión.");
+      return;
+    }
+    const idToken = await user.getIdToken();
     if (!companyId || !canEdit) {
       toast.error(!canEdit ? "No tienes permiso para publicar" : "Sin empresa");
       return;
@@ -365,7 +371,10 @@ export default function BulkPublishPage() {
       try {
         const res = await fetch("/api/publish/facebook", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
           body: JSON.stringify({
             pageId: facebookAccount.pageId,
             accessToken: facebookAccount.accessToken,
@@ -396,7 +405,10 @@ export default function BulkPublishPage() {
       try {
         const res = await fetch("/api/publish/instagram", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
           body: JSON.stringify({
             igUserId: instagramAccount.igUserId,
             accessToken: instagramAccount.accessToken,
@@ -438,7 +450,10 @@ export default function BulkPublishPage() {
       try {
         const res = await fetch("/api/publish/linkedin", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
           body: JSON.stringify({
             personId: linkedinAccount.personId,
             accessToken: linkedinAccount.accessToken,
@@ -468,7 +483,10 @@ export default function BulkPublishPage() {
       try {
         const res = await fetch("/api/publish/youtube", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
           body: JSON.stringify({
             companyId,
             channelId: youtubeAccount.channelId,
@@ -500,7 +518,10 @@ export default function BulkPublishPage() {
       try {
         const res = await fetch("/api/publish/tiktok", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
           body: JSON.stringify({
             companyId,
             accessToken: tiktokAccount.accessToken,

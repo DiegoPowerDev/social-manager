@@ -11,7 +11,7 @@ import {
   deleteDoc,
   doc,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { FacebookComposer } from "@/components/social/FacebookComposer";
 import { PostHistory } from "@/components/social/PostHistory";
 import { Button } from "@/components/ui/button";
@@ -99,6 +99,12 @@ export default function FacebookPage() {
   }, [searchParams]);
 
   const handlePublish = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      toast.error("Sesión expirada. Vuelve a iniciar sesión.");
+      return;
+    }
+    const idToken = await user.getIdToken();
     if (!account) return;
     if (!message.trim() && !imageUrl && !videoUrl) return;
 
@@ -107,7 +113,10 @@ export default function FacebookPage() {
     try {
       const res = await fetch("/api/publish/facebook", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify({
           pageId: account.pageId,
           companyId,

@@ -11,7 +11,7 @@ import {
   deleteDoc,
   doc,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { LinkedInComposer } from "@/components/social/LinkedInComposer";
 import { LinkedInConnectFlow } from "@/components/social/LinkedInConnectFlow";
 import { PostHistory } from "@/components/social/PostHistory";
@@ -100,6 +100,12 @@ export default function LinkedInPage() {
   }, [searchParams]);
 
   const handlePublish = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      toast.error("Sesión expirada. Vuelve a iniciar sesión.");
+      return;
+    }
+    const idToken = await user.getIdToken();
     if (!account || !companyId || !canEdit) return;
     if (!text.trim() && !imageUrl && !videoUrl) {
       toast.error("Escribe un texto o añade media");
@@ -112,7 +118,10 @@ export default function LinkedInPage() {
     try {
       const res = await fetch("/api/publish/linkedin", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify({
           personId: account.personId,
           accessToken: account.accessToken,

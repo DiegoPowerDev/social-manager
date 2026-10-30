@@ -11,6 +11,10 @@ export const maxDuration = 60;
 async function verifyWebhook(headers: Headers, body: string) {
   const webhookId = process.env.PAYPAL_WEBHOOK_ID;
   if (!webhookId) {
+    if (process.env.NODE_ENV === "production") {
+      console.error("PAYPAL_WEBHOOK_ID missing in production");
+      return false;
+    }
     console.warn("PAYPAL_WEBHOOK_ID missing — skip verify (solo dev)");
     return true;
   }
