@@ -11,6 +11,7 @@ import { es } from "date-fns/locale";
 import { Video, FileText, ExternalLink, Loader2 } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { toast } from "sonner";
+import { EmptyState } from "../layout/EmptyState";
 
 interface Post {
   id: string;
@@ -151,15 +152,17 @@ export function PostHistory({ pageId, platform = "facebook" }: Props) {
       </CardHeader>
 
       <CardContent className="space-y-3">
-        {loading && posts.length === 0 ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Cargando historial…
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : posts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Aún no hay publicaciones.
-          </p>
+          <EmptyState
+            icon={FileText}
+            title="Aún no hay publicaciones"
+            description="Cuando publiques en esta red, el historial se mostrará aquí."
+            className="border-0 bg-transparent shadow-none"
+          />
         ) : (
           posts.map((post) => {
             const postUrl = getPostUrl(post);

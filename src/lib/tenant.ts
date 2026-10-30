@@ -13,7 +13,7 @@ import { db } from "@/lib/firebase";
 import type { MemberRole } from "@/types";
 import { PlanId } from "@/content/plans";
 
-/** Límites por plan (ajusta cuando tengas Stripe) */
+/** Límites por plan */
 export const PLAN_LIMITS = {
   free: {
     aiEnabled: false,
@@ -44,7 +44,7 @@ export function membershipId(uid: string, companyId: string) {
 export function usagePeriodKey(date = new Date()) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
-  return `${y}-${m}`; // "2026-10"
+  return `${y}-${m}`;
 }
 
 export async function createCompany(params: {
@@ -66,6 +66,7 @@ export async function createCompany(params: {
     createdBy: uid,
     plan: "free",
     planStatus: "active",
+    planSource: "billing",
     features: {
       aiEnabled: limits.aiEnabled,
     },
@@ -115,8 +116,12 @@ export async function getCompany(companyId: string) {
     aiInstructions: data.aiInstructions || "",
     plan: data.plan || "free",
     planStatus: data.planStatus || "active",
-    features: data.features || { aiEnabled: true },
-    limits: data.limits || PLAN_LIMITS.free,
+    // default sin IA (antes estaba aiEnabled: true)
+    features: data.features || { aiEnabled: false },
+    limits: data.limits || {
+      aiCaptionsPerMonth: PLAN_LIMITS.free.aiCaptionsPerMonth,
+      aiImagesPerMonth: PLAN_LIMITS.free.aiImagesPerMonth,
+    },
     ...data,
   };
 }
@@ -136,7 +141,6 @@ export async function getMembership(uid: string, companyId: string) {
   };
 }
 
-/** Uso del mes actual */
 export async function getAiUsage(companyId: string) {
   const period = usagePeriodKey();
   const snap = await getDoc(doc(db, "companies", companyId, "usage", period));
@@ -152,9 +156,8 @@ export async function getAiUsage(companyId: string) {
 }
 
 /**
- * Comprueba límite y suma 1 al contador.
- * type: "caption" | "image"
- * Llamar DESDE API routes (idealmente con Admin SDK más adelante).
+ * Preferible usar consumeAiCreditAdmin en API routes.
+ * Si se usa en cliente, respeta plan efectivo (cortesía/socio/premium).
  */
 export async function consumeAiCredit(
   companyId: string,
@@ -163,17 +166,17 @@ export async function consumeAiCredit(
   const company = await getCompany(companyId);
   if (!company) throw new Error("Empresa no encontrada");
 
-  const aiEnabled = company.features?.aiEnabled !== false;
-  if (!aiEnabled) {
+  const effective = getEffectivePlan(company);
+  if (!effective.aiEnabled) {
     throw new Error("Tu plan no incluye IA");
   }
 
-  const limits = company.limits || PLAN_LIMITS.free;
+  const limits = effective.limits;
   const usage = await getAiUsage(companyId);
   const period = usagePeriodKey();
 
   if (type === "caption") {
-    const limit = limits.aiCaptionsPerMonth ?? 15;
+    const limit = limits.aiCaptionsPerMonth ?? 0;
     if (usage.aiCaptions >= limit) {
       throw new Error(
         `Límite de captions alcanzado (${limit}/mes). Mejora tu plan o espera al próximo mes.`,
@@ -189,7 +192,7 @@ export async function consumeAiCredit(
       { merge: true },
     );
   } else {
-    const limit = limits.aiImagesPerMonth ?? 3;
+    const limit = limits.aiImagesPerMonth ?? 0;
     if (usage.aiImages >= limit) {
       throw new Error(
         `Límite de imágenes IA alcanzado (${limit}/mes). Mejora tu plan o espera al próximo mes.`,
@@ -206,13 +209,14 @@ export async function consumeAiCredit(
     );
   }
 }
+
+/** Plan efectivo: cortesía > socio > facturación. IA solo en premium. */
 export function getEffectivePlan(company: any) {
   const now = Date.now();
 
   const courtesy = company?.courtesy;
   if (courtesy?.active) {
-    const untilOk =
-      !courtesy.until || new Date(courtesy.until).getTime() > Date.now();
+    const untilOk = !courtesy.until || new Date(courtesy.until).getTime() > now;
     if (untilOk) {
       const tier = (courtesy.plan || "premium") as PlanId;
       return fromTier(tier, courtesy.limits, "courtesy");
@@ -220,44 +224,46 @@ export function getEffectivePlan(company: any) {
   }
 
   const partner = company?.partner;
-  if (
-    partner?.active &&
-    (!partner.until || new Date(partner.until).getTime() > now)
-  ) {
-    const tier = (partner.tier || "premium") as PlanId;
-    return fromTier(tier, partner.limits, "partner");
+  if (partner?.active) {
+    const untilOk = !partner.until || new Date(partner.until).getTime() > now;
+    if (untilOk) {
+      const tier = (partner.tier || "premium") as PlanId;
+      return fromTier(tier, partner.limits, "partner");
+    }
   }
 
   const plan = (company?.plan || "free") as "free" | "basic" | "premium";
+
   if (plan === "premium") {
     return {
-      plan: "premium",
+      plan: "premium" as const,
+      planStatus: "active",
       aiEnabled: true,
       limits: {
         aiCaptionsPerMonth: company?.limits?.aiCaptionsPerMonth ?? 100,
         aiImagesPerMonth: company?.limits?.aiImagesPerMonth ?? 30,
       },
-      source: "billing",
+      source: "billing" as const,
     };
   }
+
   return {
-    plan, // free | basic
+    plan,
+    planStatus: company?.planStatus || "active",
     aiEnabled: false,
     limits: { aiCaptionsPerMonth: 0, aiImagesPerMonth: 0 },
-    source: "billing",
+    source: "billing" as const,
   };
 }
 
 function fromTier(tier: PlanId | string, limits: any, source: string) {
   const planKey = (tier as PlanId) || "free";
   const defaults = PLAN_LIMITS[planKey] || PLAN_LIMITS.free;
-
-  // IA solo premium (ajusta si basic también tiene IA)
   const aiEnabled = planKey === "premium";
 
   return {
     plan: planKey,
-    planStatus: "active",
+    planStatus: "active" as const,
     aiEnabled,
     limits: {
       aiCaptionsPerMonth:
@@ -266,34 +272,5 @@ function fromTier(tier: PlanId | string, limits: any, source: string) {
         limits?.aiImagesPerMonth ?? defaults.aiImagesPerMonth ?? 0,
     },
     source,
-  };
-}
-
-function buildFromTier(
-  tier: string,
-  limits: any,
-  meta: {
-    source: string;
-    courtesyActive: boolean;
-    partnerActive: boolean;
-    until: string | null;
-  },
-) {
-  const planKey = tier as keyof typeof PLAN_LIMITS;
-  const defaults = PLAN_LIMITS[planKey] || PLAN_LIMITS.premium;
-
-  return {
-    plan: planKey,
-    planStatus: "active",
-    aiEnabled: true,
-    limits: {
-      aiCaptionsPerMonth:
-        limits?.aiCaptionsPerMonth ?? defaults.aiCaptionsPerMonth,
-      aiImagesPerMonth: limits?.aiImagesPerMonth ?? defaults.aiImagesPerMonth,
-    },
-    source: meta.source,
-    courtesyActive: meta.courtesyActive,
-    partnerActive: meta.partnerActive,
-    until: meta.until,
   };
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { publishPost } from "@/adapters/facebook";
 import { adminDb } from "@/lib/firebase-admin";
-import { requireCompanyMember, jsonError } from "@/lib/ai-route-helpers";
+import { jsonError, requireCompanyMemberOrCron } from "@/lib/ai-route-helpers";
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await requireCompanyMember(req, companyId);
+    await requireCompanyMemberOrCron(req, companyId);
 
     const accSnap = await adminDb
       .collection("socialAccounts")

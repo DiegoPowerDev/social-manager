@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { publishToTikTok } from "@/adapters/tiktok";
 import { adminDb } from "@/lib/firebase-admin";
-import { requireCompanyMember, jsonError } from "@/lib/ai-route-helpers";
+import { requireCompanyMemberOrCron, jsonError } from "@/lib/ai-route-helpers";
 
 export const maxDuration = 60;
 
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await requireCompanyMember(req, companyId);
+    await requireCompanyMemberOrCron(req, companyId);
 
     let q = adminDb
       .collection("socialAccounts")

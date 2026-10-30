@@ -46,6 +46,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/layout/ConfirmDialog";
+import { EmptyState } from "@/components/layout/EmptyState"; // ajusta ruta
+import { ImageIcon, FolderOpen } from "lucide-react";
 
 interface MediaItem {
   id: string;
@@ -309,7 +311,13 @@ export default function MediaLibraryPage() {
   if (!companyId) {
     return (
       <div className="p-6">
-        <p className="text-muted-foreground">No hay empresa asociada.</p>
+        <EmptyState
+          icon={FolderOpen}
+          title="Empresa no cargada"
+          description="No hay una empresa asociada a tu sesión. Recarga la página o vuelve a iniciar sesión."
+          actionLabel="Recargar"
+          onAction={() => window.location.reload()}
+        />
       </div>
     );
   }
@@ -396,11 +404,30 @@ export default function MediaLibraryPage() {
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             ) : filtered.length === 0 ? (
-              <p className="text-center text-muted-foreground py-16 text-sm">
-                {items.length === 0
-                  ? "Aún no hay archivos. Sube una imagen o video para empezar."
-                  : "No hay resultados con ese filtro o búsqueda."}
-              </p>
+              items.length === 0 ? (
+                <EmptyState
+                  icon={ImageIcon}
+                  title="Biblioteca vacía"
+                  description="Sube imágenes o videos para reutilizarlos en Instagram, Facebook, el calendario y publicación en masa."
+                  actionLabel={canEdit ? "Subir archivo" : undefined}
+                  onAction={
+                    canEdit ? () => inputRef.current?.click() : undefined
+                  }
+                  className="border-0 bg-transparent"
+                />
+              ) : (
+                <EmptyState
+                  icon={Search}
+                  title="Sin resultados"
+                  description="Prueba otro nombre o cambia el filtro de tipo (imagen / video)."
+                  actionLabel="Limpiar filtros"
+                  onAction={() => {
+                    setSearch("");
+                    setTypeFilter("all");
+                  }}
+                  className="border-0 bg-transparent"
+                />
+              )
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {filtered.map((item) => (

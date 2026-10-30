@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { publishToYouTube } from "@/adapters/youtube";
 import { getValidYouTubeAccessToken } from "@/lib/youtube-token";
 import { adminDb } from "@/lib/firebase-admin";
-import { requireCompanyMember, jsonError } from "@/lib/ai-route-helpers";
+import { requireCompanyMemberOrCron, jsonError } from "@/lib/ai-route-helpers";
 
 export const maxDuration = 300;
 
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await requireCompanyMember(req, companyId);
+    await requireCompanyMemberOrCron(req, companyId);
 
     const accRef = adminDb.collection("socialAccounts").doc(accountDocId);
     const accSnap = await accRef.get();

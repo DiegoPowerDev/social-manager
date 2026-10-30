@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { publishToInstagram } from "@/adapters/instagram";
 import { adminDb } from "@/lib/firebase-admin";
-import { requireCompanyMember, jsonError } from "@/lib/ai-route-helpers"; // o muévelos a lib/api-auth.ts
+import { requireCompanyMemberOrCron, jsonError } from "@/lib/ai-route-helpers"; // o muévelos a lib/api-auth.ts
 
 export const maxDuration = 60;
 
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 1) Usuario logueado + miembro editor/admin de la empresa
-    await requireCompanyMember(req, companyId);
+    await requireCompanyMemberOrCron(req, companyId);
 
     // 2) La cuenta social debe ser de ESA empresa
     const accSnap = await adminDb

@@ -193,7 +193,11 @@ export async function GET(req: NextRequest) {
           try {
             const res = await fetch(`${baseUrl}/api/publish/facebook`, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${cronSecret}`,
+                "x-cron-internal": "1",
+              },
               body: JSON.stringify({
                 pageId: facebookAccount.pageId,
                 accessToken: facebookAccount.accessToken,
@@ -243,7 +247,11 @@ export async function GET(req: NextRequest) {
               } else {
                 const res = await fetch(`${baseUrl}/api/publish/instagram`, {
                   method: "POST",
-                  headers: { "Content-Type": "application/json" },
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${cronSecret}`,
+                    "x-cron-internal": "1",
+                  },
                   body: JSON.stringify({
                     igUserId: instagramAccount.igUserId,
                     accessToken: instagramAccount.accessToken,
@@ -278,7 +286,11 @@ export async function GET(req: NextRequest) {
             } else {
               const res = await fetch(`${baseUrl}/api/publish/instagram`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${cronSecret}`,
+                  "x-cron-internal": "1",
+                },
                 body: JSON.stringify({
                   igUserId: instagramAccount.igUserId,
                   accessToken: instagramAccount.accessToken,
@@ -319,7 +331,11 @@ export async function GET(req: NextRequest) {
           try {
             const res = await fetch(`${baseUrl}/api/publish/linkedin`, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${cronSecret}`,
+                "x-cron-internal": "1",
+              },
               body: JSON.stringify({
                 personId: linkedinAccount.personId,
                 accessToken: linkedinAccount.accessToken,
@@ -362,7 +378,11 @@ export async function GET(req: NextRequest) {
           try {
             const res = await fetch(`${baseUrl}/api/publish/youtube`, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${cronSecret}`,
+                "x-cron-internal": "1",
+              },
               body: JSON.stringify({
                 companyId,
                 channelId: youtubeAccount.channelId,
@@ -411,7 +431,11 @@ export async function GET(req: NextRequest) {
           try {
             const res = await fetch(`${baseUrl}/api/publish/tiktok`, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${cronSecret}`,
+                "x-cron-internal": "1",
+              },
               body: JSON.stringify({
                 companyId,
                 accessToken: tiktokAccount.accessToken,

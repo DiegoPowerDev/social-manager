@@ -93,16 +93,7 @@ export function getEffectivePlanFromCompany(
     };
   }
 
-  // 3) Facturación
   const plan = (company?.plan || "free") as "free" | "basic" | "premium";
-  const base = DEFAULT_LIMITS[plan] || DEFAULT_LIMITS.free;
-
-  // Solo el plan de cobro mira features; cortesía/socio ya salieron arriba
-  let aiEnabled = base.aiEnabled;
-  if (company?.features?.aiEnabled === false) aiEnabled = false;
-  if (company?.features?.aiEnabled === true) aiEnabled = true;
-  // premium de pago siempre IA
-  if (plan === "premium") aiEnabled = true;
 
   if (plan === "premium") {
     return {
@@ -116,14 +107,14 @@ export function getEffectivePlanFromCompany(
     };
   }
 
+  // free | basic → sin IA
   return {
     plan,
-    aiEnabled,
+    aiEnabled: false,
     limits: {
       aiCaptionsPerMonth: 0,
       aiImagesPerMonth: 0,
     },
-
     source: "billing",
   };
 }
@@ -206,4 +197,21 @@ export function jsonError(error: any) {
     status,
     body: { error: error?.message || "Error interno" },
   };
+}
+export async function requireCompanyMemberOrCron(
+  req: NextRequest,
+  companyId: string,
+) {
+  const authHeader = req.headers.get("authorization") || "";
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (
+    cronSecret &&
+    authHeader === `Bearer ${cronSecret}` &&
+    req.headers.get("x-cron-internal") === "1"
+  ) {
+    return { uid: "cron", role: "admin" as const };
+  }
+
+  return requireCompanyMember(req, companyId);
 }
