@@ -112,6 +112,9 @@ export async function generateImage(options: {
   prompt: string;
   imageUrl?: string;
   imageUrls?: string[];
+  /** ej. "16:9" | "1:1" | "21:9" */
+  aspectRatio?: string;
+  imageSize?: "1K" | "2K";
 }) {
   const prompt = options.prompt.trim();
   if (!prompt) throw new Error("Prompt vacío");
@@ -122,8 +125,10 @@ export async function generateImage(options: {
       ? [options.imageUrl]
       : [];
 
-  // Máx. ~3 refs recomendado por Google
   const limitedRefs = refs.slice(0, 3);
+  const aspectRatio =
+    options.aspectRatio || (limitedRefs.length ? "16:9" : "1:1");
+  const imageSize = options.imageSize || "1K";
 
   const parts: any[] = [{ text: prompt }];
   for (const url of limitedRefs) {
@@ -140,8 +145,8 @@ export async function generateImage(options: {
     generationConfig: {
       responseModalities: ["TEXT", "IMAGE"],
       imageConfig: {
-        aspectRatio: "1:1",
-        imageSize: "1K",
+        aspectRatio: aspectRatio || "1:1",
+        imageSize: imageSize || "1K",
       },
     },
   };

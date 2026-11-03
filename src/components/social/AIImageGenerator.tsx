@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -87,11 +87,54 @@ const STYLES = [
   },
 ];
 
+/** Formatos típicos de redes */
+const FORMATS = [
+  { value: "1:1", label: "1:1 · Cuadrado (feed)" },
+  { value: "4:5", label: "4:5 · Retrato (Instagram)" },
+  { value: "9:16", label: "9:16 · Stories / Reels" },
+  { value: "16:9", label: "16:9 · Horizontal / YouTube" },
+  { value: "3:2", label: "3:2 · Foto clásica" },
+  { value: "21:9", label: "21:9 · Banner ancho" },
+] as const;
+
+type RefMode = "guide" | "edit";
 type RefItem = { file: File; preview: string };
+
+function ratioToGeminiAspect(w: number, h: number): string {
+  if (!w || !h) return "1:1";
+  const r = w / h;
+  if (r >= 2.0) return "21:9";
+  if (r >= 1.6) return "16:9";
+  if (r >= 1.35) return "3:2";
+  if (r >= 1.15) return "4:3";
+  if (r >= 0.95) return "1:1";
+  if (r >= 0.8) return "4:5";
+  if (r >= 0.7) return "3:4";
+  if (r >= 0.55) return "2:3";
+  return "9:16";
+}
+
+function getImageDimensions(file: File): Promise<{ w: number; h: number }> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve({ w: img.naturalWidth, h: img.naturalHeight });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("No se pudo leer la imagen"));
+    };
+    img.src = url;
+  });
+}
 
 export function AIImageGenerator({ onGenerate }: Props) {
   const [prompt, setPrompt] = useState("");
   const [style, setStyle] = useState("realistic");
+  const [format, setFormat] = useState("1:1");
+  const [refMode, setRefMode] = useState<RefMode>("guide");
   const [refs, setRefs] = useState<RefItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
@@ -113,7 +156,6 @@ export function AIImageGenerator({ onGenerate }: Props) {
     if (!files.length) return;
 
     const next: RefItem[] = [...refs];
-
     for (const file of files) {
       if (next.length >= MAX_REFS) break;
       if (file.size > MAX_REF_SIZE) {
@@ -123,7 +165,6 @@ export function AIImageGenerator({ onGenerate }: Props) {
       if (!file.type.startsWith("image/")) continue;
       next.push({ file, preview: URL.createObjectURL(file) });
     }
-
     setRefs(next);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -152,9 +193,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
       method: "POST",
       body: formData,
     });
-
     if (!res.ok) throw new Error("Error al subir una imagen de referencia");
-
     const data = await res.json();
     return data.publicUrl as string;
   };
@@ -165,14 +204,21 @@ export function AIImageGenerator({ onGenerate }: Props) {
       ? `${prompt.trim()}, ${selectedStyle.suffix}`
       : prompt.trim();
 
-    if (refs.length > 1) {
+    if (refs.length === 0) return base;
+
+    if (refMode === "edit") {
       return (
-        `${base}. Use the reference images as visual guidance: ` +
-        `match architecture, materials, colors and style. ` +
-        `Generate the scene described in the prompt guided by those references.`
+        `${base}. Edit the first provided reference image. ` +
+        `Apply only the requested changes. Preserve composition, framing, layout and aspect ratio. ` +
+        `Do not crop to square. Do not redesign the entire image from scratch.`
       );
     }
-    return base;
+
+    // guide
+    return (
+      `${base}. Use the reference image(s) only as visual guidance for subject, style, colors or product. ` +
+      `Create a new scene as described in the prompt. Do not copy the reference framing or canvas size.`
+    );
   };
 
   const handleGenerate = async () => {
@@ -193,6 +239,10 @@ export function AIImageGenerator({ onGenerate }: Props) {
       toast.error("Sin imágenes disponibles este mes");
       return;
     }
+    if (refMode === "edit" && refs.length === 0) {
+      toast.error("Para editar, sube al menos una imagen de referencia");
+      return;
+    }
 
     setLoading(true);
     setGeneratedUrl(null);
@@ -204,6 +254,16 @@ export function AIImageGenerator({ onGenerate }: Props) {
         imageUrls.push(await uploadReferenceToR2(ref.file));
       }
 
+      let aspectRatio = format;
+      if (refMode === "edit" && refs[0]) {
+        try {
+          const { w, h } = await getImageDimensions(refs[0].file);
+          aspectRatio = ratioToGeminiAspect(w, h);
+        } catch {
+          /* se mantiene format */
+        }
+      }
+
       const res = await fetch("/api/ai/generate-image", {
         method: "POST",
         headers: await authHeaders(),
@@ -212,6 +272,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
           imageUrl: imageUrls[0],
           imageUrls,
           companyId,
+          aspectRatio,
         }),
       });
       const data = await res.json();
@@ -241,6 +302,12 @@ export function AIImageGenerator({ onGenerate }: Props) {
     }
   };
 
+  useEffect(() => {
+    if (refs.length === 0 && refMode === "edit") {
+      setRefMode("guide");
+    }
+  }, [refs.length, refMode]);
+
   return (
     <div className="relative space-y-3 p-4 flex flex-col w-full">
       {!allowed && <AiLockedOverlay reason={reason} />}
@@ -258,64 +325,157 @@ export function AIImageGenerator({ onGenerate }: Props) {
             <Textarea
               id="image-prompt"
               className="resize-none bg-white text-black"
-              placeholder="Ej: Interior moderno del salón de esta casa, luz natural, mismos materiales..."
+              rows={3}
+              placeholder={
+                refMode === "edit"
+                  ? "Ej: Quita el bloque de publicidad de la derecha y deja el resto igual"
+                  : "Ej: Paisaje al atardecer con animales; incluye un perro como el de la referencia"
+              }
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              rows={3}
               disabled={loading || !allowed}
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Estilo</Label>
-            <Select
-              value={style}
-              onValueChange={(v) => setStyle(v as any)}
-              disabled={loading || !allowed}
-            >
-              <SelectTrigger className="bg-white text-black">
-                <SelectValue placeholder="Selecciona un estilo" />
-              </SelectTrigger>
-              <SelectContent>
-                {STYLES.map((s) => (
-                  <SelectItem key={s.value} value={s.value}>
-                    {s.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Estilo</Label>
+              <Select
+                value={style}
+                onValueChange={(v) => setStyle(v as any)}
+                disabled={loading || !allowed}
+              >
+                <SelectTrigger className="w-full bg-white text-black">
+                  <SelectValue placeholder="Selecciona un estilo">
+                    {STYLES.find((s) => s.value === style)?.label}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="min-w-[var(--radix-select-trigger-width)] w-[var(--radix-select-trigger-width)]">
+                  {STYLES.map((s) => (
+                    <SelectItem
+                      key={s.value}
+                      value={s.value}
+                      className="cursor-pointer"
+                    >
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Formato</Label>
+              <Select
+                value={format}
+                onValueChange={(v) => setFormat(v as any)}
+                disabled={
+                  loading || !allowed || (refMode === "edit" && refs.length > 0)
+                }
+              >
+                <SelectTrigger className="w-full bg-white text-black">
+                  <SelectValue placeholder="Formato del post">
+                    {FORMATS.find((f) => f.value === format)?.label}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="min-w-[var(--radix-select-trigger-width)] w-[var(--radix-select-trigger-width)]">
+                  {FORMATS.map((f) => (
+                    <SelectItem
+                      key={f.value}
+                      value={f.value}
+                      className="cursor-pointer"
+                    >
+                      {f.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {refMode === "edit" && refs.length > 0 && (
+                <p className="text-[11px] text-white/50">
+                  En modo editar se usa el formato de tu imagen de referencia.
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">
             <Label>Imágenes de referencia (opcional, máx. {MAX_REFS})</Label>
+
+            {refs.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => setRefMode("guide")}
+                  className={cn(
+                    "rounded-full px-3 py-1 text-xs border transition",
+                    refMode === "guide"
+                      ? "bg-yellow-500 text-black border-yellow-500"
+                      : "bg-white/10 border-white/20 text-white/80 hover:bg-white/15",
+                  )}
+                >
+                  Usar como guía
+                </button>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => setRefMode("edit")}
+                  className={cn(
+                    "rounded-full px-3 py-1 text-xs border transition",
+                    refMode === "edit"
+                      ? "bg-yellow-500 text-black border-yellow-500"
+                      : "bg-white/10 border-white/20 text-white/80 hover:bg-white/15",
+                  )}
+                >
+                  Editar la 1ª imagen
+                </button>
+              </div>
+            )}
+
             <p className="text-xs text-white/60">
-              Ej: fachada + materiales + estilo. La IA usará estas fotos como
-              guía.
+              {refs.length === 0
+                ? "Opcional: sube fotos de producto, estilo o una imagen a retocar."
+                : refMode === "edit"
+                  ? "Se modificará la primera imagen según tu descripción"
+                  : "Las fotos solo orientan estilo o sujeto; el formato lo eliges arriba."}
             </p>
 
             <div className="flex flex-wrap gap-2">
-              {refs.map((ref, i) => (
-                <div
-                  key={ref.preview}
-                  className="relative w-20 h-20 rounded-md overflow-hidden border border-white/80"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={ref.preview}
-                    alt={`Ref ${i + 1}`}
-                    className="w-full h-full object-cover"
-                  />
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full"
-                    onClick={() => removeReference(i)}
-                    disabled={loading}
+              {refs.map((ref, i) => {
+                const isEditTarget = refMode === "edit" && i === 0;
+                return (
+                  <div
+                    key={ref.preview}
+                    className={cn(
+                      "relative w-20 h-20 rounded-md overflow-hidden border-2 transition",
+                      isEditTarget
+                        ? "border-yellow-400 ring-2 ring-yellow-400/60 scale-105 z-10"
+                        : "border-white/40 opacity-80",
+                    )}
                   >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              ))}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={ref.preview}
+                      alt={`Ref ${i + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    {isEditTarget && (
+                      <span className="absolute bottom-0 inset-x-0 bg-yellow-500 text-black text-[9px] font-semibold text-center py-0.5">
+                        Se edita
+                      </span>
+                    )}
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full"
+                      onClick={() => removeReference(i)}
+                      disabled={loading}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                );
+              })}
 
               {refs.length < MAX_REFS && (
                 <>

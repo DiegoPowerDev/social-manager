@@ -132,10 +132,12 @@ export function PostHistory({ pageId, platform = "facebook" }: Props) {
   }, [fetchPosts]);
 
   return (
-    <Card className="h-fit sticky top-6 self-start w-full">
+    <Card className="h-fit sticky top-6 self-start w-full bg-zinc-950/60">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-lg">Últimas publicaciones</CardTitle>
+          <CardTitle className="text-lg text-white">
+            Últimas publicaciones
+          </CardTitle>
           <Button
             variant="ghost"
             size="sm"
@@ -171,7 +173,7 @@ export function PostHistory({ pageId, platform = "facebook" }: Props) {
             return (
               <div
                 key={post.id}
-                className="flex gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
+                className="flex gap-3 p-3 rounded-lg border-2 border-zinc-300/50 bg-zinc-950/60 hover:bg-zinc-900/20 transition-colors"
               >
                 <div className="w-14 h-14 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
                   {post.imageUrl ? (
@@ -188,40 +190,37 @@ export function PostHistory({ pageId, platform = "facebook" }: Props) {
                   )}
                 </div>
 
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm line-clamp-2 leading-snug">
-                    {text ? (
-                      text
-                    ) : (
-                      <span className="text-muted-foreground italic">
-                        Sin texto
-                      </span>
-                    )}
-                  </p>
-
-                  <div className="flex items-center justify-between mt-2 gap-2">
+                <div className="flex-1 min-w-0 flex justify-between items-center">
+                  <div className="flex flex-col gap-2">
+                    <p className="text-sm line-clamp-2 leading-snug text-white">
+                      {text ? text : <span className=" italic">Sin texto</span>}
+                    </p>
                     <div className="flex items-center gap-2 min-w-0">
-                      <Badge variant="outline" className="text-xs shrink-0">
+                      <Badge
+                        variant="outline"
+                        className="text-xs shrink-0 bg-white"
+                      >
                         {post.imageUrl
                           ? "Imagen"
                           : post.videoUrl
                             ? "Video"
                             : "Texto"}
                       </Badge>
-                      <span className="text-xs text-muted-foreground truncate">
+                      <span className="text-xs  truncate text-white/70">
                         {formatDistanceToNow(post.publishedAt, {
                           addSuffix: true,
                           locale: es,
                         })}
                       </span>
                     </div>
-
+                  </div>
+                  <div className="flex items-center justify-between mt-2 gap-2">
                     {postUrl && (
                       <a
                         href={postUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-muted-foreground hover:text-foreground shrink-0"
+                        className="text-white hover:text-white/50 shrink-0"
                         title="Ver publicación"
                       >
                         <ExternalLink className="h-4 w-4" />

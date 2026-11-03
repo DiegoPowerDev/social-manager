@@ -262,8 +262,9 @@ export default function SettingsPage() {
                       size="sm"
                       onClick={() => setLogoUrl(null)}
                       disabled={saving}
+                      className="text-white"
                     >
-                      <X className="h-4 w-4 mr-1" />
+                      <X className="h-4 w-4 mr-1 " />
                       Quitar
                     </Button>
                   )}
@@ -273,36 +274,34 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+        {aiEnabled && (
+          <Card className="bg-zinc-950/60">
+            <CardHeader>
+              <CardTitle className="text-white">
+                Instrucciones para la IA
+              </CardTitle>
+              <CardDescription className="text-white/50">
+                Se usarán al generar captions e imágenes (si tu plan incluye IA)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Textarea
+                value={aiInstructions}
+                onChange={(e) => setAiInstructions(e.target.value)}
+                placeholder="Ej. Somos una marca de tecnología B2B. Tono profesional y cercano..."
+                rows={6}
+                disabled={!canEdit || saving}
+                className="bg-white text-black resize-none"
+              />
 
-        <Card className="bg-zinc-950/60">
-          <CardHeader>
-            <CardTitle className="text-white">
-              Instrucciones para la IA
-            </CardTitle>
-            <CardDescription className="text-white/50">
-              Se usarán al generar captions e imágenes (si tu plan incluye IA)
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Textarea
-              value={aiInstructions}
-              onChange={(e) => setAiInstructions(e.target.value)}
-              placeholder="Ej. Somos una marca de tecnología B2B. Tono profesional y cercano..."
-              rows={6}
-              disabled={!canEdit || saving}
-              className="bg-white text-black resize-none"
-            />
-            {aiEnabled ? (
               <p className="text-xs text-white/50">
                 Uso este mes: {usage.aiCaptions}/{aiCaptionsLimit} captions ·{" "}
                 {usage.aiImages}/{aiImagesLimit} imágenes
                 {plan ? ` · Plan: ${plan}` : ""}
               </p>
-            ) : (
-              <p className="text-xs text-white/50">Tu plan no incluye IA.</p>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {canEdit && (
           <Button

@@ -35,15 +35,13 @@ export function EmptyState({
       )}
     >
       {Icon && (
-        <div className="mb-4 rounded-full bg-yellow-500/20 p-3">
-          <Icon className="h-8 w-8 text-amber-700" />
+        <div className="mb-4 rounded-full bg-yellow-400 p-3">
+          <Icon className="h-8 w-8 text-black" />
         </div>
       )}
-      <h3 className="text-lg font-semibold text-zinc-900">{title}</h3>
+      <h3 className="text-lg font-semibold text-white">{title}</h3>
       {description && (
-        <p className="mt-2 max-w-md text-sm text-muted-foreground">
-          {description}
-        </p>
+        <p className="mt-2 max-w-md text-sm text-white">{description}</p>
       )}
       {children}
       {(actionLabel && onAction) || (actionLabel && actionHref) ? (

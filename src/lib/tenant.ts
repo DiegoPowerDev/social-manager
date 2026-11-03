@@ -13,7 +13,6 @@ import { db } from "@/lib/firebase";
 import type { MemberRole } from "@/types";
 import { PlanId } from "@/content/plans";
 
-/** Límites por plan */
 export const PLAN_LIMITS = {
   free: {
     aiEnabled: false,

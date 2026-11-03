@@ -13,7 +13,8 @@ import {
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, imageUrl, imageUrls, companyId } = await req.json();
+    const { prompt, imageUrl, imageUrls, companyId, aspectRatio } =
+      await req.json();
 
     if (!companyId) {
       return NextResponse.json({ error: "Falta companyId" }, { status: 400 });
@@ -82,6 +83,7 @@ export async function POST(req: NextRequest) {
       prompt: finalPrompt,
       imageUrl: refs[0],
       imageUrls: refs,
+      aspectRatio: typeof aspectRatio === "string" ? aspectRatio : "1:1",
     });
 
     await consumeAiCreditAdmin(companyId, "image");

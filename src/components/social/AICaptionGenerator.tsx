@@ -19,6 +19,7 @@ import { canUseAi } from "@/content/access";
 import { AiLockedOverlay } from "@/components/auth/AiLockedOverlay";
 import { cn } from "@/lib/utils";
 import { auth } from "@/lib/firebase";
+import { Textarea } from "../ui/textarea";
 
 interface Props {
   platform?: "facebook" | "instagram" | "general";
@@ -116,12 +117,13 @@ export function AICaptionGenerator({
 
         <div className="space-y-2">
           <Label htmlFor="topic">Tema o idea</Label>
-          <Input
+          <Textarea
             id="topic"
+            className="resize-none bg-white text-black"
             placeholder="Ej: Lanzamiento de nuevo producto, tips de productividad..."
             value={topic}
-            className="bg-white text-black"
             onChange={(e) => setTopic(e.target.value)}
+            rows={3}
             disabled={loading || !allowed}
           />
         </div>
