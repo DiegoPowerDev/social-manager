@@ -33,9 +33,9 @@ import { cn } from "@/lib/utils";
 
 export const PRIVACY_LABELS: Record<string, string> = {
   PUBLIC_TO_EVERYONE: "Público (Everyone)",
-  MUTUAL_FOLLOW_FRIENDS: "Amigos",
-  FOLLOWER_OF_CREATOR: "Seguidores",
-  SELF_ONLY: "Solo yo",
+  MUTUAL_FOLLOW_FRIENDS: "Amigos (Friends)",
+  FOLLOWER_OF_CREATOR: "Seguidores (Followers)",
+  SELF_ONLY: "Solo yo (Only me)",
 };
 
 export type TikTokPrivacy = string;
@@ -395,16 +395,25 @@ export function TikTokComposer({
                 }}
                 disabled={isLoading}
               >
-                <SelectTrigger className="bg-white max-w-md text-black">
-                  <SelectValue placeholder="Selecciona visibilidad (obligatorio)" />
+                <SelectTrigger className="w-full max-w-md bg-white text-black">
+                  <SelectValue placeholder="Selecciona visibilidad (obligatorio)">
+                    {privacyLevel
+                      ? PRIVACY_LABELS[privacyLevel] || privacyLevel
+                      : undefined}
+                  </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
                   {privacyOptions.map((value) => {
                     const blocked = brandedContent && value === "SELF_ONLY";
                     return (
-                      <SelectItem key={value} value={value} disabled={blocked}>
+                      <SelectItem
+                        key={value}
+                        value={value}
+                        disabled={blocked}
+                        className="cursor-pointer"
+                      >
                         {PRIVACY_LABELS[value] || value}
-                        {blocked ? " (no disponible con branded content)" : ""}
+                        {blocked ? " — no disponible con branded content" : ""}
                       </SelectItem>
                     );
                   })}
