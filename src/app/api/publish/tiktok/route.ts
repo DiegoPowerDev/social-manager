@@ -7,8 +7,20 @@ export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
-    const { openId, name, title, videoUrl, companyId, privacyLevel } =
-      await req.json();
+    const body = await req.json();
+    const {
+      openId,
+      name,
+      title,
+      videoUrl,
+      companyId,
+      privacyLevel,
+      disableComment,
+      disableDuet,
+      disableStitch,
+      brandContentToggle,
+      brandOrganicToggle,
+    } = body;
 
     if (!companyId) {
       return NextResponse.json({ error: "Falta companyId" }, { status: 400 });
@@ -22,16 +34,46 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
+    if (!privacyLevel) {
+      return NextResponse.json(
+        { error: "Debes elegir la visibilidad" },
+        { status: 400 },
+      );
+    }
+
+    // Comercial on sin opción
+    const commercialOn = !!(brandContentToggle || brandOrganicToggle);
+    // Si envías un flag commercialDisclosureEnabled desde el front:
+    if (body.commercialDisclosure === true) {
+      if (!brandContentToggle && !brandOrganicToggle) {
+        return NextResponse.json(
+          {
+            error:
+              "Indica si el contenido promociona tu marca, un tercero, o ambos",
+          },
+          { status: 400 },
+        );
+      }
+      if (brandContentToggle && privacyLevel === "SELF_ONLY") {
+        return NextResponse.json(
+          {
+            error:
+              "Branded content no puede publicarse solo para ti (privacidad privada)",
+          },
+          { status: 400 },
+        );
+      }
+    }
 
     await requireCompanyMemberOrCron(req, companyId);
 
-    let q = adminDb
+    const accSnap = await adminDb
       .collection("socialAccounts")
       .where("companyId", "==", companyId)
       .where("platform", "==", "tiktok")
-      .limit(5);
+      .limit(5)
+      .get();
 
-    const accSnap = await q.get();
     if (accSnap.empty) {
       return NextResponse.json(
         { error: "Cuenta de TikTok no vinculada a esta empresa" },
@@ -39,7 +81,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Preferir openId si viene; si no, primera cuenta de la empresa
     let account = accSnap.docs[0].data();
     let docId = accSnap.docs[0].id;
     if (openId) {
@@ -54,13 +95,16 @@ export async function POST(req: NextRequest) {
       docId = match.id;
     }
 
-    const token = account.accessToken as string;
-
     const result = await publishToTikTok({
-      accessToken: token,
+      accessToken: account.accessToken as string,
       title: title.trim(),
       videoUrl,
-      privacyLevel: privacyLevel || undefined,
+      privacyLevel,
+      disableComment: !!disableComment,
+      disableDuet: !!disableDuet,
+      disableStitch: !!disableStitch,
+      brandContentToggle: !!brandContentToggle,
+      brandOrganicToggle: !!brandOrganicToggle,
     });
 
     await adminDb.collection("publishedPosts").add({
@@ -70,6 +114,9 @@ export async function POST(req: NextRequest) {
       name: name || account.name || account.username || null,
       message: title || null,
       videoUrl,
+      privacyLevel,
+      brandContentToggle: !!brandContentToggle,
+      brandOrganicToggle: !!brandOrganicToggle,
       tiktokPublishId: result.publishId || null,
       publishedAt: new Date(),
       status: result.status || "published",

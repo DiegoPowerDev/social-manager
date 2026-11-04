@@ -48,8 +48,7 @@ export default function TikTokPage() {
 
   const [title, setTitle] = useState("");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [privacyLevel, setPrivacyLevel] =
-    useState<TikTokPrivacy>("PUBLIC_TO_EVERYONE");
+  const [privacyLevel, setPrivacyLevel] = useState("");
 
   const loadAccount = async () => {
     try {
@@ -101,7 +100,15 @@ export default function TikTokPage() {
     }
   }, [searchParams]);
 
-  const handlePublish = async () => {
+  const handlePublish = async (meta: {
+    privacyLevel: string;
+    disableComment: boolean;
+    disableDuet: boolean;
+    disableStitch: boolean;
+    brandContentToggle: boolean;
+    brandOrganicToggle: boolean;
+    commercialDisclosure: boolean;
+  }) => {
     const user = auth.currentUser;
     if (!user) {
       toast.error("Sesión expirada. Vuelve a iniciar sesión.");
@@ -125,16 +132,21 @@ export default function TikTokPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
+          Authorization: `Bearer ${await auth.currentUser?.getIdToken()}`,
         },
         body: JSON.stringify({
           companyId,
-          accessToken: account.accessToken,
           openId: account.openId,
-          name: account.name || account.username,
-          title: title.trim(),
+          name: account.name,
+          title,
           videoUrl,
-          privacyLevel,
+          privacyLevel: meta.privacyLevel,
+          disableComment: meta.disableComment,
+          disableDuet: meta.disableDuet,
+          disableStitch: meta.disableStitch,
+          brandContentToggle: meta.brandContentToggle,
+          brandOrganicToggle: meta.brandOrganicToggle,
+          commercialDisclosure: meta.commercialDisclosure,
         }),
       });
       const result = await res.json();

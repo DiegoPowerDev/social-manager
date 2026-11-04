@@ -45,58 +45,63 @@ export async function publishToTikTok(options: {
   accessToken: string;
   title: string;
   videoUrl: string;
-  privacyLevel?: string;
+  privacyLevel: string;
+  disableComment?: boolean;
+  disableDuet?: boolean;
+  disableStitch?: boolean;
+  /** true = branded content (tercero) */
+  brandContentToggle?: boolean;
+  /** true = your brand */
+  brandOrganicToggle?: boolean;
 }) {
-  const { accessToken, title, videoUrl } = options;
+  const {
+    accessToken,
+    title,
+    videoUrl,
+    privacyLevel,
+    disableComment = false,
+    disableDuet = false,
+    disableStitch = false,
+    brandContentToggle = false,
+    brandOrganicToggle = false,
+  } = options;
 
-  const creator = await queryCreatorInfo(accessToken);
-  const allowed = creator.privacy_level_options?.length
-    ? creator.privacy_level_options
-    : ["SELF_ONLY"];
-
-  // Preferencia: la que pide el cliente → pública → primera permitida
-  const preferred = options.privacyLevel;
-  let privacyLevel: string;
-  if (preferred && allowed.includes(preferred)) {
-    privacyLevel = preferred;
-  } else if (allowed.includes("PUBLIC_TO_EVERYONE")) {
-    privacyLevel = "PUBLIC_TO_EVERYONE";
-  } else {
-    privacyLevel = allowed[0];
-  }
-
-  const initRes = await fetch(`${TIKTOK_API}/v2/post/publish/video/init/`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json; charset=UTF-8",
+  const initRes = await fetch(
+    "https://open.tiktokapis.com/v2/post/publish/video/init/",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json; charset=UTF-8",
+      },
+      body: JSON.stringify({
+        post_info: {
+          title: title.slice(0, 2200),
+          privacy_level: privacyLevel,
+          disable_comment: disableComment,
+          disable_duet: disableDuet,
+          disable_stitch: disableStitch,
+          brand_content_toggle: brandContentToggle,
+          brand_organic_toggle: brandOrganicToggle,
+        },
+        source_info: {
+          source: "PULL_FROM_URL",
+          video_url: videoUrl,
+        },
+      }),
     },
-    body: JSON.stringify({
-      post_info: {
-        title: title.slice(0, 2200),
-        privacy_level: privacyLevel,
-        disable_duet: false,
-        disable_comment: false,
-        disable_stitch: false,
-        video_cover_timestamp_ms: 1000,
-      },
-      source_info: {
-        source: "PULL_FROM_URL",
-        video_url: videoUrl,
-      },
-    }),
-  });
+  );
 
-  const initJson = await initRes.json();
-  if (initJson.error?.code && initJson.error.code !== "ok") {
+  const initData = await initRes.json();
+  if (!initRes.ok || initData?.error?.code !== "ok") {
     throw new Error(
-      initJson.error?.message ||
-        initJson.error?.code ||
-        "Error al iniciar publicación TikTok",
+      initData?.error?.message ||
+        initData?.error?.code ||
+        "Error al iniciar publicación en TikTok",
     );
   }
 
-  const publishId = initJson.data?.publish_id as string;
+  const publishId = initData?.data?.publish_id as string;
 
   let status = "PROCESSING";
   for (let i = 0; i < 20; i++) {
@@ -118,7 +123,10 @@ export async function publishToTikTok(options: {
     throw new Error("TikTok no pudo procesar el video");
   }
 
-  return { publishId, status, privacyLevel };
+  return {
+    publishId,
+    status: initData?.data?.publish_id ? "processing" : "published",
+  };
 }
 
 export async function refreshTikTokToken(refreshToken: string) {
