@@ -41,7 +41,7 @@ import { PostPreview } from "@/components/social/PostPreview";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { toast } from "sonner";
 import {
-  TIKTOK_PRIVACY_OPTIONS,
+  PRIVACY_LABELS,
   type TikTokPrivacy,
 } from "@/components/social/TikTokComposer";
 

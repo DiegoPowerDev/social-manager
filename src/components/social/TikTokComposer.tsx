@@ -31,7 +31,7 @@ import { saveMediaToLibrary } from "@/lib/media";
 import { auth } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
 
-const PRIVACY_LABELS: Record<string, string> = {
+export const PRIVACY_LABELS: Record<string, string> = {
   PUBLIC_TO_EVERYONE: "Público (Everyone)",
   MUTUAL_FOLLOW_FRIENDS: "Amigos",
   FOLLOWER_OF_CREATOR: "Seguidores",
