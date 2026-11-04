@@ -599,10 +599,10 @@ export function TikTokComposer({
             </div>
 
             {/* Point 4 + 2 NOTE — disclaimer */}
-            <p className="text-xs text-white/60 leading-relaxed">
+            <p className="text-xs text-white/80 leading-relaxed">
               {disclaimer}
             </p>
-            <p className="text-xs text-white/40">
+            <p className="text-xs text-white/70">
               After publishing, it may take a few minutes for the content to
               process and appear on the TikTok profile.
             </p>
