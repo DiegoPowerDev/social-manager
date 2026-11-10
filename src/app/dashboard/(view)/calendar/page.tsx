@@ -22,16 +22,22 @@ import {
   format,
   startOfMonth,
   endOfMonth,
+  startOfWeek,
+  endOfWeek,
   eachDayOfInterval,
   isSameDay,
+  isSameMonth,
   addMonths,
   subMonths,
+  addWeeks,
+  subWeeks,
   getDay,
 } from "date-fns";
 import { es } from "date-fns/locale";
 import Image from "next/image";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 export type IgMediaType = "FEED" | "REELS" | "STORIES" | "CAROUSEL";
 
@@ -62,6 +68,13 @@ export interface ScheduledPost {
   scheduledAt: Date;
   status: "scheduled" | "publishing" | "published" | "failed";
   results?: Record<string, { success: boolean; message?: string }>;
+  createdByUid: string;
+  createdByName: string | null;
+  createdByEmail: string | null;
+  createdAt: Timestamp;
+  updatedByUid?: string | null;
+  updatedByName?: string | null;
+  updatedAt?: Timestamp;
 }
 
 const statusStyles: Record<
@@ -92,24 +105,74 @@ const statusStyles: Record<
 
 const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
+type CalendarView = "month" | "week";
+
+function PlatformIcons({ post }: { post: ScheduledPost }) {
+  return (
+    <div className="flex items-center gap-1 mt-0.5">
+      {post.platforms.facebook && (
+        <Image height={14} width={14} src="/facebook-icon.svg" alt="Facebook" />
+      )}
+      {post.platforms.instagram && (
+        <Image
+          height={14}
+          width={14}
+          src="/instagram-icon.svg"
+          alt="Instagram"
+        />
+      )}
+      {post.platforms.instagram && post.instagramMediaType === "CAROUSEL" && (
+        <span className="text-[9px] opacity-80">carousel</span>
+      )}
+      {post.platforms.linkedin && (
+        <Image height={14} width={14} src="/linkedin.svg" alt="LinkedIn" />
+      )}
+      {post.platforms.youtube && (
+        <Image height={14} width={14} src="/youtube.svg" alt="YouTube" />
+      )}
+      {post.platforms.tiktok && (
+        <Image height={14} width={14} src="/tiktok.svg" alt="TikTok" />
+      )}
+      <span className="text-[10px] opacity-70 ml-auto">
+        {format(post.scheduledAt, "HH:mm")}
+      </span>
+    </div>
+  );
+}
+
 export default function CalendarPage() {
   const companyId = useAuthStore((s) => s.companyId);
   const memberRole = useAuthStore((s) => s.memberRole);
   const canEdit = memberRole === "admin" || memberRole === "editor";
 
-  const [currentMonth, setCurrentMonth] = useState(() => new Date());
+  const [view, setView] = useState<CalendarView>("month");
+  const [cursor, setCursor] = useState(() => new Date()); // mes o cualquier día de la semana
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Un solo modal: create (post=null) | detail (post definido)
   const [modalOpen, setModalOpen] = useState(false);
   const [modalDate, setModalDate] = useState<Date>(() => new Date());
   const [modalPost, setModalPost] = useState<ScheduledPost | null>(null);
 
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(currentMonth);
-  const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
-  const startPad = (getDay(monthStart) + 6) % 7;
+  const range = useMemo(() => {
+    if (view === "week") {
+      const start = startOfWeek(cursor, { weekStartsOn: 1 });
+      const end = endOfWeek(cursor, { weekStartsOn: 1 });
+      return { start, end };
+    }
+    return {
+      start: startOfMonth(cursor),
+      end: endOfMonth(cursor),
+    };
+  }, [view, cursor]);
+
+  const days = useMemo(
+    () => eachDayOfInterval({ start: range.start, end: range.end }),
+    [range],
+  );
+
+  const monthStart = startOfMonth(cursor);
+  const startPad = view === "month" ? (getDay(monthStart) + 6) % 7 : 0;
   const paddingDays = Array.from({ length: startPad });
 
   const loadPosts = useCallback(async () => {
@@ -121,14 +184,11 @@ export default function CalendarPage() {
 
     try {
       setLoading(true);
-      const start = startOfMonth(currentMonth);
-      const end = endOfMonth(currentMonth);
-
       const q = query(
         collection(db, "scheduledPosts"),
         where("companyId", "==", companyId),
-        where("scheduledAt", ">=", Timestamp.fromDate(start)),
-        where("scheduledAt", "<=", Timestamp.fromDate(end)),
+        where("scheduledAt", ">=", Timestamp.fromDate(range.start)),
+        where("scheduledAt", "<=", Timestamp.fromDate(range.end)),
       );
 
       const snapshot = await getDocs(q);
@@ -146,9 +206,18 @@ export default function CalendarPage() {
           instagramMediaType: d.instagramMediaType || null,
           youtubeTitle: d.youtubeTitle || null,
           youtubePrivacy: d.youtubePrivacy || null,
+          tiktokPrivacy: d.tiktokPrivacy || null,
           scheduledAt: d.scheduledAt?.toDate?.() || new Date(d.scheduledAt),
           status: d.status || "scheduled",
           results: d.results || undefined,
+          createdByUid: d.createdByUid || null,
+          createdByName: d.createdByName || null,
+          createdByEmail: d.createdByEmail || null,
+          createdAt:
+            d.createdAt?.toDate?.() ||
+            (d.createdAt ? new Date(d.createdAt) : null),
+          updatedByUid: d.updatedByUid || null,
+          updatedByName: d.updatedByName || null,
         } as ScheduledPost;
       });
 
@@ -159,7 +228,7 @@ export default function CalendarPage() {
     } finally {
       setLoading(false);
     }
-  }, [companyId, currentMonth]);
+  }, [companyId, range.start, range.end]);
 
   useEffect(() => {
     loadPosts();
@@ -177,6 +246,35 @@ export default function CalendarPage() {
     });
     return map;
   }, [posts]);
+
+  const headerLabel = useMemo(() => {
+    if (view === "week") {
+      const sameMonth = isSameMonth(range.start, range.end);
+      if (sameMonth) {
+        return `${format(range.start, "d", { locale: es })} – ${format(
+          range.end,
+          "d MMM yyyy",
+          { locale: es },
+        )}`;
+      }
+      return `${format(range.start, "d MMM", { locale: es })} – ${format(
+        range.end,
+        "d MMM yyyy",
+        { locale: es },
+      )}`;
+    }
+    return format(cursor, "MMMM yyyy", { locale: es });
+  }, [view, range, cursor]);
+
+  const goPrev = () => {
+    setCursor((d) => (view === "week" ? subWeeks(d, 1) : subMonths(d, 1)));
+  };
+
+  const goNext = () => {
+    setCursor((d) => (view === "week" ? addWeeks(d, 1) : addMonths(d, 1)));
+  };
+
+  const goToday = () => setCursor(new Date());
 
   const openCreate = (day: Date) => {
     if (!canEdit) {
@@ -207,8 +305,11 @@ export default function CalendarPage() {
     );
   }
 
+  const dayMinHeight = view === "week" ? "min-h-[420px]" : "min-h-[120px]";
+  const dayPostsMaxH = view === "week" ? "max-h-64" : "max-h-48";
+
   return (
-    <div>
+    <div className="h-full flex flex-col">
       <div className="flex items-center justify-between bg-zinc-950/60">
         <div className="p-6 text-white">
           <h1 className="text-2xl font-bold">Calendario</h1>
@@ -230,22 +331,43 @@ export default function CalendarPage() {
       <div className="w-full h-full px-6 py-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-            >
+            <Button variant="outline" size="icon" onClick={goPrev}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <h3 className="text-lg font-semibold min-w-[180px] text-center capitalize text-white">
-              {format(currentMonth, "MMMM yyyy", { locale: es })}
+            <h3 className="text-lg font-semibold min-w-[200px] text-center capitalize text-white">
+              {headerLabel}
             </h3>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-            >
+            <Button variant="outline" size="icon" onClick={goNext}>
               <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-1 rounded-full bg-zinc-900 p-1 border border-white/10">
+            <Button
+              size="sm"
+              variant="ghost"
+              className={cn(
+                "rounded-full h-8 px-4 text-sm",
+                view === "month"
+                  ? "bg-gradient-to-r from-orange-400 to-yellow-500 text-white hover:text-white"
+                  : "text-white/70 hover:text-white",
+              )}
+              onClick={() => setView("month")}
+            >
+              Mes
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className={cn(
+                "rounded-full h-8 px-4 text-sm",
+                view === "week"
+                  ? "bg-gradient-to-r from-orange-400 to-yellow-500 text-white hover:text-white"
+                  : "text-white/70 hover:text-white",
+              )}
+              onClick={() => setView("week")}
+            >
+              Semana
             </Button>
           </div>
 
@@ -264,12 +386,12 @@ export default function CalendarPage() {
             </span>
           </div>
 
-          <Button variant="outline" onClick={() => setCurrentMonth(new Date())}>
+          <Button variant="outline" onClick={goToday}>
             Hoy
           </Button>
         </div>
 
-        <div className="rounded-lg overflow-hidden mt-4 relative">
+        <div className="rounded-lg overflow-hidden mt-4 relative h-full">
           {loading && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/20">
               <LucideLoaderCircle className="animate-spin h-10 w-10 text-yellow-200" />
@@ -287,28 +409,40 @@ export default function CalendarPage() {
             ))}
           </div>
 
-          <div className="grid grid-cols-7 auto-rows-[minmax(120px,auto)]">
-            {paddingDays.map((_, i) => (
-              <div key={`pad-${i}`} />
-            ))}
+          <div
+            className={cn(
+              "grid grid-cols-7",
+              view === "week"
+                ? "auto-rows-[minmax(220px,auto)]"
+                : "auto-rows-[minmax(120px,auto)]",
+            )}
+          >
+            {view === "month" &&
+              paddingDays.map((_, i) => <div key={`pad-${i}`} />)}
 
             {days.map((day) => {
               const key = format(day, "yyyy-MM-dd");
               const dayPosts = postsByDay.get(key) || [];
               const isToday = isSameDay(day, new Date());
+              const outsideMonth =
+                view === "month" && !isSameMonth(day, cursor);
 
               return (
                 <div
                   key={key}
-                  className={`border-b border-r border-white/20 p-1.5 flex flex-col gap-1 min-h-[120px] ${
-                    isToday ? "bg-yellow-500/20" : "bg-zinc-950/60 text-white"
-                  }`}
+                  className={cn(
+                    "border-b border-r border-white/20 p-1.5 flex flex-col gap-1 h-full",
+                    dayMinHeight,
+                    isToday ? "bg-yellow-500/20" : "bg-zinc-950/60 text-white",
+                    outsideMonth && "opacity-40",
+                  )}
                 >
                   <div className="flex items-center justify-between gap-1">
                     <span
-                      className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full ${
-                        isToday ? "bg-yellow-500 text-black" : ""
-                      }`}
+                      className={cn(
+                        "text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full",
+                        isToday && "bg-yellow-500 text-black",
+                      )}
                     >
                       {format(day, "d")}
                     </span>
@@ -333,7 +467,12 @@ export default function CalendarPage() {
                     </div>
                   </div>
 
-                  <div className="flex-1 space-y-1 overflow-y-auto max-h-28 pr-0.5">
+                  <div
+                    className={cn(
+                      "flex-1 space-y-1 overflow-y-auto pr-0.5",
+                      dayPostsMaxH,
+                    )}
+                  >
                     {dayPosts.map((post) => {
                       const style =
                         statusStyles[post.status] || statusStyles.scheduled;
@@ -342,69 +481,25 @@ export default function CalendarPage() {
                         <button
                           key={post.id}
                           type="button"
-                          className={`w-full text-left px-1.5 py-1 rounded text-[11px] leading-tight border transition-colors ${style.card}`}
+                          className={cn(
+                            "w-full text-left px-1.5 py-1 rounded text-[11px] leading-tight border transition-colors",
+                            style.card,
+                          )}
                           onClick={() => openDetail(post)}
                           title={`${style.label} · ${format(post.scheduledAt, "HH:mm")}`}
                         >
                           <div className="flex items-center gap-1 truncate">
                             <span
-                              className={`h-1.5 w-1.5 rounded-full shrink-0 ${style.dot}`}
+                              className={cn(
+                                "h-1.5 w-1.5 rounded-full shrink-0",
+                                style.dot,
+                              )}
                             />
                             <span className="truncate font-medium">
                               {post.title}
                             </span>
                           </div>
-                          <div className="flex items-center gap-1 mt-0.5">
-                            {post.platforms.facebook && (
-                              <Image
-                                height={14}
-                                width={14}
-                                src="/facebook-icon.svg"
-                                alt="Facebook"
-                              />
-                            )}
-                            {post.platforms.instagram && (
-                              <Image
-                                height={14}
-                                width={14}
-                                src="/instagram-icon.svg"
-                                alt="Instagram"
-                              />
-                            )}
-                            {post.platforms.instagram &&
-                              post.instagramMediaType === "CAROUSEL" && (
-                                <span className="text-[9px] opacity-80">
-                                  carousel
-                                </span>
-                              )}
-                            {post.platforms.linkedin && (
-                              <Image
-                                height={14}
-                                width={14}
-                                src="/linkedin.svg"
-                                alt="LinkedIn"
-                              />
-                            )}
-                            {post.platforms.youtube && (
-                              <Image
-                                height={14}
-                                width={14}
-                                src="/youtube.svg"
-                                alt="YouTube"
-                              />
-                            )}
-                            {post.platforms.tiktok && (
-                              <Image
-                                height={14}
-                                width={14}
-                                src="/tiktok.svg"
-                                alt="TikTok"
-                              />
-                            )}
-                            <span className="text-[10px] opacity-70 ml-auto">
-                              {format(post.scheduledAt, "HH:mm")}
-                            </span>
-                          </div>
+                          <PlatformIcons post={post} />
                         </button>
                       );
                     })}
@@ -415,7 +510,6 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        {/* Un solo modal: crear (post=null) o detalle/editar (post definido) */}
         <SchedulePostModal
           open={modalOpen}
           date={modalDate}

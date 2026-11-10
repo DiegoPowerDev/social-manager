@@ -40,10 +40,7 @@ import { Separator } from "@/components/ui/separator";
 import { PostPreview } from "@/components/social/PostPreview";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { toast } from "sonner";
-import {
-  PRIVACY_LABELS,
-  type TikTokPrivacy,
-} from "@/components/social/TikTokComposer";
+import { cn } from "@/lib/utils";
 
 interface SocialAccount {
   id: string;
@@ -66,6 +63,31 @@ interface PublishResult {
 }
 
 type IgMediaType = "FEED" | "REELS" | "STORIES" | "CAROUSEL";
+type TikTokPrivacy =
+  | "PUBLIC_TO_EVERYONE"
+  | "MUTUAL_FOLLOW_FRIENDS"
+  | "FOLLOWER_OF_CREATOR"
+  | "SELF_ONLY";
+
+const TIKTOK_PRIVACY_OPTIONS: { value: TikTokPrivacy; label: string }[] = [
+  { value: "PUBLIC_TO_EVERYONE", label: "Público" },
+  { value: "MUTUAL_FOLLOW_FRIENDS", label: "Amigos" },
+  { value: "FOLLOWER_OF_CREATOR", label: "Seguidores" },
+  { value: "SELF_ONLY", label: "Solo yo" },
+];
+
+const YOUTUBE_PRIVACY_OPTIONS = [
+  { value: "public", label: "Público" },
+  { value: "unlisted", label: "No listado" },
+  { value: "private", label: "Privado" },
+] as const;
+
+const IG_TYPE_OPTIONS: { value: IgMediaType; label: string }[] = [
+  { value: "FEED", label: "Feed" },
+  { value: "CAROUSEL", label: "Carrusel" },
+  { value: "REELS", label: "Reel" },
+  { value: "STORIES", label: "Historia" },
+];
 
 export default function BulkPublishPage() {
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
@@ -99,6 +121,12 @@ export default function BulkPublishPage() {
 
   const [tiktokPrivacy, setTiktokPrivacy] =
     useState<TikTokPrivacy>("PUBLIC_TO_EVERYONE");
+  const [tiktokAllowComment, setTiktokAllowComment] = useState(true);
+  const [tiktokAllowDuet, setTiktokAllowDuet] = useState(false);
+  const [tiktokAllowStitch, setTiktokAllowStitch] = useState(false);
+  const [tiktokCommercial, setTiktokCommercial] = useState(false);
+  const [tiktokBrandOrganic, setTiktokBrandOrganic] = useState(false);
+  const [tiktokBrandContent, setTiktokBrandContent] = useState(false);
 
   const [publishing, setPublishing] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
@@ -120,17 +148,12 @@ export default function BulkPublishPage() {
           where("companyId", "==", companyId),
         );
         const snapshot = await getDocs(q);
-        const data = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
+        const data = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
         })) as SocialAccount[];
-
         setAccounts(data);
-        setSelectedFacebook(!!data.find((a) => a.platform === "facebook"));
-        setSelectedInstagram(!!data.find((a) => a.platform === "instagram"));
-        setSelectedLinkedIn(!!data.find((a) => a.platform === "linkedin"));
-        setSelectedYouTube(!!data.find((a) => a.platform === "youtube"));
-        setSelectedTikTok(!!data.find((a) => a.platform === "tiktok"));
+        // No pre-marcar redes
       } catch (error) {
         console.error(error);
         toast.error("Error al cargar cuentas");
@@ -138,7 +161,6 @@ export default function BulkPublishPage() {
         setLoadingAccounts(false);
       }
     };
-
     loadAccounts();
   }, [companyId]);
 
@@ -158,19 +180,13 @@ export default function BulkPublishPage() {
     formData.append("file", file);
     formData.append("platform", "bulk");
     formData.append("companyId", companyId);
-    const res = await fetch("/api/upload", {
-      method: "POST",
-      body: formData,
-    });
-
+    const res = await fetch("/api/upload", { method: "POST", body: formData });
     if (!res.ok) {
       const error = await res.json().catch(() => ({}));
       throw new Error(error.error || "Error al subir el archivo");
     }
-
     const data = await res.json();
     const publicUrl = data.publicUrl as string;
-
     if (user?.uid) {
       try {
         await saveMediaToLibrary({
@@ -187,7 +203,6 @@ export default function BulkPublishPage() {
         console.warn("No se pudo guardar en biblioteca:", e);
       }
     }
-
     return publicUrl;
   };
 
@@ -218,14 +233,11 @@ export default function BulkPublishPage() {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files?.length) return;
-
     const isCarouselMode =
       selectedInstagram && instagramMediaType === "CAROUSEL";
-
     try {
       setUploadingMedia(true);
       setVideoUrl(null);
-
       if (isCarouselMode) {
         const list = Array.from(files);
         if (imageUrls.length + list.length > 10) {
@@ -252,9 +264,8 @@ export default function BulkPublishPage() {
           return;
         }
         const tid = toast.loading("Subiendo imagen…");
-        const url = await uploadToR2(file);
         setImageUrls([]);
-        setImageUrl(url);
+        setImageUrl(await uploadToR2(file));
         toast.success("Imagen lista", { id: tid });
       }
     } catch (err: any) {
@@ -268,19 +279,16 @@ export default function BulkPublishPage() {
   const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (file.size > 100 * 1024 * 1024) {
       toast.error("El video no puede superar los 100MB");
       return;
     }
-
     const tid = toast.loading("Subiendo video…");
     try {
       setUploadingMedia(true);
       setImageUrl(null);
       setImageUrls([]);
-      const url = await uploadToR2(file);
-      setVideoUrl(url);
+      setVideoUrl(await uploadToR2(file));
       toast.success("Video listo", { id: tid });
     } catch (err: any) {
       toast.error(err.message || "Error al subir el video", { id: tid });
@@ -305,17 +313,24 @@ export default function BulkPublishPage() {
     setVideoUrl(null);
     setLink("");
     setYoutubeTitle("");
+    setTiktokPrivacy("PUBLIC_TO_EVERYONE");
+    setTiktokAllowComment(true);
+    setTiktokAllowDuet(false);
+    setTiktokAllowStitch(false);
+    setTiktokCommercial(false);
+    setTiktokBrandOrganic(false);
+    setTiktokBrandContent(false);
     if (imageInputRef.current) imageInputRef.current.value = "";
     if (videoInputRef.current) videoInputRef.current.value = "";
   };
 
   const handlePublish = async () => {
-    const user = auth.currentUser;
-    if (!user) {
+    const authUser = auth.currentUser;
+    if (!authUser) {
       toast.error("Sesión expirada. Vuelve a iniciar sesión.");
       return;
     }
-    const idToken = await user.getIdToken();
+    const idToken = await authUser.getIdToken();
     if (!companyId || !canEdit) {
       toast.error(!canEdit ? "No tienes permiso para publicar" : "Sin empresa");
       return;
@@ -330,17 +345,14 @@ export default function BulkPublishPage() {
       toast.error("Selecciona al menos una red");
       return;
     }
-
     if ((selectedYouTube || selectedTikTok) && !videoUrl) {
       toast.error("YouTube y TikTok requieren un video");
       return;
     }
-
     if (selectedYouTube && !youtubeTitle.trim() && !message.trim()) {
       toast.error("YouTube requiere un título");
       return;
     }
-
     if (selectedInstagram) {
       if (instagramMediaType === "CAROUSEL" && imageUrls.length < 2) {
         toast.error("El carrusel de Instagram necesita al menos 2 imágenes");
@@ -360,11 +372,30 @@ export default function BulkPublishPage() {
         return;
       }
     }
+    if (selectedTikTok) {
+      if (!tiktokPrivacy) {
+        toast.error("Elige la visibilidad de TikTok");
+        return;
+      }
+      if (tiktokCommercial) {
+        if (!tiktokBrandOrganic && !tiktokBrandContent) {
+          toast.error(
+            "Indica si el contenido promociona tu marca, un tercero, o ambos",
+          );
+          return;
+        }
+        if (tiktokBrandContent && tiktokPrivacy === "SELF_ONLY") {
+          toast.error(
+            "Branded content no puede publicarse solo para ti (Solo yo)",
+          );
+          return;
+        }
+      }
+    }
 
     setPublishing(true);
     setResults([]);
     const tid = toast.loading("Publicando en las redes seleccionadas…");
-
     const publishResults: PublishResult[] = [];
 
     if (selectedFacebook && facebookAccount) {
@@ -524,12 +555,17 @@ export default function BulkPublishPage() {
           },
           body: JSON.stringify({
             companyId,
-            accessToken: tiktokAccount.accessToken,
             openId: tiktokAccount.openId,
             name: tiktokAccount.name || tiktokAccount.username,
             title: message.trim() || "Video",
             videoUrl,
             privacyLevel: tiktokPrivacy,
+            disableComment: !tiktokAllowComment,
+            disableDuet: !tiktokAllowDuet,
+            disableStitch: !tiktokAllowStitch,
+            commercialDisclosure: tiktokCommercial,
+            brandOrganicToggle: tiktokBrandOrganic,
+            brandContentToggle: tiktokBrandContent,
           }),
         });
         const data = await res.json();
@@ -596,6 +632,7 @@ export default function BulkPublishPage() {
   ].filter(Boolean).length;
 
   const isCarousel = selectedInstagram && instagramMediaType === "CAROUSEL";
+  const busy = publishing || uploadingMedia;
 
   return (
     <div>
@@ -610,7 +647,7 @@ export default function BulkPublishPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
         <div className="lg:col-span-2 space-y-5">
-          <Card className="bg-zinc-950/50">
+          <Card className="bg-zinc-950/50 border-white/10">
             <CardHeader>
               <CardTitle className="text-white">Contenido</CardTitle>
               <CardDescription className="text-white/60">
@@ -618,39 +655,68 @@ export default function BulkPublishPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              <Card className="bg-zinc-950/60 text-white">
-                <CardHeader>
-                  <CardTitle>Redes</CardTitle>
-                  <CardDescription>Selecciona dónde publicar</CardDescription>
-                </CardHeader>
-                <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {/* Redes */}
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-white">Redes</Label>
+                  <p className="text-xs text-white/50 mt-0.5">
+                    Elige al menos una. Solo aparecen las cuentas conectadas.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {facebookAccount && (
-                    <div className="flex items-start space-x-3 p-3 rounded-lg">
-                      <Checkbox
-                        id="fb"
-                        checked={selectedFacebook}
-                        onCheckedChange={(c) => setSelectedFacebook(c === true)}
-                        disabled={publishing}
-                      />
-                      <div className="space-y-1">
-                        <Label
-                          htmlFor="fb"
-                          className="font-medium cursor-pointer"
-                        >
+                    <div
+                      className={cn(
+                        " rounded-xl border p-3 space-y-3",
+                        selectedTikTok
+                          ? "bg-white/15 border-white/30"
+                          : "bg-white/5 border-white/10",
+                      )}
+                    >
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <Checkbox
+                          checked={selectedFacebook}
+                          onCheckedChange={(c) =>
+                            setSelectedFacebook(c === true)
+                          }
+                          disabled={busy}
+                        />
+                        <span className="text-sm text-white font-medium">
                           Facebook
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
+                        </span>
+                        <span className="text-xs text-white/40 truncate ml-auto">
                           {facebookAccount.name}
-                        </p>
-                      </div>
+                        </span>
+                      </label>
+
+                      {selectedFacebook && (
+                        <div className="space-y-2">
+                          <Label className="text-white font-bold">
+                            Enlace (solo Facebook)
+                          </Label>
+                          <Input
+                            placeholder="https://ejemplo.com"
+                            value={link}
+                            onChange={(e) => setLink(e.target.value)}
+                            disabled={busy}
+                            className="bg-white text-black"
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {instagramAccount && (
-                    <div className="space-y-3 p-3 rounded-lg">
-                      <div className="flex items-start space-x-3">
+                    <div
+                      className={cn(
+                        "rounded-xl border p-3 space-y-2",
+                        selectedInstagram
+                          ? "bg-white/15 border-pink-400/40"
+                          : "bg-white/5 border-white/10",
+                      )}
+                    >
+                      <label className="flex items-center gap-3 cursor-pointer">
                         <Checkbox
-                          id="ig"
                           checked={selectedInstagram}
                           onCheckedChange={(checked) => {
                             const on = checked === true;
@@ -660,46 +726,133 @@ export default function BulkPublishPage() {
                               setImageUrls([]);
                             }
                           }}
-                          disabled={publishing}
+                          disabled={busy}
                         />
-                        <div className="space-y-1 flex-1">
-                          <Label
-                            htmlFor="ig"
-                            className="font-medium cursor-pointer"
-                          >
-                            Instagram
-                          </Label>
-                          <p className="text-xs text-muted-foreground">
-                            @{instagramAccount.username}
-                          </p>
-                        </div>
-                      </div>
-
+                        <span className="text-sm text-white font-medium">
+                          Instagram
+                        </span>
+                        <span className="text-xs text-white/40 truncate ml-auto">
+                          @{instagramAccount.username}
+                        </span>
+                      </label>
                       {selectedInstagram && (
-                        <div className="ml-7 space-y-2">
-                          <Label className="text-xs">Tipo</Label>
-                          <Select
-                            value={instagramMediaType}
-                            onValueChange={(v) => {
-                              const t = v as IgMediaType;
-                              setInstagramMediaType(t);
-                              if (t !== "CAROUSEL") setImageUrls([]);
-                              if (t === "CAROUSEL") setVideoUrl(null);
-                              if (t === "REELS") {
-                                setImageUrl(null);
-                                setImageUrls([]);
+                        <Select
+                          value={instagramMediaType}
+                          onValueChange={(v) => {
+                            const t = v as IgMediaType;
+                            setInstagramMediaType(t);
+                            if (t !== "CAROUSEL") setImageUrls([]);
+                            if (t === "CAROUSEL") setVideoUrl(null);
+                            if (t === "REELS") {
+                              setImageUrl(null);
+                              setImageUrls([]);
+                            }
+                          }}
+                          disabled={busy}
+                        >
+                          <SelectTrigger className="h-9 bg-white text-black">
+                            <SelectValue>
+                              {
+                                IG_TYPE_OPTIONS.find(
+                                  (o) => o.value === instagramMediaType,
+                                )?.label
                               }
-                            }}
-                            disabled={publishing}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {IG_TYPE_OPTIONS.map((o) => (
+                              <SelectItem key={o.value} value={o.value}>
+                                {o.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                  )}
+
+                  {linkedinAccount && (
+                    <label
+                      className={cn(
+                        "flex items-center gap-3 p-3 rounded-xl border cursor-pointer",
+                        selectedLinkedIn
+                          ? "bg-white/15 border-blue-400/40"
+                          : "bg-white/5 border-white/10 hover:bg-white/10",
+                        busy && "opacity-60 pointer-events-none",
+                      )}
+                    >
+                      <Checkbox
+                        checked={selectedLinkedIn}
+                        onCheckedChange={(c) => setSelectedLinkedIn(c === true)}
+                        disabled={busy}
+                      />
+                      <span className="text-sm text-white font-medium">
+                        LinkedIn
+                      </span>
+                      <span className="text-xs text-white/40 truncate ml-auto">
+                        {linkedinAccount.name}
+                      </span>
+                    </label>
+                  )}
+
+                  {youtubeAccount && (
+                    <div
+                      className={cn(
+                        "rounded-xl border p-3 space-y-2",
+                        selectedYouTube
+                          ? "bg-white/15 border-red-400/40"
+                          : "bg-white/5 border-white/10",
+                      )}
+                    >
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <Checkbox
+                          checked={selectedYouTube}
+                          onCheckedChange={(c) =>
+                            setSelectedYouTube(c === true)
+                          }
+                          disabled={busy}
+                        />
+                        <span className="text-sm text-white font-medium">
+                          YouTube
+                        </span>
+                        <span className="text-xs text-white/40 truncate ml-auto">
+                          {youtubeAccount.name || "Canal"}
+                        </span>
+                      </label>
+                      {selectedYouTube && (
+                        <div className="grid gap-2">
+                          <Input
+                            placeholder="Título del video"
+                            value={youtubeTitle}
+                            onChange={(e) => setYoutubeTitle(e.target.value)}
+                            maxLength={100}
+                            className="bg-white text-black"
+                            disabled={busy}
+                          />
+                          <Select
+                            value={youtubePrivacy}
+                            onValueChange={(v) =>
+                              setYoutubePrivacy(
+                                v as "public" | "unlisted" | "private",
+                              )
+                            }
+                            disabled={busy}
                           >
-                            <SelectTrigger className="h-8 bg-black">
-                              <SelectValue />
+                            <SelectTrigger className="bg-white text-black">
+                              <SelectValue>
+                                {
+                                  YOUTUBE_PRIVACY_OPTIONS.find(
+                                    (o) => o.value === youtubePrivacy,
+                                  )?.label
+                                }
+                              </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="FEED">Feed</SelectItem>
-                              <SelectItem value="CAROUSEL">Carrusel</SelectItem>
-                              <SelectItem value="REELS">Reel</SelectItem>
-                              <SelectItem value="STORIES">Historia</SelectItem>
+                              {YOUTUBE_PRIVACY_OPTIONS.map((o) => (
+                                <SelectItem key={o.value} value={o.value}>
+                                  {o.label}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>
@@ -707,134 +860,161 @@ export default function BulkPublishPage() {
                     </div>
                   )}
 
-                  {linkedinAccount && (
-                    <div className="flex items-start space-x-3 p-3 rounded-lg">
-                      <Checkbox
-                        id="li"
-                        checked={selectedLinkedIn}
-                        onCheckedChange={(c) => setSelectedLinkedIn(c === true)}
-                        disabled={publishing}
-                      />
-                      <div className="space-y-1">
-                        <Label
-                          htmlFor="li"
-                          className="font-medium cursor-pointer"
-                        >
-                          LinkedIn
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
-                          {linkedinAccount.name}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {youtubeAccount && (
-                    <div className="flex items-start space-x-3 p-3 rounded-lg">
-                      <Checkbox
-                        id="yt"
-                        checked={selectedYouTube}
-                        onCheckedChange={(c) => setSelectedYouTube(c === true)}
-                        disabled={publishing}
-                      />
-                      <div className="space-y-1">
-                        <Label
-                          htmlFor="yt"
-                          className="font-medium cursor-pointer"
-                        >
-                          YouTube
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
-                          {youtubeAccount.name || "Canal"}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
                   {tiktokAccount && (
-                    <div className="flex items-start space-x-3 p-3 rounded-lg">
-                      <Checkbox
-                        id="tt"
-                        checked={selectedTikTok}
-                        onCheckedChange={(c) => setSelectedTikTok(c === true)}
-                        disabled={publishing}
-                      />
-                      <div className="space-y-1">
-                        <Label
-                          htmlFor="tt"
-                          className="font-medium cursor-pointer"
-                        >
+                    <div
+                      className={cn(
+                        "sm:col-span-2 rounded-xl border p-3 space-y-3",
+                        selectedTikTok
+                          ? "bg-white/15 border-white/30"
+                          : "bg-white/5 border-white/10",
+                      )}
+                    >
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <Checkbox
+                          checked={selectedTikTok}
+                          onCheckedChange={(c) => setSelectedTikTok(c === true)}
+                          disabled={busy}
+                        />
+                        <span className="text-sm text-white font-medium">
                           TikTok
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
+                        </span>
+                        <span className="text-xs text-white/40 truncate ml-auto">
                           {tiktokAccount.name || tiktokAccount.username}
-                        </p>
-                      </div>
+                        </span>
+                      </label>
+
+                      {selectedTikTok && (
+                        <div className="space-y-3 pl-1 border-l-2 border-white/10 ml-1">
+                          <div className="space-y-1.5">
+                            <Label className="text-white/80 text-xs">
+                              Visibilidad
+                            </Label>
+                            <Select
+                              value={tiktokPrivacy}
+                              onValueChange={(v) =>
+                                setTiktokPrivacy(v as TikTokPrivacy)
+                              }
+                              disabled={busy}
+                            >
+                              <SelectTrigger className="bg-white text-black max-w-xs">
+                                <SelectValue placeholder="Visibilidad">
+                                  {
+                                    TIKTOK_PRIVACY_OPTIONS.find(
+                                      (o) => o.value === tiktokPrivacy,
+                                    )?.label
+                                  }
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {TIKTOK_PRIVACY_OPTIONS.map((o) => (
+                                  <SelectItem key={o.value} value={o.value}>
+                                    {o.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <p className="text-xs text-white/50">
+                              Interacciones
+                            </p>
+                            <label className="flex items-center gap-2 text-sm text-white/90 cursor-pointer">
+                              <Checkbox
+                                checked={tiktokAllowComment}
+                                onCheckedChange={(c) =>
+                                  setTiktokAllowComment(c === true)
+                                }
+                                disabled={busy}
+                              />
+                              Permitir comentarios
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-white/90 cursor-pointer">
+                              <Checkbox
+                                checked={tiktokAllowDuet}
+                                onCheckedChange={(c) =>
+                                  setTiktokAllowDuet(c === true)
+                                }
+                                disabled={busy}
+                              />
+                              Permitir Duet
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-white/90 cursor-pointer">
+                              <Checkbox
+                                checked={tiktokAllowStitch}
+                                onCheckedChange={(c) =>
+                                  setTiktokAllowStitch(c === true)
+                                }
+                                disabled={busy}
+                              />
+                              Permitir Stitch
+                            </label>
+                          </div>
+
+                          <label className="flex items-start gap-2 cursor-pointer">
+                            <Checkbox
+                              checked={tiktokCommercial}
+                              onCheckedChange={(c) => {
+                                const on = c === true;
+                                setTiktokCommercial(on);
+                                if (!on) {
+                                  setTiktokBrandOrganic(false);
+                                  setTiktokBrandContent(false);
+                                }
+                              }}
+                              disabled={busy}
+                            />
+                            <span className="text-sm text-white/90 leading-snug">
+                              Contenido promocional / comercial
+                              <span className="block text-xs text-white/45">
+                                Actívalo si el video promociona una marca o
+                                producto
+                              </span>
+                            </span>
+                          </label>
+
+                          {tiktokCommercial && (
+                            <div className="flex flex-col gap-2 pl-6">
+                              <label className="flex items-center gap-2 text-sm text-white/80 cursor-pointer">
+                                <Checkbox
+                                  checked={tiktokBrandOrganic}
+                                  onCheckedChange={(c) =>
+                                    setTiktokBrandOrganic(c === true)
+                                  }
+                                  disabled={busy}
+                                />
+                                Promociona tu propia marca
+                              </label>
+                              <label className="flex items-center gap-2 text-sm text-white/80 cursor-pointer">
+                                <Checkbox
+                                  checked={tiktokBrandContent}
+                                  onCheckedChange={(c) =>
+                                    setTiktokBrandContent(c === true)
+                                  }
+                                  disabled={busy}
+                                />
+                                Promociona una marca de terceros (paid
+                                partnership)
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
-              {selectedYouTube && (
-                <div className="space-y-2">
-                  <Label className="text-white">Título YouTube</Label>
-                  <Input
-                    value={youtubeTitle}
-                    onChange={(e) => setYoutubeTitle(e.target.value)}
-                    maxLength={100}
-                    className="bg-white text-black"
-                    disabled={publishing}
-                  />
-                  <Select
-                    value={youtubePrivacy}
-                    onValueChange={(v) =>
-                      setYoutubePrivacy(v as "public" | "unlisted" | "private")
-                    }
-                  >
-                    <SelectTrigger className="bg-black text-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="public">Público</SelectItem>
-                      <SelectItem value="unlisted">No listado</SelectItem>
-                      <SelectItem value="private">Privado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              {selectedTikTok && (
-                <div className="space-y-2">
-                  <Label className="text-white">Visibilidad TikTok</Label>
-                  <Select
-                    value={tiktokPrivacy}
-                    onValueChange={(v) => setTiktokPrivacy(v as TikTokPrivacy)}
-                    disabled={publishing}
-                  >
-                    <SelectTrigger className="bg-black text-white max-w-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="PUBLIC_TO_EVERYONE">
-                        Público
-                      </SelectItem>
-                      <SelectItem value="MUTUAL_FOLLOW_FRIENDS">
-                        Amigos
-                      </SelectItem>
-                      <SelectItem value="FOLLOWER_OF_CREATOR">
-                        Seguidores
-                      </SelectItem>
-                      <SelectItem value="SELF_ONLY">Solo yo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
               {!(selectedInstagram && instagramMediaType === "STORIES") && (
-                <div className="flex justify-between gap-2 bg-zinc-950/50 text-white rounded">
+                <div className="flex flex-col lg:flex-row justify-between gap-2 bg-zinc-950/50 text-white rounded">
                   <AICaptionGenerator
                     platform="general"
                     onGenerate={(caption) => setMessage(caption)}
                   />
-                  <Separator orientation="vertical" />
+                  <Separator
+                    orientation="vertical"
+                    className="hidden lg:block"
+                  />
                   <div className="flex flex-col w-full gap-2 p-4">
                     <span>Texto / Caption</span>
                     <Textarea
@@ -843,14 +1023,14 @@ export default function BulkPublishPage() {
                       onChange={(e) => setMessage(e.target.value)}
                       rows={5}
                       className="resize-none bg-white flex-1 text-black"
-                      disabled={publishing || uploadingMedia}
+                      disabled={busy}
                     />
                   </div>
                 </div>
               )}
 
               {selectedInstagram && instagramMediaType === "STORIES" && (
-                <p className="text-sm text-black bg-white/60 p-3 rounded">
+                <p className="text-sm text-amber-100 bg-amber-500/10 border border-amber-500/30 p-3 rounded">
                   Las Historias de Instagram no permiten texto por la API.
                 </p>
               )}
@@ -868,7 +1048,7 @@ export default function BulkPublishPage() {
                 </p>
               )}
 
-              <div className="flex justify-between gap-2 bg-zinc-950/50 text-white rounded">
+              <div className="flex flex-col lg:flex-row justify-between gap-2 bg-zinc-950/50 text-white rounded">
                 <AIImageGenerator
                   onGenerate={(url) => {
                     setVideoUrl(null);
@@ -886,7 +1066,7 @@ export default function BulkPublishPage() {
                     }
                   }}
                 />
-                <Separator orientation="vertical" />
+                <Separator orientation="vertical" className="hidden lg:block" />
                 <div className="flex w-full flex-col gap-2 p-4">
                   <span>Media</span>
                   <div className="flex items-center justify-center gap-2 flex-wrap">
@@ -897,7 +1077,7 @@ export default function BulkPublishPage() {
                       ref={imageInputRef}
                       onChange={handleImageUpload}
                       className="hidden"
-                      disabled={publishing || uploadingMedia}
+                      disabled={busy}
                     />
                     <input
                       type="file"
@@ -905,25 +1085,19 @@ export default function BulkPublishPage() {
                       ref={videoInputRef}
                       onChange={handleVideoUpload}
                       className="hidden"
-                      disabled={publishing || uploadingMedia || isCarousel}
+                      disabled={busy || isCarousel}
                     />
-
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
                       className="text-black"
                       onClick={() => imageInputRef.current?.click()}
-                      disabled={
-                        publishing ||
-                        uploadingMedia ||
-                        (!!videoUrl && !isCarousel)
-                      }
+                      disabled={busy || (!!videoUrl && !isCarousel)}
                     >
                       <ImagePlus className="h-4 w-4 mr-2" />
                       {isCarousel ? "Añadir imágenes" : "Imagen"}
                     </Button>
-
                     <Button
                       type="button"
                       variant="outline"
@@ -931,24 +1105,19 @@ export default function BulkPublishPage() {
                       className="text-black"
                       onClick={() => videoInputRef.current?.click()}
                       disabled={
-                        publishing ||
-                        uploadingMedia ||
-                        isCarousel ||
-                        !!imageUrl ||
-                        imageUrls.length > 0
+                        busy || isCarousel || !!imageUrl || imageUrls.length > 0
                       }
                     >
                       <Video className="h-4 w-4 mr-2" />
                       Video
                     </Button>
-
                     <Button
                       type="button"
                       variant="secondary"
                       size="sm"
                       className="text-black"
                       onClick={() => setLibraryOpen(true)}
-                      disabled={publishing || uploadingMedia}
+                      disabled={busy}
                     >
                       <FolderOpen className="h-4 w-4 mr-2" />
                       Biblioteca
@@ -981,7 +1150,7 @@ export default function BulkPublishPage() {
                                 setImageUrls(next);
                                 setImageUrl(next[0] || null);
                               }}
-                              disabled={publishing || uploadingMedia}
+                              disabled={busy}
                             >
                               <X className="h-3 w-3" />
                             </Button>
@@ -1011,7 +1180,7 @@ export default function BulkPublishPage() {
                             size="icon"
                             className="absolute top-2 right-2 h-8 w-8 rounded-full"
                             onClick={removeMedia}
-                            disabled={publishing || uploadingMedia}
+                            disabled={busy}
                           >
                             <X className="h-4 w-4" />
                           </Button>
@@ -1019,7 +1188,6 @@ export default function BulkPublishPage() {
                       )
                     )}
                   </div>
-
                   {uploadingMedia && (
                     <p className="text-sm text-muted-foreground flex items-center gap-2 justify-center">
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -1028,20 +1196,6 @@ export default function BulkPublishPage() {
                   )}
                 </div>
               </div>
-              {selectedFacebook && (
-                <div className="space-y-2">
-                  <Label className="text-white font-bold">
-                    Enlace (solo Facebook)
-                  </Label>
-                  <Input
-                    placeholder="https://ejemplo.com"
-                    value={link}
-                    onChange={(e) => setLink(e.target.value)}
-                    disabled={publishing || uploadingMedia}
-                    className="bg-white text-black"
-                  />
-                </div>
-              )}
             </CardContent>
           </Card>
         </div>
@@ -1057,13 +1211,7 @@ export default function BulkPublishPage() {
             className="w-full h-12 text-base font-semibold rounded-xl bg-gradient-to-r from-orange-400 to-yellow-500 hover:from-orange-500 hover:to-yellow-500 text-white shadow-lg shadow-orange-500/25"
             size="lg"
             onClick={handlePublish}
-            disabled={
-              !canEdit ||
-              !companyId ||
-              publishing ||
-              uploadingMedia ||
-              selectedCount === 0
-            }
+            disabled={!canEdit || !companyId || busy || selectedCount === 0}
           >
             {uploadingMedia ? (
               <>
@@ -1118,7 +1266,9 @@ export default function BulkPublishPage() {
         open={libraryOpen}
         onClose={() => setLibraryOpen(false)}
         accept={
-          instagramMediaType === "REELS"
+          selectedYouTube ||
+          selectedTikTok ||
+          (selectedInstagram && instagramMediaType === "REELS")
             ? "video"
             : isCarousel
               ? "image"

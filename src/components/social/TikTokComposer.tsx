@@ -38,8 +38,12 @@ export const PRIVACY_LABELS: Record<string, string> = {
   SELF_ONLY: "Solo yo (Only me)",
 };
 
-export type TikTokPrivacy = string;
-
+export type TikTokPrivacy =
+  | "PUBLIC_TO_EVERYONE"
+  | "MUTUAL_FOLLOW_FRIENDS"
+  | "FOLLOWER_OF_CREATOR"
+  | "SELF_ONLY"
+  | "";
 interface CreatorInfo {
   creator_nickname?: string;
   creator_username?: string;
@@ -111,7 +115,12 @@ export function TikTokComposer({
     ? creator.privacy_level_options
     : forcePrivate
       ? ["SELF_ONLY"]
-      : ["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "SELF_ONLY"];
+      : [
+          "PUBLIC_TO_EVERYONE",
+          "MUTUAL_FOLLOW_FRIENDS",
+          "FOLLOWER_OF_CREATOR",
+          "SELF_ONLY",
+        ];
 
   const commentLocked = !!creator?.comment_disabled;
   const duetLocked = !!creator?.duet_disabled;

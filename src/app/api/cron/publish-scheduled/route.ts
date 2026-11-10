@@ -6,12 +6,6 @@ export const maxDuration = 60;
 
 type PlanTier = "free" | "basic" | "premium";
 
-const PLAN_RANK: Record<PlanTier, number> = {
-  free: 0,
-  basic: 1,
-  premium: 2,
-};
-
 function normalizePlan(p: unknown): PlanTier {
   if (p === "basic" || p === "premium" || p === "free") return p;
   // planes legacy
@@ -207,6 +201,11 @@ export async function GET(req: NextRequest) {
                 link: post.link || undefined,
                 imageUrl: post.imageUrl || undefined,
                 videoUrl: post.videoUrl || undefined,
+                publishedByUid: post.createdByUid || "system",
+                publishedByName: post.createdByName || "Programado",
+                publishedByEmail: post.createdByEmail || null,
+                source: "schedule",
+                scheduledPostId: postDoc.id,
               }),
             });
             const data = await res.json();
@@ -261,6 +260,11 @@ export async function GET(req: NextRequest) {
                     imageUrl: urls[0],
                     imageUrls: urls,
                     mediaType: "CAROUSEL",
+                    publishedByUid: post.createdByUid || "system",
+                    publishedByName: post.createdByName || "Programado",
+                    publishedByEmail: post.createdByEmail || null,
+                    source: "schedule",
+                    scheduledPostId: postDoc.id,
                   }),
                 });
                 const data = await res.json();
@@ -301,6 +305,11 @@ export async function GET(req: NextRequest) {
                   imageUrl: post.imageUrl || undefined,
                   videoUrl: post.videoUrl || undefined,
                   mediaType,
+                  publishedByUid: post.createdByUid || "system",
+                  publishedByName: post.createdByName || "Programado",
+                  publishedByEmail: post.createdByEmail || null,
+                  source: "schedule",
+                  scheduledPostId: postDoc.id,
                 }),
               });
               const data = await res.json();
@@ -344,6 +353,11 @@ export async function GET(req: NextRequest) {
                 text: post.message || "",
                 imageUrl: post.imageUrl || undefined,
                 videoUrl: post.videoUrl || undefined,
+                publishedByUid: post.createdByUid || "system",
+                publishedByName: post.createdByName || "Programado",
+                publishedByEmail: post.createdByEmail || null,
+                source: "schedule",
+                scheduledPostId: postDoc.id,
               }),
             });
             const data = await res.json();
@@ -397,6 +411,11 @@ export async function GET(req: NextRequest) {
                 description: post.message || "",
                 videoUrl: post.videoUrl,
                 privacyStatus: post.youtubePrivacy || "public",
+                publishedByUid: post.createdByUid || "system",
+                publishedByName: post.createdByName || "Programado",
+                publishedByEmail: post.createdByEmail || null,
+                source: "schedule",
+                scheduledPostId: postDoc.id,
               }),
             });
             const data = await res.json();
@@ -429,28 +448,53 @@ export async function GET(req: NextRequest) {
           };
         } else {
           try {
-            const res = await fetch(`${baseUrl}/api/publish/tiktok`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${cronSecret}`,
-                "x-cron-internal": "1",
-              },
-              body: JSON.stringify({
-                companyId,
-                accessToken: tiktokAccount.accessToken,
-                openId: tiktokAccount.openId,
-                name: tiktokAccount.name || tiktokAccount.username,
-                title: post.message || post.title || "Video",
-                videoUrl: post.videoUrl,
-                privacyLevel: post.tiktokPrivacy || undefined,
-              }),
-            });
-            const data = await res.json();
-            results.tiktok = {
-              success: res.ok,
-              message: res.ok ? "OK" : data.error || "Error",
-            };
+            const privacyLevel =
+              post.tiktokPrivacy || post.privacyLevel || undefined;
+
+            if (!privacyLevel) {
+              results.tiktok = {
+                success: false,
+                message: "Falta visibilidad de TikTok en el post programado",
+              };
+            } else {
+              const res = await fetch(`${baseUrl}/api/publish/tiktok`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${cronSecret}`,
+                  "x-cron-internal": "1",
+                },
+                body: JSON.stringify({
+                  companyId,
+                  openId: tiktokAccount.openId,
+                  name: tiktokAccount.name || tiktokAccount.username,
+                  title: post.message || post.title || "Video",
+                  videoUrl: post.videoUrl,
+                  privacyLevel,
+
+                  // Interacciones (API usa disable*)
+                  disableComment: post.disableComment ?? false,
+                  disableDuet: post.disableDuet ?? true,
+                  disableStitch: post.disableStitch ?? true,
+
+                  // Comercial
+                  commercialDisclosure: !!post.commercialDisclosure,
+                  brandOrganicToggle: !!post.brandOrganicToggle,
+                  brandContentToggle: !!post.brandContentToggle,
+
+                  publishedByUid: post.createdByUid || "system",
+                  publishedByName: post.createdByName || "Programado",
+                  publishedByEmail: post.createdByEmail || null,
+                  source: "schedule",
+                  scheduledPostId: postDoc.id,
+                }),
+              });
+              const data = await res.json();
+              results.tiktok = {
+                success: res.ok,
+                message: res.ok ? "OK" : data.error || "Error",
+              };
+            }
           } catch (e: any) {
             results.tiktok = { success: false, message: e.message };
           }

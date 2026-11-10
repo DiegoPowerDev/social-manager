@@ -12,24 +12,7 @@ import { Video, FileText, ExternalLink, Loader2 } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { toast } from "sonner";
 import { EmptyState } from "../layout/EmptyState";
-
-interface Post {
-  id: string;
-  pageId: string;
-  platform: string;
-  message?: string;
-  title?: string;
-  imageUrl?: string;
-  videoUrl?: string;
-  link?: string | null;
-  permalink?: string | null;
-  publishedAt: Date;
-  facebookPostId?: string | null;
-  instagramPostId?: string | null;
-  linkedinPostId?: string | null;
-  youtubeVideoId?: string | null;
-  tiktokPublishId?: string | null;
-}
+import { Post } from "@/types";
 
 interface Props {
   pageId: string;
@@ -103,6 +86,8 @@ export function PostHistory({ pageId, platform = "facebook" }: Props) {
             linkedinPostId: d.linkedinPostId || null,
             youtubeVideoId: d.youtubeVideoId || null,
             tiktokPublishId: d.tiktokPublishId || null,
+            publishedByName: d.publishedByName || null,
+            publishedByEmail: d.publishedByEmail || null,
           } as Post;
         })
         .filter((post) => {
@@ -213,6 +198,10 @@ export function PostHistory({ pageId, platform = "facebook" }: Props) {
                         })}
                       </span>
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      {post.publishedByName || post.publishedByEmail || "—"}
+                      {post.source === "schedule" ? " · programado" : ""}
+                    </p>
                   </div>
                   <div className="flex items-center justify-between mt-2 gap-2">
                     {postUrl && (

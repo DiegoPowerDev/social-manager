@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { publishToTikTok } from "@/adapters/tiktok";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireCompanyMemberOrCron, jsonError } from "@/lib/ai-route-helpers";
+import { getActorByUid } from "@/lib/request-actor";
 
 export const maxDuration = 60;
 
@@ -20,6 +21,11 @@ export async function POST(req: NextRequest) {
       disableStitch,
       brandContentToggle,
       brandOrganicToggle,
+      // Autoría (cron o cliente)
+      publishedByUid,
+      publishedByName,
+      publishedByEmail,
+      scheduledPostId,
     } = body;
 
     if (!companyId) {
@@ -42,7 +48,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Comercial on sin opción
-    const commercialOn = !!(brandContentToggle || brandOrganicToggle);
     // Si envías un flag commercialDisclosureEnabled desde el front:
     if (body.commercialDisclosure === true) {
       if (!brandContentToggle && !brandOrganicToggle) {
@@ -65,14 +70,36 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    await requireCompanyMemberOrCron(req, companyId);
-
+    const member = await requireCompanyMemberOrCron(req, companyId);
     const accSnap = await adminDb
       .collection("socialAccounts")
       .where("companyId", "==", companyId)
       .where("platform", "==", "tiktok")
       .limit(5)
       .get();
+
+    let byUid: string | null = null;
+    let byName: string | null = null;
+    let byEmail: string | null = null;
+    let postSource: "manual" | "schedule" = "manual";
+
+    if (member?.uid) {
+      const actor = await getActorByUid(member.uid);
+      byUid = actor.uid;
+      byName = actor.name;
+      byEmail = actor.email;
+      postSource = "manual";
+    } else if (publishedByUid || publishedByName) {
+      byUid = publishedByUid || null;
+      byName = publishedByName || "Programado";
+      byEmail = publishedByEmail || null;
+      postSource = "schedule";
+    } else {
+      byUid = null;
+      byName = "Sistema";
+      byEmail = null;
+      postSource = "schedule";
+    }
 
     if (accSnap.empty) {
       return NextResponse.json(
@@ -121,6 +148,11 @@ export async function POST(req: NextRequest) {
       publishedAt: new Date(),
       status: result.status || "published",
       socialAccountId: docId,
+      publishedByUid: byUid,
+      publishedByName: byName,
+      publishedByEmail: byEmail,
+      source: postSource,
+      scheduledPostId: scheduledPostId || null,
     });
 
     return NextResponse.json({ success: true, result });

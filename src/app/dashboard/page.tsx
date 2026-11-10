@@ -45,7 +45,6 @@ import {
   Legend,
 } from "recharts";
 import { useAuthStore } from "@/stores/useAuthStore";
-import TitleComponent from "@/components/layout/titleComponent";
 import { cn } from "@/lib/utils";
 
 interface PublishedPost {
@@ -60,9 +59,14 @@ interface PublishedPost {
   facebookPostId?: string | null;
   instagramPostId?: string | null;
   tiktokPostId?: string | null;
+  tiktokPublishId?: string | null;
   linkedinPostId?: string | null;
   youtubeVideoId?: string | null;
   permalink?: string | null;
+  publishedByUid?: string | null;
+  publishedByName?: string | null;
+  publishedByEmail?: string | null;
+  source?: "manual" | "schedule" | string | null;
 }
 
 interface ScheduledPost {
@@ -95,10 +99,11 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   const companyId = useAuthStore((s) => s.companyId);
-  // Filtros
+
   const [range, setRange] = useState<RangeKey>("30");
   const [platformFilter, setPlatformFilter] = useState<PlatformFilter>("all");
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [selectedUser, setSelectedUser] = useState<string | null>(null);
 
   useEffect(() => {
     if (!companyId) {
@@ -107,9 +112,6 @@ export default function DashboardPage() {
     }
     const load = async () => {
       try {
-        if (!companyId) {
-          return;
-        }
         const [pubSnap, schSnap] = await Promise.all([
           getDocs(
             query(
@@ -141,11 +143,17 @@ export default function DashboardPage() {
               imageUrl: data.imageUrl || null,
               videoUrl: data.videoUrl || null,
               link: data.link || null,
-              tiktokPostId: data.tiktokPostId || null,
+              tiktokPostId: data.tiktokPostId || data.tiktokPublishId || null,
+              tiktokPublishId: data.tiktokPublishId || null,
               facebookPostId: data.facebookPostId || data.postId || null,
               instagramPostId: data.instagramPostId || null,
               linkedinPostId: data.linkedinPostId || null,
+              youtubeVideoId: data.youtubeVideoId || null,
               permalink: data.permalink || null,
+              publishedByUid: data.publishedByUid || null,
+              publishedByName: data.publishedByName || null,
+              publishedByEmail: data.publishedByEmail || null,
+              source: data.source || null,
             };
           }),
         );
@@ -180,10 +188,6 @@ export default function DashboardPage() {
     if (post.platform === "linkedin" && post.linkedinPostId) {
       return `https://www.linkedin.com/feed/update/${post.linkedinPostId}/`;
     }
-    if (post.platform === "tiktok" && post.tiktokPostId) {
-      // si no hay permalink, a veces solo open_id; mejor siempre guardar permalink al publicar
-      return `https://www.tiktok.com/@/video/${post.tiktokPostId}`;
-    }
     if (post.platform === "youtube" && post.youtubeVideoId) {
       return `https://www.youtube.com/watch?v=${post.youtubeVideoId}`;
     }
@@ -198,7 +202,6 @@ export default function DashboardPage() {
     return eachDayOfInterval({ start, end });
   }, [rangeDays]);
 
-  // Filtro base: rango + plataforma
   const filtered = useMemo(() => {
     const start = startOfDay(subDays(new Date(), rangeDays - 1));
     const end = endOfDay(new Date());
@@ -208,11 +211,14 @@ export default function DashboardPage() {
       if (!isWithinInterval(p.publishedAt, { start, end })) return false;
       if (platformFilter !== "all" && p.platform !== platformFilter)
         return false;
+      if (selectedUser) {
+        const key = p.publishedByUid || "unknown";
+        if (key !== selectedUser) return false;
+      }
       return true;
     });
-  }, [published, rangeDays, platformFilter]);
+  }, [published, rangeDays, platformFilter, selectedUser]);
 
-  // Si hay día seleccionado, lista de ese día
   const listPosts = useMemo(() => {
     if (!selectedDay) return filtered;
     return filtered.filter(
@@ -249,6 +255,39 @@ export default function DashboardPage() {
     }));
   }, [filtered]);
 
+  /** Ranking por quién publicó (periodo + red; sin filtro de usuario para ver el ranking completo) */
+  const byUser = useMemo(() => {
+    const start = startOfDay(subDays(new Date(), rangeDays - 1));
+    const end = endOfDay(new Date());
+
+    const base = published.filter((p) => {
+      if (!p.publishedAt) return false;
+      if (!isWithinInterval(p.publishedAt, { start, end })) return false;
+      if (platformFilter !== "all" && p.platform !== platformFilter)
+        return false;
+      return true;
+    });
+
+    const map = new Map<
+      string,
+      { name: string; total: number; byPlatform: Record<string, number> }
+    >();
+
+    for (const p of base) {
+      const key = p.publishedByUid || "unknown";
+      const name = p.publishedByName || p.publishedByEmail || "Desconocido";
+      const cur = map.get(key) || { name, total: 0, byPlatform: {} };
+      cur.total += 1;
+      const plat = p.platform || "other";
+      cur.byPlatform[plat] = (cur.byPlatform[plat] || 0) + 1;
+      map.set(key, cur);
+    }
+
+    return Array.from(map.entries())
+      .map(([uid, v]) => ({ uid, ...v }))
+      .sort((a, b) => b.total - a.total);
+  }, [published, rangeDays, platformFilter]);
+
   const stats = useMemo(() => {
     const scheduledCount = scheduled.filter(
       (s) => s.status === "scheduled",
@@ -271,6 +310,7 @@ export default function DashboardPage() {
   const clearFilters = () => {
     setPlatformFilter("all");
     setSelectedDay(null);
+    setSelectedUser(null);
     setRange("30");
   };
 
@@ -284,19 +324,19 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between bg-zinc-950/50 ">
-        <div className="p-6  text-white">
+      <div className="flex items-center justify-between bg-zinc-950/50">
+        <div className="p-6 text-white">
           <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className=" text-sm">
-            Actividad de publicaciones — haz clic en barras o sectores para
-            filtrar
+          <p className="text-sm">
+            Actividad de publicaciones — clic en barras, sectores o usuarios
+            para filtrar
           </p>
         </div>
       </div>
 
       <div className="p-6 space-y-6">
         {/* Filtros */}
-        <Card className="bg-zinc-950/60 ">
+        <Card className="bg-zinc-950/60">
           <CardContent className="pt-4 flex flex-wrap items-center gap-3">
             <span className="text-sm font-medium text-white">Periodo:</span>
             {(["7", "14", "30", "90"] as RangeKey[]).map((r) => (
@@ -319,7 +359,7 @@ export default function DashboardPage() {
               </Button>
             ))}
 
-            <span className="text-sm font-medium  text-white ml-2">Red:</span>
+            <span className="text-sm font-medium text-white ml-2">Red:</span>
             {(
               [
                 ["all", "Todas"],
@@ -349,12 +389,12 @@ export default function DashboardPage() {
               </Button>
             ))}
 
-            {(platformFilter !== "all" || selectedDay) && (
+            {(platformFilter !== "all" || selectedDay || selectedUser) && (
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={clearFilters}
-                className="ml-auto"
+                className="ml-auto text-white"
               >
                 <X className="h-4 w-4 mr-1" />
                 Limpiar filtros
@@ -363,8 +403,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Chips activos */}
-        {(selectedDay || platformFilter !== "all") && (
+        {(selectedDay || platformFilter !== "all" || selectedUser) && (
           <div className="flex flex-wrap gap-2">
             {platformFilter !== "all" && (
               <Badge variant="secondary" className="capitalize">
@@ -374,6 +413,13 @@ export default function DashboardPage() {
             {selectedDay && (
               <Badge variant="secondary">
                 Día: {format(selectedDay, "d MMM yyyy", { locale: es })}
+              </Badge>
+            )}
+            {selectedUser && (
+              <Badge variant="secondary">
+                Usuario:{" "}
+                {byUser.find((u) => u.uid === selectedUser)?.name ||
+                  "Desconocido"}
               </Badge>
             )}
           </div>
@@ -393,7 +439,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-zinc-950/60 ">
+          <Card className="bg-zinc-950/60">
             <CardHeader className="pb-2">
               <CardDescription className="text-white">
                 Programados
@@ -407,7 +453,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-zinc-950/60 ">
+          <Card className="bg-zinc-950/60">
             <CardHeader className="pb-2">
               <CardDescription className="text-white">Fallidos</CardDescription>
               <CardTitle className="text-3xl text-red-600">
@@ -419,7 +465,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-zinc-950/60 ">
+          <Card className="bg-zinc-950/60">
             <CardHeader className="pb-2">
               <CardDescription className="text-white">
                 Día con más posts
@@ -491,7 +537,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-zinc-950/60 ">
+          <Card className="bg-zinc-950/60">
             <CardHeader>
               <CardTitle className="text-white">Por red</CardTitle>
               <CardDescription className="text-white">
@@ -549,8 +595,70 @@ export default function DashboardPage() {
           </Card>
         </div>
 
+        {/* Ranking por usuario */}
+        <Card className="bg-zinc-950/60">
+          <CardHeader>
+            <CardTitle className="text-white">
+              Publicaciones por persona
+            </CardTitle>
+            <CardDescription className="text-white">
+              Quién publicó más en el periodo (incluye posts programados
+              ejecutados). Clic para filtrar.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {byUser.length === 0 ? (
+              <p className="text-sm text-white/70">
+                Sin datos de autoría aún. Los posts nuevos guardarán quién
+                publicó.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {byUser.map((u, i) => (
+                  <li key={u.uid}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelectedUser((prev) =>
+                          prev === u.uid ? null : u.uid,
+                        )
+                      }
+                      className={cn(
+                        "w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors",
+                        selectedUser === u.uid
+                          ? "bg-orange-500/30 ring-1 ring-orange-400/50"
+                          : "bg-zinc-900/80 hover:bg-zinc-900",
+                      )}
+                    >
+                      <span className="text-white/50 text-sm w-6">
+                        {i + 1}.
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-white truncate">
+                          {u.name}
+                        </p>
+                        <p className="text-xs text-white/50 truncate">
+                          {Object.entries(u.byPlatform)
+                            .map(([plat, n]) => `${plat}: ${n}`)
+                            .join(" · ")}
+                        </p>
+                      </div>
+                      <Badge
+                        variant="secondary"
+                        className="shrink-0 bg-white/10 text-white"
+                      >
+                        {u.total}
+                      </Badge>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Lista filtrada */}
-        <Card className="bg-zinc-950/60 ">
+        <Card className="bg-zinc-950/60">
           <CardHeader>
             <CardTitle className="text-white">
               {selectedDay
@@ -570,13 +678,16 @@ export default function DashboardPage() {
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {listPosts.slice(0, 30).map((p) => {
                   const externalUrl = getExternalUrl(p);
+                  const author =
+                    p.publishedByName || p.publishedByEmail || null;
                   return (
                     <div
                       key={p.id}
                       className="flex items-center gap-3 p-3 rounded-lg bg-zinc-950/60 text-sm"
                     >
-                      <div className="w-14 h-14 rounded-md overflow-hidden bg-gradient-to-r from-orange-500 to-yellow-500  flex items-center justify-center shrink-0">
+                      <div className="w-14 h-14 rounded-md overflow-hidden bg-gradient-to-r from-orange-500 to-yellow-500 flex items-center justify-center shrink-0">
                         {p.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={p.imageUrl}
                             alt=""
@@ -597,6 +708,8 @@ export default function DashboardPage() {
                           {p.publishedAt
                             ? ` · ${format(p.publishedAt, "d MMM HH:mm", { locale: es })}`
                             : ""}
+                          {author ? ` · ${author}` : ""}
+                          {p.source === "schedule" ? " · programado" : ""}
                         </p>
                       </div>
                       {externalUrl && (

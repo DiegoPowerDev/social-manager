@@ -44,6 +44,23 @@ export interface Post {
   platformPostId?: string;
   error?: string;
   createdAt: Date;
+  pageId: string;
+  message?: string;
+  title?: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  link?: string | null;
+  permalink?: string | null;
+  facebookPostId?: string | null;
+  instagramPostId?: string | null;
+  linkedinPostId?: string | null;
+  youtubeVideoId?: string | null;
+  tiktokPublishId?: string | null;
+  publishedByUid: string;
+  publishedByName: string | null;
+  publishedByEmail: string | null;
+  source?: "manual" | "schedule";
+  scheduledPostId?: string | null;
 }
 
 export interface PlatformCredentials {

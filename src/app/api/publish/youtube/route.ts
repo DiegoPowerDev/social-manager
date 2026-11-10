@@ -3,6 +3,7 @@ import { publishToYouTube } from "@/adapters/youtube";
 import { getValidYouTubeAccessToken } from "@/lib/youtube-token";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireCompanyMemberOrCron, jsonError } from "@/lib/ai-route-helpers";
+import { getActorByUid } from "@/lib/request-actor";
 
 export const maxDuration = 300;
 
@@ -16,6 +17,11 @@ export async function POST(req: NextRequest) {
       description,
       videoUrl,
       privacyStatus,
+      // Autoría (cron o cliente)
+      publishedByUid,
+      publishedByName,
+      publishedByEmail,
+      scheduledPostId,
     } = await req.json();
 
     if (!companyId || !channelId || !accountDocId) {
@@ -28,8 +34,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await requireCompanyMemberOrCron(req, companyId);
-
+    const member = await requireCompanyMemberOrCron(req, companyId);
     const accRef = adminDb.collection("socialAccounts").doc(accountDocId);
     const accSnap = await accRef.get();
 
@@ -38,6 +43,29 @@ export async function POST(req: NextRequest) {
         { error: "Cuenta de YouTube no encontrada" },
         { status: 403 },
       );
+    }
+
+    let byUid: string | null = null;
+    let byName: string | null = null;
+    let byEmail: string | null = null;
+    let postSource: "manual" | "schedule" = "manual";
+
+    if (member?.uid) {
+      const actor = await getActorByUid(member.uid);
+      byUid = actor.uid;
+      byName = actor.name;
+      byEmail = actor.email;
+      postSource = "manual";
+    } else if (publishedByUid || publishedByName) {
+      byUid = publishedByUid || null;
+      byName = publishedByName || "Programado";
+      byEmail = publishedByEmail || null;
+      postSource = "schedule";
+    } else {
+      byUid = null;
+      byName = "Sistema";
+      byEmail = null;
+      postSource = "schedule";
     }
 
     const account = accSnap.data()!;
@@ -80,6 +108,11 @@ export async function POST(req: NextRequest) {
       permalink: result.permalink,
       publishedAt: new Date(),
       status: "published",
+      publishedByUid: byUid,
+      publishedByName: byName,
+      publishedByEmail: byEmail,
+      source: postSource,
+      scheduledPostId: scheduledPostId || null,
     });
 
     return NextResponse.json({

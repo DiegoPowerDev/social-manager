@@ -159,7 +159,18 @@ export function MediaLibraryPicker({
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      <Video className="h-8 w-8 text-muted-foreground" />
+                      <div className="relative h-full w-full bg-black">
+                        <video
+                          src={`${item.url}#t=0.1`}
+                          muted
+                          playsInline
+                          preload="metadata"
+                          className="h-full w-full object-cover pointer-events-none"
+                        />
+                        <div className="absolute bottom-1 left-1 rounded bg-black/60 p-1">
+                          <Video className="h-3.5 w-3.5 text-white" />
+                        </div>
+                      </div>
                     )}
                   </div>
                   <p className="text-[10px] truncate px-1.5 py-1">

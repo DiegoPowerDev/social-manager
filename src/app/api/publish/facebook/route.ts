@@ -2,11 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { publishPost } from "@/adapters/facebook";
 import { adminDb } from "@/lib/firebase-admin";
 import { jsonError, requireCompanyMemberOrCron } from "@/lib/ai-route-helpers";
+import { getActorByUid } from "@/lib/request-actor";
 
 export async function POST(req: NextRequest) {
   try {
-    const { pageId, message, link, imageUrl, videoUrl, pageName, companyId } =
-      await req.json();
+    const {
+      pageId,
+      message,
+      link,
+      imageUrl,
+      videoUrl,
+      pageName,
+      companyId,
+      // Autoría (cron o cliente)
+      publishedByUid,
+      publishedByName,
+      publishedByEmail,
+      scheduledPostId,
+    } = await req.json();
 
     if (!companyId) {
       return NextResponse.json({ error: "Falta companyId" }, { status: 400 });
@@ -24,8 +37,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await requireCompanyMemberOrCron(req, companyId);
+    const member = await requireCompanyMemberOrCron(req, companyId);
 
+    let byUid: string | null = null;
+    let byName: string | null = null;
+    let byEmail: string | null = null;
+    let postSource: "manual" | "schedule" = "manual";
+
+    if (member?.uid) {
+      const actor = await getActorByUid(member.uid);
+      byUid = actor.uid;
+      byName = actor.name;
+      byEmail = actor.email;
+      postSource = "manual";
+    } else if (publishedByUid || publishedByName) {
+      byUid = publishedByUid || null;
+      byName = publishedByName || "Programado";
+      byEmail = publishedByEmail || null;
+      postSource = "schedule";
+    } else {
+      byUid = null;
+      byName = "Sistema";
+      byEmail = null;
+      postSource = "schedule";
+    }
     const accSnap = await adminDb
       .collection("socialAccounts")
       .where("companyId", "==", companyId)
@@ -40,7 +75,6 @@ export async function POST(req: NextRequest) {
         { status: 403 },
       );
     }
-
     const account = accSnap.docs[0].data();
     const token = account.accessToken as string;
 
@@ -68,6 +102,12 @@ export async function POST(req: NextRequest) {
         : null,
       publishedAt: new Date(),
       status: "published",
+      // Autoría
+      publishedByUid: byUid,
+      publishedByName: byName,
+      publishedByEmail: byEmail,
+      source: postSource,
+      scheduledPostId: scheduledPostId || null,
     });
 
     return NextResponse.json({

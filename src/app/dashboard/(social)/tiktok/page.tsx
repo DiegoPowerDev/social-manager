@@ -13,10 +13,7 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { TikTokConnectFlow } from "@/components/social/TikTokConnectFlow";
-import {
-  TikTokComposer,
-  type TikTokPrivacy,
-} from "@/components/social/TikTokComposer";
+import { TikTokComposer } from "@/components/social/TikTokComposer";
 import { PostHistory } from "@/components/social/PostHistory";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -99,7 +96,11 @@ export default function TikTokPage() {
       router.replace("/dashboard/tiktok");
     }
   }, [searchParams]);
-
+  useEffect(() => {
+    if (!checking && plan && !planAtLeast(plan, "premium")) {
+      router.replace("/dashboard/membresia");
+    }
+  }, [checking, plan, router]);
   const handlePublish = async (meta: {
     privacyLevel: string;
     disableComment: boolean;
@@ -124,7 +125,10 @@ export default function TikTokPage() {
       toast.error("El caption es obligatorio");
       return;
     }
-
+    if (!meta.privacyLevel) {
+      toast.error("Elige la visibilidad del post");
+      return;
+    }
     setLoading(true);
     const tid = toast.loading("Publicando en TikTok…");
     try {
@@ -132,7 +136,7 @@ export default function TikTokPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${await auth.currentUser?.getIdToken()}`,
+          Authorization: `Bearer ${idToken}`,
         },
         body: JSON.stringify({
           companyId,
@@ -154,6 +158,7 @@ export default function TikTokPage() {
 
       toast.success("Video enviado a TikTok", { id: tid });
       setTitle("");
+      setPrivacyLevel("");
       setVideoUrl(null);
       setHistoryKey((k) => k + 1);
     } catch (err: any) {
@@ -186,9 +191,7 @@ export default function TikTokPage() {
       </div>
     );
   }
-  if (!planAtLeast(plan, "premium")) {
-    redirect("/dashboard/membresia");
-  }
+
   if (!companyId) {
     return (
       <div className="p-6 text-muted-foreground">
@@ -282,6 +285,7 @@ export default function TikTokPage() {
           ) : (
             <TikTokComposer
               accountName={account.name || account.username || "TikTok"}
+              openId={account.openId}
               loading={loading}
               title={title}
               onTitleChange={setTitle}
