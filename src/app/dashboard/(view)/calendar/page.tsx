@@ -350,7 +350,7 @@ export default function CalendarPage() {
                 "rounded-full h-8 px-4 text-sm",
                 view === "month"
                   ? "bg-gradient-to-r from-orange-400 to-yellow-500 text-white hover:text-white"
-                  : "text-white/70 hover:text-white",
+                  : "text-white/70 hover:text-black",
               )}
               onClick={() => setView("month")}
             >
@@ -363,7 +363,7 @@ export default function CalendarPage() {
                 "rounded-full h-8 px-4 text-sm",
                 view === "week"
                   ? "bg-gradient-to-r from-orange-400 to-yellow-500 text-white hover:text-white"
-                  : "text-white/70 hover:text-white",
+                  : "text-white/70 hover:text-black",
               )}
               onClick={() => setView("week")}
             >

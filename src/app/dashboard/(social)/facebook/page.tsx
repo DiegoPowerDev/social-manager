@@ -261,7 +261,7 @@ export default function FacebookPage() {
 
       <div className="w-full h-full p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList variant="line" className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="create">Crear contenido</TabsTrigger>
             <TabsTrigger value="history">Historial</TabsTrigger>
           </TabsList>

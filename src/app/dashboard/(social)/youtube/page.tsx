@@ -238,7 +238,7 @@ export default function YouTubePage() {
 
       <div className="p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList variant="line" className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="create">Subir video</TabsTrigger>
             <TabsTrigger value="history">Historial</TabsTrigger>
           </TabsList>
