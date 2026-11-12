@@ -1,6 +1,13 @@
 export type UserRole = "admin" | "editor" | "viewer";
 
-export type Platform = "instagram" | "facebook" | "linkedin" | "youtube";
+export type Platform =
+  | "instagram"
+  | "facebook"
+  | "linkedin"
+  | "youtube"
+  | "tiktok";
+
+export type CompanyPlan = "free" | "basic" | "premium";
 
 export interface AppUser {
   uid: string;
@@ -92,8 +99,10 @@ export interface Company {
   createdAt: Date;
   logoUrl: string | null;
   createdBy: string;
-  plan: "free" | "monthly" | "yearly";
+  plan: CompanyPlan;
   planStatus: "active" | "past_due" | "canceled" | "trialing";
+  limits?: StorageLimits;
+  storageUsedBytes?: number;
 }
 
 export interface Membership {
@@ -103,17 +112,13 @@ export interface Membership {
   role: MemberRole;
   createdAt: Date;
 }
-export type CompanyPlan = "free" | "basic" | "premium";
 
 export type CompanyCourtesy = {
   active?: boolean;
   plan?: CompanyPlan | string;
-  until?: unknown; // Timestamp | string | Date
+  until?: unknown;
   reason?: string | null;
-  limits?: {
-    aiCaptionsPerMonth?: number;
-    aiImagesPerMonth?: number;
-  };
+  limits?: StorageLimits;
   grantedBy?: string | null;
   grantedAt?: string | null;
 };
@@ -123,10 +128,7 @@ export type CompanyPartner = {
   tier?: "basic" | "premium" | string;
   until?: unknown;
   reason?: string | null;
-  limits?: {
-    aiCaptionsPerMonth?: number;
-    aiImagesPerMonth?: number;
-  };
+  limits?: StorageLimits;
   grantedBy?: string | null;
   grantedAt?: string | null;
 };
@@ -139,18 +141,19 @@ export type CompanyDoc = {
   plan?: CompanyPlan | string;
   planStatus?: string;
   planSource?: string;
-  features?: {
-    aiEnabled?: boolean;
-  };
-  limits?: {
-    aiCaptionsPerMonth?: number;
-    aiImagesPerMonth?: number;
-  };
+  features?: { aiEnabled?: boolean };
+  limits?: StorageLimits;
+  storageUsedBytes?: number;
   courtesy?: CompanyCourtesy | null;
   partner?: CompanyPartner | null;
   paypalSubscriptionId?: string | null;
   nextBillingTime?: string | null;
   createdAt?: unknown;
   updatedAt?: unknown;
-  [key: string]: unknown; // resto de campos de Firestore
+  [key: string]: unknown;
+};
+export type StorageLimits = {
+  aiCaptionsPerMonth?: number;
+  aiImagesPerMonth?: number;
+  storageBytes?: number;
 };

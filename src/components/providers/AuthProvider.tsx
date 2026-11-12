@@ -6,16 +6,18 @@ import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { getCompany, getMembership, getEffectivePlan } from "@/lib/tenant";
+import type { MemberRole } from "@/types";
 
 const emptyTenant = {
   companyId: null as string | null,
   companyName: null as string | null,
-  memberRole: null as null,
+  memberRole: null as MemberRole | null,
   companyLogo: null as string | null,
   plan: null as string | null,
   aiEnabled: false,
   aiCaptionsLimit: 0,
   aiImagesLimit: 0,
+  storageLimit: 0,
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -82,8 +84,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           memberRole: membership.role,
           plan: effective.plan,
           aiEnabled: effective.aiEnabled,
-          aiCaptionsLimit: effective.limits.aiCaptionsPerMonth,
-          aiImagesLimit: effective.limits.aiImagesPerMonth,
+          aiCaptionsLimit: effective.limits.aiCaptionsPerMonth ?? 0,
+          aiImagesLimit: effective.limits.aiImagesPerMonth ?? 0,
+          storageLimit: effective.limits.storageBytes ?? 0,
         });
       } finally {
         applyingRef.current = false;
@@ -108,7 +111,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await applyTenant(firebaseUser);
       } catch (e) {
         console.error("AuthProvider:", e);
-        // No hacer logout automático por error de red
       } finally {
         setLoading(false);
       }
@@ -117,7 +119,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, [applyTenant, setUser, setAppUser, setTenant, setLoading]);
 
-  // Solo cuando invalidateTenant() incrementa tenantTick (manual / admin)
   useEffect(() => {
     if (tenantTick === 0) return;
     const user = auth.currentUser;
@@ -125,7 +126,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     applyTenant(user).catch(console.error);
   }, [tenantTick, applyTenant]);
 
-  // Al volver a la pestaña (plan/cortesía pueden haber cambiado)
   useEffect(() => {
     const onFocus = () => {
       const user = auth.currentUser;

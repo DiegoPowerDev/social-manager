@@ -18,18 +18,21 @@ export const PLAN_LIMITS = {
     aiEnabled: false,
     aiCaptionsPerMonth: 0,
     aiImagesPerMonth: 0,
+    storageBytes: 500 * 1024 * 1024, // 500 MB
     platforms: [] as string[],
   },
   basic: {
     aiEnabled: false,
     aiCaptionsPerMonth: 0,
     aiImagesPerMonth: 0,
+    storageBytes: 10 * 1024 * 1024 * 1024, // 10 GB
     platforms: ["facebook", "instagram", "youtube"],
   },
   premium: {
     aiEnabled: true,
     aiCaptionsPerMonth: 100,
     aiImagesPerMonth: 30,
+    storageBytes: 10 * 1024 * 1024 * 1024, // 10 GB
     platforms: ["facebook", "instagram", "youtube", "linkedin", "tiktok"],
   },
 } as const;
@@ -72,7 +75,9 @@ export async function createCompany(params: {
     limits: {
       aiCaptionsPerMonth: limits.aiCaptionsPerMonth,
       aiImagesPerMonth: limits.aiImagesPerMonth,
+      storageBytes: limits.storageBytes,
     },
+    storageUsedBytes: 0,
   });
 
   await setDoc(doc(db, "memberships", membershipId(uid, companyId)), {
@@ -120,7 +125,9 @@ export async function getCompany(companyId: string) {
     limits: data.limits || {
       aiCaptionsPerMonth: PLAN_LIMITS.free.aiCaptionsPerMonth,
       aiImagesPerMonth: PLAN_LIMITS.free.aiImagesPerMonth,
+      storageBytes: PLAN_LIMITS.free.storageBytes,
     },
+    storageUsedBytes: data.storageUsedBytes ?? 0,
     ...data,
   };
 }
@@ -231,33 +238,42 @@ export function getEffectivePlan(company: any) {
     }
   }
 
-  const plan = (company?.plan || "free") as "free" | "basic" | "premium";
+  const plan = (company?.plan || "free") as PlanKey;
+  const defaults = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
 
   if (plan === "premium") {
     return {
       plan: "premium" as const,
-      planStatus: "active",
+      planStatus: "active" as const,
       aiEnabled: true,
       limits: {
-        aiCaptionsPerMonth: company?.limits?.aiCaptionsPerMonth ?? 100,
-        aiImagesPerMonth: company?.limits?.aiImagesPerMonth ?? 30,
+        aiCaptionsPerMonth:
+          company?.limits?.aiCaptionsPerMonth ?? defaults.aiCaptionsPerMonth,
+        aiImagesPerMonth:
+          company?.limits?.aiImagesPerMonth ?? defaults.aiImagesPerMonth,
+        storageBytes: company?.limits?.storageBytes ?? defaults.storageBytes,
       },
       source: "billing" as const,
     };
   }
 
+  // free | basic (y legacy que caiga aquí)
   return {
-    plan,
+    plan: plan === "basic" ? ("basic" as const) : ("free" as const),
     planStatus: company?.planStatus || "active",
     aiEnabled: false,
-    limits: { aiCaptionsPerMonth: 0, aiImagesPerMonth: 0 },
+    limits: {
+      aiCaptionsPerMonth: 0,
+      aiImagesPerMonth: 0,
+      storageBytes: company?.limits?.storageBytes ?? defaults.storageBytes,
+    },
     source: "billing" as const,
   };
 }
 
 function fromTier(tier: PlanId | string, limits: any, source: string) {
-  const planKey = (tier as PlanId) || "free";
-  const defaults = PLAN_LIMITS[planKey] || PLAN_LIMITS.free;
+  const planKey = (tier as PlanKey) in PLAN_LIMITS ? (tier as PlanKey) : "free";
+  const defaults = PLAN_LIMITS[planKey];
   const aiEnabled = planKey === "premium";
 
   return {
@@ -269,6 +285,7 @@ function fromTier(tier: PlanId | string, limits: any, source: string) {
         limits?.aiCaptionsPerMonth ?? defaults.aiCaptionsPerMonth ?? 0,
       aiImagesPerMonth:
         limits?.aiImagesPerMonth ?? defaults.aiImagesPerMonth ?? 0,
+      storageBytes: limits?.storageBytes ?? defaults.storageBytes,
     },
     source,
   };

@@ -17,23 +17,12 @@ const PLANS: Cycle[] = [
     value: "19.00",
     envKey: "PAYPAL_PLAN_BASIC_MONTHLY",
   },
-  {
-    name: "TrendlyStudio Básico Anual",
-    interval_unit: "YEAR",
-    value: "190.00",
-    envKey: "PAYPAL_PLAN_BASIC_YEARLY",
-  },
+
   {
     name: "TrendlyStudio Premium Mensual",
     interval_unit: "MONTH",
     value: "39.00",
     envKey: "PAYPAL_PLAN_PREMIUM_MONTHLY",
-  },
-  {
-    name: "TrendlyStudio Premium Anual",
-    interval_unit: "YEAR",
-    value: "390.00",
-    envKey: "PAYPAL_PLAN_PREMIUM_YEARLY",
   },
 ];
 

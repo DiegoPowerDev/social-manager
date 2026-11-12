@@ -12,11 +12,12 @@ interface AuthState {
   companyLogo: string | null;
   memberRole: MemberRole | null;
 
-  // IA / plan (se rellenan al cargar company)
   plan: string | null;
   aiEnabled: boolean;
   aiCaptionsLimit: number;
   aiImagesLimit: number;
+  /** bytes; 0 = sin dato / free default se resuelve en UI si hace falta */
+  storageLimit: number;
 
   tenantTick: number;
 
@@ -33,6 +34,7 @@ interface AuthState {
     aiEnabled?: boolean;
     aiCaptionsLimit?: number;
     aiImagesLimit?: number;
+    storageLimit?: number;
   }) => void;
   invalidateTenant: () => void;
   hasPermission: (allowedRoles: UserRole[]) => boolean;
@@ -48,8 +50,8 @@ const emptyTenant = {
   plan: null as string | null,
   aiEnabled: false,
   aiCaptionsLimit: 0,
-  tentantTick: 0,
   aiImagesLimit: 0,
+  storageLimit: 0,
 };
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -58,7 +60,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   loading: true,
   ...emptyTenant,
   tenantTick: 0,
+
   invalidateTenant: () => set((s) => ({ tenantTick: s.tenantTick + 1 })),
+
   setUser: (user) => set({ user }),
   setAppUser: (appUser) => set({ appUser }),
   setLoading: (loading) => set({ loading }),
@@ -68,6 +72,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       user: null,
       appUser: null,
       ...emptyTenant,
+      // tenantTick se puede dejar; no hace daño
     }),
 
   setTenant: (data) =>
@@ -80,6 +85,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       aiEnabled: data.aiEnabled ?? false,
       aiCaptionsLimit: data.aiCaptionsLimit ?? 0,
       aiImagesLimit: data.aiImagesLimit ?? 0,
+      storageLimit: data.storageLimit ?? 0,
     }),
 
   hasPermission: (allowedRoles) => {

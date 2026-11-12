@@ -8,8 +8,7 @@ type PlanTier = "free" | "basic" | "premium";
 
 function normalizePlan(p: unknown): PlanTier {
   if (p === "basic" || p === "premium" || p === "free") return p;
-  // planes legacy
-  if (p === "monthly" || p === "yearly") return "premium";
+  if (p === "monthly" || p === "yearly") return "premium"; // legacy Firestore
   return "free";
 }
 

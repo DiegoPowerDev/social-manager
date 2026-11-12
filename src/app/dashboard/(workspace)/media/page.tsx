@@ -44,10 +44,14 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  ImageIcon,
+  FolderOpen,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/layout/ConfirmDialog";
-import { EmptyState } from "@/components/layout/EmptyState"; // ajusta ruta
-import { ImageIcon, FolderOpen } from "lucide-react";
+import { EmptyState } from "@/components/layout/EmptyState";
+import { StorageMeter } from "@/components/storage/storageMeter";
+import { useStorageUsage } from "@/hooks/useStorageUsage";
+import { formatBytes } from "@/lib/storage";
 
 interface MediaItem {
   id: string;
@@ -70,6 +74,8 @@ function formatSize(bytes: number) {
 
 export default function MediaLibraryPage() {
   const { companyId, user, memberRole } = useAuthStore();
+  const storage = useStorageUsage();
+
   const [items, setItems] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -176,6 +182,13 @@ export default function MediaLibraryPage() {
       return;
     }
 
+    if (storage.full || file.size > storage.remaining) {
+      toast.error(
+        `No hay espacio suficiente. Disponible: ${formatBytes(storage.remaining)}. Borra archivos o mejora el plan.`,
+      );
+      return;
+    }
+
     setUploading(true);
     const tid = toast.loading("Subiendo archivo…");
     try {
@@ -187,6 +200,7 @@ export default function MediaLibraryPage() {
           platform: "library",
           contentType: file.type || "application/octet-stream",
           fileName: file.name,
+          size: file.size,
         }),
       });
 
@@ -197,13 +211,20 @@ export default function MediaLibraryPage() {
         const signed = await signRes.json();
         const putRes = await fetch(signed.uploadUrl, {
           method: "PUT",
-          headers: { "Content-Type": file.type || "application/octet-stream" },
+          headers: {
+            "Content-Type": file.type || "application/octet-stream",
+          },
           body: file,
         });
         if (!putRes.ok) throw new Error("Error al subir a almacenamiento");
         publicUrl = signed.publicUrl;
         key = signed.key;
       } else {
+        const errBody = await signRes.json().catch(() => ({}));
+        if (signRes.status === 403 || errBody.code === "STORAGE_FULL") {
+          throw new Error(errBody.error || "Almacenamiento lleno");
+        }
+
         const formData = new FormData();
         formData.append("file", file);
         formData.append("platform", "library");
@@ -213,15 +234,18 @@ export default function MediaLibraryPage() {
           body: formData,
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Error al subir");
+        if (!res.ok) {
+          throw new Error(data.error || "Error al subir");
+        }
         publicUrl = data.publicUrl;
+        key = data.key;
       }
 
       await saveMediaToLibrary({
         companyId,
         uid: user.uid,
         url: publicUrl,
-        key: key,
+        key,
         fileName: file.name,
         size: file.size,
         mimeType: file.type || "application/octet-stream",
@@ -257,6 +281,7 @@ export default function MediaLibraryPage() {
           uid: user.uid,
         }),
       });
+
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No se pudo eliminar");
 
@@ -342,7 +367,8 @@ export default function MediaLibraryPage() {
             />
             <Button
               onClick={() => inputRef.current?.click()}
-              disabled={uploading}
+              title={storage.full ? "Almacenamiento lleno" : undefined}
+              disabled={!canEdit || uploading || storage.full}
               className="bg-yellow-500 text-black hover:bg-yellow-400"
             >
               {uploading ? (
@@ -360,7 +386,15 @@ export default function MediaLibraryPage() {
           </div>
         )}
       </div>
-
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6 p-6 bg-zinc-950/60">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Biblioteca</h1>
+          <p className="text-sm text-white/60">
+            Imágenes y videos de tu empresa
+          </p>
+        </div>
+        <StorageMeter className="w-full sm:w-72" />
+      </div>
       <div className="flex-1 flex justify-center p-6 pt-0">
         <Card className="bg-zinc-950/60 w-full flex-1">
           <CardHeader className="pb-3 space-y-4">

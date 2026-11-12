@@ -245,6 +245,7 @@ export function TikTokComposer({
         platform: "tiktok",
         contentType: file.type || "video/mp4",
         fileName: file.name,
+        size: file.size,
       }),
     });
     if (!signRes.ok) {

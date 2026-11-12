@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { nanoid } from "nanoid";
+import { assertCanUpload, incrementStorage } from "@/lib/storage-admin";
 
 const s3Client = new S3Client({
   region: "auto",
@@ -21,17 +22,25 @@ export async function POST(req: NextRequest) {
     if (!file) {
       return NextResponse.json({ error: "File missing" }, { status: 400 });
     }
-
     if (!companyId) {
       return NextResponse.json({ error: "Falta companyId" }, { status: 400 });
     }
 
-    // Límites básicos
-    const maxSize = 200 * 1024 * 1024; // 200MB
-    if (file.size > maxSize) {
+    const size = file.size;
+    const maxSize = 200 * 1024 * 1024;
+    if (size > maxSize) {
       return NextResponse.json(
         { error: "Archivo demasiado grande (máx. 200MB)" },
         { status: 400 },
+      );
+    }
+
+    try {
+      await assertCanUpload(companyId, size);
+    } catch (e: any) {
+      return NextResponse.json(
+        { error: e.message, code: e.code || "STORAGE_FULL" },
+        { status: 403 },
       );
     }
 
@@ -42,7 +51,6 @@ export async function POST(req: NextRequest) {
       : "bin";
 
     const safePlatform = platform.replace(/[^a-z0-9-_]/gi, "") || "general";
-    // Aislamiento por empresa
     const key = `companies/${companyId}/${safePlatform}/${Date.now()}-${nanoid(8)}.${extension}`;
 
     await s3Client.send(
@@ -54,12 +62,16 @@ export async function POST(req: NextRequest) {
       }),
     );
 
+    // Contabilizar uso (después de subir con éxito)
+    await incrementStorage(companyId, size);
+
     const publicUrl = `${process.env.R2_PUBLIC_URL}/${key}`;
 
     return NextResponse.json({
       publicUrl,
       key,
       contentType: file.type,
+      size,
     });
   } catch (error: any) {
     console.error("R2 Upload Error:", error);

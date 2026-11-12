@@ -79,6 +79,7 @@ export function YouTubeComposer({
         platform: "youtube",
         contentType: file.type || "video/mp4",
         fileName: file.name,
+        size: file.size,
       }),
     });
 

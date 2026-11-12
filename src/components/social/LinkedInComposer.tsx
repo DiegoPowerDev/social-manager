@@ -70,12 +70,14 @@ export function LinkedInComposer({
       body: formData,
     });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || "Error al subir el archivo");
-    }
-
     const data = await res.json();
+    if (!res.ok) {
+      if (data.code === "STORAGE_FULL" || res.status === 403) {
+        throw new Error(data.error || "Error al subir el logo");
+      } else {
+        throw new Error(data.error || "Error al subir el logo");
+      }
+    }
     const publicUrl = data.publicUrl as string;
 
     if (user?.uid) {

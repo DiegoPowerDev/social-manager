@@ -13,6 +13,7 @@ const PLAN_CONFIG: Record<
     aiEnabled: boolean;
     aiCaptionsPerMonth: number;
     aiImagesPerMonth: number;
+    storageBytes: number;
   }
 > = {
   basic_monthly: {
@@ -21,6 +22,7 @@ const PLAN_CONFIG: Record<
     aiEnabled: false,
     aiCaptionsPerMonth: 0,
     aiImagesPerMonth: 0,
+    storageBytes: 10 * 1024 * 1024 * 1024, // 10 GB
   },
   premium_monthly: {
     plan: "premium",
@@ -28,6 +30,7 @@ const PLAN_CONFIG: Record<
     aiEnabled: true,
     aiCaptionsPerMonth: 100,
     aiImagesPerMonth: 30,
+    storageBytes: 10 * 1024 * 1024 * 1024, // 10 GB
   },
 };
 
@@ -40,12 +43,11 @@ function membershipId(uid: string, companyId: string) {
 }
 
 function resolvePlanKey(raw: string): PayPalPlanKey {
-  // compat por si aún llega un yearly viejo
-  if (raw === "basic_yearly" || raw === "basic_monthly") return "basic_monthly";
-  if (raw === "premium_yearly" || raw === "premium_monthly")
-    return "premium_monthly";
-  if (raw === "basic") return "basic_monthly";
-  if (raw === "premium") return "premium_monthly";
+  if (raw === "basic_monthly" || raw === "basic") return "basic_monthly";
+  if (raw === "premium_monthly" || raw === "premium") return "premium_monthly";
+  // residual: si aún llegara un id viejo con "yearly", trátalo como monthly
+  if (raw.includes("basic")) return "basic_monthly";
+  if (raw.includes("premium")) return "premium_monthly";
   return PLAN_CONFIG[raw as PayPalPlanKey]
     ? (raw as PayPalPlanKey)
     : "premium_monthly";
@@ -175,6 +177,7 @@ export async function provisionFromPayPal(params: {
     limits: {
       aiCaptionsPerMonth: config.aiCaptionsPerMonth,
       aiImagesPerMonth: config.aiImagesPerMonth,
+      storageBytes: config.storageBytes,
     },
     paypalSubscriptionId: subscriptionId,
     updatedAt: FieldValue.serverTimestamp(),
@@ -190,6 +193,7 @@ export async function provisionFromPayPal(params: {
       aiInstructions: "",
       createdAt: FieldValue.serverTimestamp(),
       createdBy: uid,
+      storageUsedBytes: 0,
       ...companyPayload,
     });
 
@@ -272,11 +276,12 @@ async function setCompanyInactive(
         plan: "free",
         planStatus,
         planSource: "billing",
+        features: { aiEnabled: false },
         limits: {
           aiCaptionsPerMonth: 0,
           aiImagesPerMonth: 0,
+          storageBytes: 500 * 1024 * 1024, // 500 MB free
         },
-        features: { aiEnabled: false },
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true },
@@ -291,11 +296,6 @@ export async function cancelPayPalSubscription(subscriptionId: string) {
   const data = snap.data()!;
   await ref.update({
     status: "cancelled",
-    features: { aiEnabled: false },
-    limits: {
-      aiCaptionsPerMonth: 0,
-      aiImagesPerMonth: 0,
-    },
     updatedAt: FieldValue.serverTimestamp(),
   });
 
@@ -304,7 +304,6 @@ export async function cancelPayPalSubscription(subscriptionId: string) {
   }
 }
 
-/** Pago fallido / suspendido por PayPal → free + past_due (cron no publica) */
 export async function suspendPayPalSubscription(subscriptionId: string) {
   const ref = adminDb.collection("subscriptions").doc(subscriptionId);
   const snap = await ref.get();
@@ -313,11 +312,6 @@ export async function suspendPayPalSubscription(subscriptionId: string) {
   const data = snap.data()!;
   await ref.update({
     status: "suspended",
-    features: { aiEnabled: false },
-    limits: {
-      aiCaptionsPerMonth: 0,
-      aiImagesPerMonth: 0,
-    },
     updatedAt: FieldValue.serverTimestamp(),
   });
 

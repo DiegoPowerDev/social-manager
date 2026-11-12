@@ -193,8 +193,15 @@ export function AIImageGenerator({ onGenerate }: Props) {
       method: "POST",
       body: formData,
     });
-    if (!res.ok) throw new Error("Error al subir una imagen de referencia");
+
     const data = await res.json();
+    if (!res.ok) {
+      if (data.code === "STORAGE_FULL" || res.status === 403) {
+        throw new Error(data.error || "Error al subir el logo");
+      } else {
+        throw new Error(data.error || "Error al subir el logo");
+      }
+    }
     return data.publicUrl as string;
   };
 
