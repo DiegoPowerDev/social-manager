@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateCaption } from "@/lib/ai";
+import { generateCaption, type CaptionLength } from "@/lib/ai";
 import {
   consumeAiCreditAdmin,
   getCompanyAdmin,
@@ -13,7 +13,16 @@ import {
 
 export async function POST(req: NextRequest) {
   try {
-    const { topic, platform, tone, companyId } = await req.json();
+    const {
+      topic,
+      platform,
+      tone,
+      companyId,
+      language,
+      length,
+      includeHashtags,
+      includeEmojis,
+    } = await req.json();
 
     if (!companyId) {
       return NextResponse.json({ error: "Falta companyId" }, { status: 400 });
@@ -36,13 +45,6 @@ export async function POST(req: NextRequest) {
     }
 
     const effective = getEffectivePlanFromCompany(company);
-    console.log("AI effective plan", {
-      companyId,
-      billingPlan: company.plan,
-      courtesy: company.courtesy,
-      partner: company.partner,
-      effective,
-    });
     if (!effective.aiEnabled) {
       return NextResponse.json(
         { error: "Tu plan no incluye IA" },
@@ -50,10 +52,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const limit = effective.limits.aiCaptionsPerMonth; // o aiImages    const imagesLimit = effective.limits.aiImagesPerMonth;
-
+    const limit = effective.limits.aiCaptionsPerMonth;
     const imagesLimit = effective.limits.aiImagesPerMonth;
-
     const usage = await getAiUsageAdmin(companyId);
 
     if (usage.aiCaptions >= limit) {
@@ -70,10 +70,19 @@ export async function POST(req: NextRequest) {
         ? platform
         : "general";
 
+    const safeLength: CaptionLength =
+      length === "short" || length === "long" || length === "medium"
+        ? length
+        : "medium";
+
     const caption = await generateCaption({
       topic: topic.trim(),
       platform: safePlatform,
       tone: typeof tone === "string" ? tone : undefined,
+      language: typeof language === "string" ? language : "español",
+      length: safeLength,
+      includeHashtags: includeHashtags !== false,
+      includeEmojis: includeEmojis !== false,
       brandInstructions: company.aiInstructions || "",
     });
 

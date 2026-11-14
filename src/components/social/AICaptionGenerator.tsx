@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -19,12 +18,14 @@ import { canUseAi } from "@/content/access";
 import { AiLockedOverlay } from "@/components/auth/AiLockedOverlay";
 import { cn } from "@/lib/utils";
 import { auth } from "@/lib/firebase";
-import { Textarea } from "../ui/textarea";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface Props {
   platform?: "facebook" | "instagram" | "general";
   onGenerate: (caption: string) => void;
 }
+
 async function authHeaders(): Promise<HeadersInit> {
   const user = auth.currentUser;
   if (!user) throw new Error("No autenticado");
@@ -35,12 +36,18 @@ async function authHeaders(): Promise<HeadersInit> {
   };
 }
 
+type CaptionLength = "short" | "medium" | "long";
+
 export function AICaptionGenerator({
   platform = "general",
   onGenerate,
 }: Props) {
   const [topic, setTopic] = useState("");
   const [tone, setTone] = useState("profesional y cercano");
+  const [language, setLanguage] = useState("español");
+  const [length, setLength] = useState<CaptionLength>("medium");
+  const [includeHashtags, setIncludeHashtags] = useState(true);
+  const [includeEmojis, setIncludeEmojis] = useState(true);
   const [loading, setLoading] = useState(false);
 
   const { captionsLeft, captionsUsed, captionsLimit, setFromApi } =
@@ -76,7 +83,16 @@ export function AICaptionGenerator({
       const res = await fetch("/api/ai/generate-caption", {
         method: "POST",
         headers: await authHeaders(),
-        body: JSON.stringify({ topic, platform, tone, companyId }),
+        body: JSON.stringify({
+          topic,
+          platform,
+          tone,
+          companyId,
+          language,
+          length,
+          includeHashtags,
+          includeEmojis,
+        }),
       });
 
       const data = await res.json();
@@ -128,31 +144,94 @@ export function AICaptionGenerator({
           />
         </div>
 
-        <div className="space-y-2">
-          <Label>Tono</Label>
-          <Select
-            value={tone}
-            onValueChange={(v) => setTone(v as any)}
-            disabled={loading || !allowed}
-          >
-            <SelectTrigger className="bg-white text-black">
-              <SelectValue placeholder="Selecciona un tono" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="profesional y cercano">
-                Profesional y cercano
-              </SelectItem>
-              <SelectItem value="divertido y desenfadado">
-                Divertido y desenfadado
-              </SelectItem>
-              <SelectItem value="inspirador">Inspirador</SelectItem>
-              <SelectItem value="urgente y persuasivo">
-                Urgente y persuasivo
-              </SelectItem>
-              <SelectItem value="educativo">Educativo</SelectItem>
-              <SelectItem value="emocional">Emocional</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="col-span-2 space-y-2">
+            <Label>Tono</Label>
+            <Select
+              value={tone}
+              onValueChange={(v) => setTone(v as any)}
+              disabled={loading || !allowed}
+            >
+              <SelectTrigger className="bg-white text-black">
+                <SelectValue placeholder="Tono" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="profesional y cercano">
+                  Profesional y cercano
+                </SelectItem>
+                <SelectItem value="divertido y desenfadado">
+                  Divertido y desenfadado
+                </SelectItem>
+                <SelectItem value="inspirador">Inspirador</SelectItem>
+                <SelectItem value="urgente y persuasivo">
+                  Urgente y persuasivo
+                </SelectItem>
+                <SelectItem value="educativo">Educativo</SelectItem>
+                <SelectItem value="emocional">Emocional</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Idioma</Label>
+            <Select
+              value={language}
+              onValueChange={(v) => setLanguage(v as any)}
+              disabled={loading || !allowed}
+            >
+              <SelectTrigger className="bg-white text-black">
+                <SelectValue placeholder="Idioma" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="español">Español</SelectItem>
+                <SelectItem value="english">English</SelectItem>
+                <SelectItem value="português">Português</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Longitud</Label>
+            <Select
+              value={length}
+              onValueChange={(v) => setLength(v as CaptionLength)}
+              disabled={loading || !allowed}
+            >
+              <SelectTrigger className="bg-white text-black">
+                <SelectValue placeholder="Longitud" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="short">
+                  Corta (~120–220 caracteres)
+                </SelectItem>
+                <SelectItem value="medium">
+                  Media (~220–450 caracteres)
+                </SelectItem>
+                <SelectItem value="long">
+                  Larga (~450–750 caracteres)
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-4">
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <Checkbox
+              checked={includeHashtags}
+              onCheckedChange={(c) => setIncludeHashtags(c === true)}
+              disabled={loading || !allowed}
+            />
+            Incluir hashtags
+          </label>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <Checkbox
+              checked={includeEmojis}
+              onCheckedChange={(c) => setIncludeEmojis(c === true)}
+              disabled={loading || !allowed}
+            />
+            Incluir emojis
+          </label>
         </div>
 
         <p className="text-xs text-white/60 text-center">
@@ -160,6 +239,7 @@ export function AICaptionGenerator({
             ? `${captionsLeft} captions restantes este mes (${captionsUsed}/${captionsLimit})`
             : "Tu plan no incluye IA"}
         </p>
+
         <Button
           onClick={handleGenerate}
           disabled={

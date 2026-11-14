@@ -12,11 +12,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Sparkles, ImagePlus, X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Loader2, Sparkles, ImagePlus, X, Info } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useAiUsage } from "@/app/hooks/useAiUsage";
 import { canUseAi } from "@/content/access";
-import { AiLockedOverlay } from "../auth/AiLockedOverlay";
+import { AiLockedOverlay } from "@/components/auth/AiLockedOverlay";
 import { cn } from "@/lib/utils";
 import { auth } from "@/lib/firebase";
 
@@ -36,6 +44,7 @@ async function authHeaders(): Promise<HeadersInit> {
 
 const MAX_REFS = 3;
 const MAX_REF_SIZE = 8 * 1024 * 1024;
+const SUPPORT_EMAIL = "bussiness_manager@trendly.studio";
 
 const STYLES = [
   {
@@ -87,7 +96,6 @@ const STYLES = [
   },
 ];
 
-/** Formatos típicos de redes */
 const FORMATS = [
   { value: "1:1", label: "1:1 · Cuadrado (feed)" },
   { value: "4:5", label: "4:5 · Retrato (Instagram)" },
@@ -130,6 +138,103 @@ function getImageDimensions(file: File): Promise<{ w: number; h: number }> {
   });
 }
 
+function PoliciesModal({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl!   bg-zinc-950 border-white/20 text-white">
+        <DialogHeader className="sticky top-1 bg-black">
+          <DialogTitle className="text-yellow-500">
+            Condiciones de generación de imágenes
+          </DialogTitle>
+          <DialogDescription className="text-white/70">
+            Al usar la IA de imágenes en TrendlyStudio aceptas estas reglas. El
+            incumplimiento puede bloquear la función en tu usuario.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 text-sm text-white/85 max-h-[65vh] leading-relaxed overflow-y-auto scrollbar-thumb-yellow-500 pr-4">
+          <p className="font-medium text-white">No está permitido</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>
+              Imágenes de <strong>menores de edad</strong> (reales o generados),
+              en cualquier contexto sexual, sugerente o en ropa de baño.
+            </li>
+            <li>Contenido sexual explícito, pornografía o explotación.</li>
+            <li>
+              Violencia gráfica extrema, odio ilegal u otras violaciones de las
+              políticas del proveedor de IA (Google Gemini).
+            </li>
+            <li>
+              Usar fotos de terceros sin derechos o para suplantar identidades.
+            </li>
+          </ul>
+
+          <p className="font-medium text-white">Uso permitido (ejemplos)</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Producto, marca, paisajes, ilustraciones, mocks de diseño.</li>
+            <li>
+              Adultos en contextos comerciales legítimos (p. ej. moda), siempre
+              dentro de las normas de cada red social al publicar.
+            </li>
+          </ul>
+
+          <p className="font-medium text-white">Avisos y bloqueo</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>
+              Si un prompt incumple las políticas, verás un{" "}
+              <strong>aviso</strong> y se registrará el intento.
+            </li>
+            <li>
+              Un <strong>segundo intento</strong> con contenido no permitido
+              bloquea la generación de imágenes{" "}
+              <strong>solo en tu usuario</strong>. Otros miembros de la empresa
+              no se ven afectados por tu bloqueo.
+            </li>
+            <li>
+              TrendlyStudio puede revisar logs de seguridad para proteger el
+              servicio y al resto de clientes.
+            </li>
+          </ul>
+
+          <p className="font-medium text-white">Responsabilidad</p>
+          <p>
+            Tú eres responsable del prompt, de las imágenes de referencia y de
+            lo que publiques en redes. Las redes (Meta, etc.) tienen normas
+            propias que también debes cumplir.
+          </p>
+
+          <p className="font-medium text-white">Contacto / desbloqueo</p>
+          <p>
+            Si crees que hubo un error o necesitas revisar un bloqueo, escribe
+            a:{" "}
+            <a
+              href={`mailto:${SUPPORT_EMAIL}`}
+              className="text-yellow-400 underline underline-offset-2"
+            >
+              {SUPPORT_EMAIL}
+            </a>
+          </p>
+        </div>
+
+        <DialogFooter className="bg-transparent">
+          <Button
+            className="w-full bg-gradient-to-r from-orange-400 to-yellow-500 text-white"
+            onClick={() => onOpenChange(false)}
+          >
+            Entendido
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function AIImageGenerator({ onGenerate }: Props) {
   const [prompt, setPrompt] = useState("");
   const [style, setStyle] = useState("realistic");
@@ -138,6 +243,8 @@ export function AIImageGenerator({ onGenerate }: Props) {
   const [refs, setRefs] = useState<RefItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
+  const [policiesOpen, setPoliciesOpen] = useState(false);
+  const [imageBlocked, setImageBlocked] = useState(false);
 
   const { imagesLeft, imagesUsed, imagesLimit, setFromApi } = useAiUsage();
   const companyId = useAuthStore((s) => s.companyId);
@@ -196,11 +303,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
 
     const data = await res.json();
     if (!res.ok) {
-      if (data.code === "STORAGE_FULL" || res.status === 403) {
-        throw new Error(data.error || "Error al subir el logo");
-      } else {
-        throw new Error(data.error || "Error al subir el logo");
-      }
+      throw new Error(data.error || "Error al subir la imagen de referencia");
     }
     return data.publicUrl as string;
   };
@@ -221,7 +324,6 @@ export function AIImageGenerator({ onGenerate }: Props) {
       );
     }
 
-    // guide
     return (
       `${base}. Use the reference image(s) only as visual guidance for subject, style, colors or product. ` +
       `Create a new scene as described in the prompt. Do not copy the reference framing or canvas size.`
@@ -229,7 +331,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
   };
 
   const handleGenerate = async () => {
-    if (!allowed) return;
+    if (!allowed || imageBlocked) return;
     if (!prompt.trim()) {
       toast.error("Escribe un prompt descriptivo");
       return;
@@ -267,7 +369,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
           const { w, h } = await getImageDimensions(refs[0].file);
           aspectRatio = ratioToGeminiAspect(w, h);
         } catch {
-          /* se mantiene format */
+          /* keep format */
         }
       }
 
@@ -283,7 +385,26 @@ export function AIImageGenerator({ onGenerate }: Props) {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error al generar la imagen");
+
+      if (!res.ok) {
+        if (data.code === "AI_SAFETY_WARNING") {
+          toast.error(data.error || "Prompt no permitido (aviso)", {
+            id: tid,
+            duration: 8000,
+          });
+          return;
+        }
+        if (data.code === "AI_IMAGE_BLOCKED") {
+          setImageBlocked(true);
+          toast.error(
+            data.error ||
+              "Generación de imágenes bloqueada en tu usuario. Contacta soporte.",
+            { id: tid, duration: 10000 },
+          );
+          return;
+        }
+        throw new Error(data.error || "Error al generar la imagen");
+      }
 
       setGeneratedUrl(data.imageUrl);
       if (data.usage) {
@@ -318,14 +439,43 @@ export function AIImageGenerator({ onGenerate }: Props) {
   return (
     <div className="relative space-y-3 p-4 flex flex-col w-full">
       {!allowed && <AiLockedOverlay reason={reason} />}
+
+      <PoliciesModal open={policiesOpen} onOpenChange={setPoliciesOpen} />
+
       <div
         className={cn(!allowed && "pointer-events-none select-none opacity-40")}
       >
         <div className="space-y-4 p-4 w-full flex flex-col">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <Sparkles className="h-4 w-4 text-purple-500" />
-            Generar imagen con IA
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Sparkles className="h-4 w-4 text-purple-500" />
+              Generar imagen con IA
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1.5 text-xs text-yellow-500"
+              onClick={() => setPoliciesOpen(true)}
+              title="Condiciones y restricciones"
+            >
+              <Info className="h-4 w-4" />
+            </Button>
           </div>
+
+          {imageBlocked && (
+            <div className="rounded-md border border-red-400/40 bg-red-500/15 px-3 py-2 text-sm text-red-100">
+              La generación de imágenes está bloqueada en tu usuario por
+              incumplir las políticas. Escribe a{" "}
+              <a
+                href={`mailto:${SUPPORT_EMAIL}`}
+                className="underline text-yellow-300"
+              >
+                {SUPPORT_EMAIL}
+              </a>
+              .
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="image-prompt">Describe la imagen</Label>
@@ -340,7 +490,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
               }
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              disabled={loading || !allowed}
+              disabled={loading || !allowed || imageBlocked}
             />
           </div>
 
@@ -350,7 +500,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
               <Select
                 value={style}
                 onValueChange={(v) => setStyle(v as any)}
-                disabled={loading || !allowed}
+                disabled={loading || !allowed || imageBlocked}
               >
                 <SelectTrigger className="w-full bg-white text-black">
                   <SelectValue placeholder="Selecciona un estilo">
@@ -377,7 +527,10 @@ export function AIImageGenerator({ onGenerate }: Props) {
                 value={format}
                 onValueChange={(v) => setFormat(v as any)}
                 disabled={
-                  loading || !allowed || (refMode === "edit" && refs.length > 0)
+                  loading ||
+                  !allowed ||
+                  imageBlocked ||
+                  (refMode === "edit" && refs.length > 0)
                 }
               >
                 <SelectTrigger className="w-full bg-white text-black">
@@ -412,7 +565,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  disabled={loading}
+                  disabled={loading || imageBlocked}
                   onClick={() => setRefMode("guide")}
                   className={cn(
                     "rounded-full px-3 py-1 text-xs border transition",
@@ -425,7 +578,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
                 </button>
                 <button
                   type="button"
-                  disabled={loading}
+                  disabled={loading || imageBlocked}
                   onClick={() => setRefMode("edit")}
                   className={cn(
                     "rounded-full px-3 py-1 text-xs border transition",
@@ -493,7 +646,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
                     ref={fileInputRef}
                     onChange={handleReferenceChange}
                     className="hidden"
-                    disabled={loading}
+                    disabled={loading || imageBlocked}
                   />
                   <Button
                     type="button"
@@ -501,7 +654,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
                     size="sm"
                     className="h-20 w-20 flex flex-col gap-1 hover:opacity-80"
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={loading || !allowed}
+                    disabled={loading || !allowed || imageBlocked}
                   >
                     <ImagePlus className="h-5 w-5" color="black" />
                     <span className="text-[10px] text-black">Añadir</span>
@@ -522,6 +675,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
             disabled={
               loading ||
               !allowed ||
+              imageBlocked ||
               !prompt.trim() ||
               imagesLeft <= 0 ||
               !companyId
