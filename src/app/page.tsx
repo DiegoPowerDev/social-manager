@@ -50,30 +50,37 @@ export default function HomePage() {
       <section className="relative overflow-hidden ">
         {/* Espacio para banner: sustituye el div por <Image src="/banner.jpg" ... /> */}
         <div className="absolute inset-0 bg-linear-to-tr from-zinc-950/50  via-zinc-950/50 via-50% to-black" />
-        <div className="w-full grid grid-cols-3 mx-auto max-w-6xl">
+        <div className="w-full grid grid-cols-1 md:grid-cols-3 mx-auto max-w-6xl">
           <div className="col-span-2 relative  pl-4 py-20 sm:pl-6 sm:py-28">
             <p className="mb-3 text-xl pl-2 font-bold text-yellow-500">
               Publicación multi-red para equipos
             </p>
-            <h1 className="max-w-2xl text-4xl font-bold tracking-tight text-white sm:text-5xl">
+            <h1 className="max-w-2xl text-3xl font-bold tracking-tight text-white sm:text-5xl">
               Crea, Programa y Publica en todas tus redes desde un solo lugar
             </h1>
+            <div className="w-full py-4 flex items-center justify-center">
+              <img
+                className="w-full border rounded-xl overflow-hidden"
+                src="/background.webp"
+                alt="background"
+              />
+            </div>
             <p className="mt-5 max-w-xl text-lg text-zinc-300">
               TrendlyStudio conecta Facebook, Instagram, LinkedIn y YouTube.
-              Calendario, publicación en masa e IA para captions e imágenes —
-              con roles para tu equipo.
+              Calendario, publicación en masa e IA para captions e imágenes con
+              roles para tu equipo.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
                 href="/login"
-                className="rounded-xl hover:-translate-y-1  duration-100 bg-gradient-to-r from-orange-400 to-yellow-500 px-6 py-3 text-sm font-semibold text-black  flex items-center justify-center gap-4"
+                className="rounded-xl text-white hover:-translate-y-1  duration-100 bg-linear-to-r from-orange-400 to-yellow-500 px-6 py-3 text-sm font-semibold flex items-center justify-center gap-4"
               >
                 Vuelvete Tendencia Ahora
                 <TrendingUpIcon />
               </Link>
             </div>
           </div>
-          <div className="relative w-full h-full flex items-center justify-center">
+          <div className="relative w-full h-full hidden md:flex items-center justify-center">
             <img
               className="w-full border rounded-xl overflow-hidden"
               src="/background.webp"

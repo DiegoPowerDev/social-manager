@@ -6,12 +6,19 @@ export default function HomeFooter() {
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div>
           <p className="font-bold text-yellow-400">TrendlyStudio</p>
-          <p className="mt-1 text-sm text-zinc-300">
+          <p className="mt-1 text-sm text-white">
             Publicación y programación para equipos de marketing.
           </p>
           <p className="mt-2 text-sm text-zinc-400">
             Operado por{" "}
-            <span className="text-zinc-200">TORRES PACHERRES DIEGO ARTURO</span>
+            <span className="text-white">TORRES PACHERRES DIEGO ARTURO</span>
+          </p>
+          <p className="text-sm mt-2 text-zinc-400">
+            Contacto:{" "}
+            <span className="text-white">
+              {" "}
+              bussiness_manager@trendly.studio
+            </span>
           </p>
         </div>
         <div className="flex flex-col flex-wrap gap-4 font-bold text-sm text-zinc-400">
