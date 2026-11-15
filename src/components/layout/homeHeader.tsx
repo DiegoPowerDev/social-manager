@@ -19,9 +19,11 @@ export default function HomeHeader() {
             alt="logo"
             className="object-contain rounded "
           />
-          <div className="font-bold text-white">Trendly Studio</div>
+          <div className="font-bold text-white text-lg">
+            Trendly<span className="text-xl text-yellow-400">Studio</span>
+          </div>
         </Link>
-        <nav className="hidden items-center gap-6 text-sm text-white md:flex">
+        <nav className="hidden font-bold items-center gap-6 text-sm text-white md:flex">
           <a
             href={`${process.env.NODE_ENV === "production" ? "https://trendly.studio/#features" : "http://localhost:3000/#features"}`}
             className="hover:text-yellow-400/90"
@@ -36,14 +38,14 @@ export default function HomeHeader() {
           {user ? (
             <Link
               href="/dashboard"
-              className="rounded-lg px-3 py-1.5 text-sm text-zinc-300 hover:text-white"
+              className="rounded-lg px-3 py-1.5 text-sm text-white font-bold hover:text-white"
             >
               Dashboard
             </Link>
           ) : (
             <Link
               href="/login"
-              className="rounded-lg px-3 py-1.5 text-sm text-zinc-300 hover:text-white"
+              className="rounded-lg px-3 py-1.5 text-sm text-white font-bold hover:text-white"
             >
               Iniciar sesión
             </Link>
