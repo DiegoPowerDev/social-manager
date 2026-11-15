@@ -50,17 +50,17 @@ export default function HomePage() {
       <section className="relative overflow-hidden ">
         {/* Espacio para banner: sustituye el div por <Image src="/banner.jpg" ... /> */}
         <div className="absolute inset-0 bg-linear-to-tr from-zinc-950/50  via-zinc-950/50 via-50% to-black" />
-        <div className="w-full grid grid-cols-1 md:grid-cols-3 mx-auto max-w-6xl">
-          <div className="col-span-2 relative  pl-4 py-20 sm:pl-6 sm:py-28">
+        <div className="w-full grid grid-cols-1 md:grid-cols-2 md:gap-8 mx-auto max-w-6xl">
+          <div className=" relative p-4 py-20 sm:pl-6 sm:py-28">
             <p className="mb-3 text-xl pl-2 font-bold text-yellow-500">
               Publicación multi-red para equipos
             </p>
-            <h1 className="max-w-2xl text-3xl font-bold tracking-tight text-white sm:text-5xl">
-              Crea, Programa y Publica en todas tus redes desde un solo lugar
+            <h1 className="max-w-2xl text-3xl font-bold tracking-tight text-white sm:text-6xl">
+              Crea, Programa y Publica desde un solo lugar
             </h1>
-            <div className="w-full py-4 flex items-center justify-center">
+            <div className="w-full py-4 flex md:hidden items-center justify-center">
               <img
-                className="w-full border rounded-xl overflow-hidden"
+                className="w-full rounded-xl overflow-hidden"
                 src="/background.webp"
                 alt="background"
               />
@@ -82,7 +82,7 @@ export default function HomePage() {
           </div>
           <div className="relative w-full h-full hidden md:flex items-center justify-center">
             <img
-              className="w-full border rounded-xl overflow-hidden"
+              className="w-full rounded-xl overflow-hidden"
               src="/background.webp"
               alt="background"
             />

@@ -18,7 +18,7 @@ import { PostHistory } from "@/components/social/PostHistory";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LucideLoaderCircle } from "lucide-react";
+import { DoorOpen, LucideLoaderCircle } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { cn } from "@/lib/utils";
 import { planAtLeast } from "@/content/menu";
@@ -232,15 +232,21 @@ export default function TikTokPage() {
               Por vencer
             </Badge>
           ) : (
-            <Badge variant="secondary">Conectado</Badge>
+            <Badge
+              className="bg-linear-to-r from-orange-400 to-yellow-500 text-white"
+              variant="secondary"
+            >
+              Conectado
+            </Badge>
           )}
           {canConnect && (
             <Button
-              variant="outline"
+              variant="destructive"
               size="sm"
+              className="bg-red-600/50 py-1.5 h-auto text-white"
               onClick={() => setDisconnectOpen(true)}
             >
-              Desconectar
+              Desconectar <DoorOpen />
             </Button>
           )}
         </div>
