@@ -40,10 +40,13 @@ const features = [
 
 export default function HomePage() {
   return (
-    <main
-      style={{ backgroundImage: `url("/home-background.webp")` }}
-      className={cn("bg-cover bg-no-repeat min-h-screen ")}
-    >
+    <main className={cn("relative isolate min-h-screen ")}>
+      {/* Fondo: fijo en móvil, estirado en toda la página desde md */}
+      <div
+        aria-hidden="true"
+        style={{ backgroundImage: `url("/home-background.webp")` }}
+        className="fixed md:absolute inset-0 -z-10 bg-cover bg-no-repeat bg-[position:40%_60%] md:bg-center"
+      />
       <HomeHeader />
 
       {/* Banner / Hero */}
@@ -138,7 +141,7 @@ export default function HomePage() {
           </p>
           <Link
             href="/login"
-            className="rounded-xl font-bold p-4 bg-gradient-to-r from-orange-400 to-yellow-500 hover:from-orange-500 hover:to-yellow-500 text-white"
+            className="rounded-xl font-bold p-4 bg-linear-to-r from-orange-400 to-yellow-500 hover:from-orange-500 hover:to-yellow-500 text-white"
           >
             Comenzar
           </Link>

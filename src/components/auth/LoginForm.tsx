@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { LucideLoaderCircle, Loader2 } from "lucide-react";
+import { LucideLoaderCircle, Loader2, Mail, Lock } from "lucide-react";
 import HomeHeader from "@/components/layout/homeHeader";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -67,63 +67,89 @@ export default function LoginForm() {
 
   if (loading || user) {
     return (
-      <div
-        style={{ backgroundImage: `url("/background.webp")` }}
-        className="bg-cover bg-center min-h-screen flex items-center justify-center"
-      >
+      <div className="relative isolate min-h-screen flex items-center justify-center">
+        <div
+          aria-hidden="true"
+          style={{ backgroundImage: `url("/background.webp")` }}
+          className="fixed md:absolute inset-0 -z-10 bg-cover bg-no-repeat bg-[position:40%_60%] md:bg-center"
+        />
+        <div
+          aria-hidden="true"
+          className="fixed md:absolute inset-0 -z-10 bg-zinc-950/40"
+        />
         <LucideLoaderCircle className="animate-spin h-16 w-16 text-orange-400" />
       </div>
     );
   }
 
   return (
-    <div
-      style={{ backgroundImage: `url("/background.webp")` }}
-      className={cn(
-        "bg-cover bg-center bg-no-repeat min-h-screen bg-muted/40 px-4 flex flex-col",
-      )}
-    >
+    <div className={cn("relative isolate min-h-screen flex flex-col")}>
+      {/* Fondo fijo */}
+      <div
+        aria-hidden="true"
+        style={{ backgroundImage: `url("/background.webp")` }}
+        className="fixed md:absolute inset-0 -z-10 bg-cover bg-no-repeat bg-[position:40%_60%] md:bg-center"
+      />
+      <div
+        aria-hidden="true"
+        className="fixed md:absolute inset-0 -z-10 bg-gradient-to-tr from-zinc-950/60 via-zinc-950/40 to-black/70"
+      />
       <HomeHeader />
-      <div className="flex-1 flex items-center justify-center py-12">
-        <Card className="w-full max-w-md shadow-xl border-white/20 bg-white/95">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold">TrendlyStudio</CardTitle>
-            <CardDescription>
+      <div className="flex-1 flex  px-4  items-center justify-center py-12">
+        <Card className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-950/70 text-white shadow-2xl shadow-black/40 backdrop-blur-xl">
+          <CardHeader className="space-y-2 pb-2">
+            <div className="h-1.5 w-8 rounded-full bg-yellow-500" />
+            <CardTitle className="text-3xl font-bold tracking-tight text-white">
+              TrendlyStudio
+            </CardTitle>
+            <CardDescription className="text-zinc-300">
               Ingresa a tu cuenta para continuar
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
+          <CardContent className="pt-4">
+            <form onSubmit={handleLogin} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="email">Correo electrónico</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="david.c@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={submitting}
-                />
+                <Label htmlFor="email" className="text-zinc-200">
+                  Correo electrónico
+                </Label>
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="david.c@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={submitting}
+                    className="h-11 rounded-xl border-white/15 bg-white/5 pl-10 text-white placeholder:text-zinc-500 focus-visible:border-yellow-500 focus-visible:ring-yellow-500/30"
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Contraseña</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  disabled={submitting}
-                />
+                <Label htmlFor="password" className="text-zinc-200">
+                  Contraseña
+                </Label>
+                <div className="relative">
+                  <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                  <Input
+                    id="password"
+                    type="password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={submitting}
+                    className="h-11 rounded-xl border-white/15 bg-white/5 pl-10 text-white placeholder:text-zinc-500 focus-visible:border-yellow-500 focus-visible:ring-yellow-500/30"
+                  />
+                </div>
               </div>
 
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-orange-400 to-yellow-500 text-white"
+                className="h-11 w-full rounded-xl bg-gradient-to-r from-orange-400 to-yellow-500 font-semibold text-white duration-100 hover:-translate-y-0.5 hover:from-orange-500 hover:to-yellow-500"
                 disabled={submitting}
               >
                 {submitting ? (
@@ -136,12 +162,18 @@ export default function LoginForm() {
                 )}
               </Button>
 
-              <p className="text-center text-sm text-muted-foreground">
-                <Link href="/" className="underline hover:no-underline">
+              <p className="text-center text-sm text-zinc-400">
+                <Link
+                  href="/"
+                  className="underline underline-offset-4 hover:text-yellow-400"
+                >
                   Volver al inicio
                 </Link>
                 {" · "}
-                <Link href="/plans" className="underline hover:no-underline">
+                <Link
+                  href="/plans"
+                  className="underline underline-offset-4 hover:text-yellow-400"
+                >
                   Ver planes
                 </Link>
               </p>
