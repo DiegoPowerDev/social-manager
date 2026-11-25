@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
-import { FolderOpen } from "lucide-react";
+import { ExternalLink, FolderOpen } from "lucide-react";
 import { MediaLibraryPicker } from "@/components/social/MediaLibraryPicker";
 import { saveMediaToLibrary } from "@/lib/media";
 import { auth, db } from "@/lib/firebase";
@@ -58,8 +58,10 @@ interface SocialAccount {
 
 interface PublishResult {
   platform: string;
-  success: boolean;
+  platformKey: "facebook" | "instagram" | "linkedin" | "youtube" | "tiktok";
+  success: boolean | null; // null = publicando
   message: string;
+  url?: string | null;
 }
 
 type IgMediaType = "FEED" | "REELS" | "STORIES" | "CAROUSEL";
@@ -88,6 +90,13 @@ const IG_TYPE_OPTIONS: { value: IgMediaType; label: string }[] = [
   { value: "REELS", label: "Reel" },
   { value: "STORIES", label: "Historia" },
 ];
+const PLATFORM_ICONS: Record<PublishResult["platformKey"], string> = {
+  facebook: "/facebook-icon.svg",
+  instagram: "/instagram-icon.svg",
+  linkedin: "/linkedin.svg",
+  youtube: "/youtube.svg",
+  tiktok: "/tiktok.svg",
+};
 
 export default function BulkPublishPage() {
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
@@ -334,10 +343,12 @@ export default function BulkPublishPage() {
       return;
     }
     const idToken = await authUser.getIdToken();
+
     if (!companyId || !canEdit) {
       toast.error(!canEdit ? "No tienes permiso para publicar" : "Sin empresa");
       return;
     }
+
     if (
       !selectedFacebook &&
       !selectedInstagram &&
@@ -348,14 +359,17 @@ export default function BulkPublishPage() {
       toast.error("Selecciona al menos una red");
       return;
     }
+
     if ((selectedYouTube || selectedTikTok) && !videoUrl) {
       toast.error("YouTube y TikTok requieren un video");
       return;
     }
+
     if (selectedYouTube && !youtubeTitle.trim() && !message.trim()) {
       toast.error("YouTube requiere un título");
       return;
     }
+
     if (selectedInstagram) {
       if (instagramMediaType === "CAROUSEL" && imageUrls.length < 2) {
         toast.error("El carrusel de Instagram necesita al menos 2 imágenes");
@@ -375,6 +389,7 @@ export default function BulkPublishPage() {
         return;
       }
     }
+
     if (selectedTikTok) {
       if (!tiktokPrivacy) {
         toast.error("Elige la visibilidad de TikTok");
@@ -397,10 +412,89 @@ export default function BulkPublishPage() {
     }
 
     setPublishing(true);
-    setResults([]);
-    const tid = toast.loading("Publicando en las redes seleccionadas…");
-    const publishResults: PublishResult[] = [];
 
+    const pending = (
+      platform: string,
+      platformKey: PublishResult["platformKey"],
+    ): PublishResult => ({
+      platform,
+      platformKey,
+      success: null,
+      message: "Publicando…",
+      url: null,
+    });
+
+    const initial: PublishResult[] = [];
+    if (selectedFacebook && facebookAccount) {
+      initial.push(pending("Facebook", "facebook"));
+    }
+    if (selectedInstagram && instagramAccount) {
+      initial.push(pending("Instagram", "instagram"));
+    }
+    if (selectedLinkedIn && linkedinAccount) {
+      initial.push(pending("LinkedIn", "linkedin"));
+    }
+    if (selectedYouTube && youtubeAccount) {
+      initial.push(pending("YouTube", "youtube"));
+    }
+    if (selectedTikTok && tiktokAccount) {
+      initial.push(pending("TikTok", "tiktok"));
+    }
+    setResults(initial);
+
+    const patch = (
+      platformKey: PublishResult["platformKey"],
+      update: Partial<PublishResult>,
+    ) => {
+      setResults((prev) =>
+        prev.map((r) =>
+          r.platformKey === platformKey ? { ...r, ...update } : r,
+        ),
+      );
+    };
+
+    const resolveUrl = (
+      platformKey: PublishResult["platformKey"],
+      data: any,
+    ): string | null => {
+      if (!data) return null;
+      if (typeof data.permalink === "string" && data.permalink) {
+        return data.permalink;
+      }
+      if (typeof data.url === "string" && data.url) return data.url;
+
+      if (platformKey === "facebook") {
+        const id =
+          data.postId || data.id || data.result?.id || data.result?.post_id;
+        return id ? `https://www.facebook.com/${id}` : null;
+      }
+
+      if (platformKey === "instagram") {
+        return data.permalink || data.result?.permalink || null;
+      }
+
+      if (platformKey === "linkedin") {
+        if (data.result?.permalink) return data.result.permalink;
+        const id =
+          data.result?.id || data.linkedinPostId || data.id || data.postId;
+        return id ? `https://www.linkedin.com/feed/update/${id}/` : null;
+      }
+
+      if (platformKey === "youtube") {
+        const id =
+          data.videoId ||
+          data.id ||
+          data.result?.id ||
+          data.result?.videoId ||
+          data.postId;
+        return id ? `https://www.youtube.com/watch?v=${id}` : null;
+      }
+
+      // TikTok: a menudo no hay URL pública al instante
+      return data.shareUrl || data.result?.share_url || null;
+    };
+
+    // ——— Facebook ———
     if (selectedFacebook && facebookAccount) {
       try {
         const res = await fetch("/api/publish/facebook", {
@@ -421,20 +515,21 @@ export default function BulkPublishPage() {
           }),
         });
         const data = await res.json();
-        publishResults.push({
-          platform: "Facebook",
+        patch("facebook", {
           success: res.ok,
-          message: res.ok ? "Publicado correctamente" : data.error || "Error",
+          message: res.ok ? "Publicado" : data.error || "Error",
+          url: res.ok ? resolveUrl("facebook", data) : null,
         });
       } catch (err: any) {
-        publishResults.push({
-          platform: "Facebook",
+        patch("facebook", {
           success: false,
           message: err.message || "Error de conexión",
+          url: null,
         });
       }
     }
 
+    // ——— Instagram ———
     if (selectedInstagram && instagramAccount) {
       try {
         const res = await fetch("/api/publish/instagram", {
@@ -460,26 +555,25 @@ export default function BulkPublishPage() {
           }),
         });
         const data = await res.json();
-        publishResults.push({
-          platform: "Instagram",
+        let okMsg = "Publicado";
+        if (instagramMediaType === "STORIES") okMsg = "Historia publicada";
+        if (instagramMediaType === "CAROUSEL") okMsg = "Carrusel publicado";
+
+        patch("instagram", {
           success: res.ok,
-          message: res.ok
-            ? instagramMediaType === "STORIES"
-              ? "Historia publicada (sin texto)"
-              : instagramMediaType === "CAROUSEL"
-                ? "Carrusel publicado"
-                : "Publicado correctamente"
-            : data.error || "Error",
+          message: res.ok ? okMsg : data.error || "Error",
+          url: res.ok ? resolveUrl("instagram", data) : null,
         });
       } catch (err: any) {
-        publishResults.push({
-          platform: "Instagram",
+        patch("instagram", {
           success: false,
           message: err.message || "Error de conexión",
+          url: null,
         });
       }
     }
 
+    // ——— LinkedIn ———
     if (selectedLinkedIn && linkedinAccount) {
       try {
         const res = await fetch("/api/publish/linkedin", {
@@ -499,20 +593,21 @@ export default function BulkPublishPage() {
           }),
         });
         const data = await res.json();
-        publishResults.push({
-          platform: "LinkedIn",
+        patch("linkedin", {
           success: res.ok,
-          message: res.ok ? "Publicado correctamente" : data.error || "Error",
+          message: res.ok ? "Publicado" : data.error || "Error",
+          url: res.ok ? resolveUrl("linkedin", data) : null,
         });
       } catch (err: any) {
-        publishResults.push({
-          platform: "LinkedIn",
+        patch("linkedin", {
           success: false,
           message: err.message || "Error de conexión",
+          url: null,
         });
       }
     }
 
+    // ——— YouTube ———
     if (selectedYouTube && youtubeAccount) {
       try {
         const res = await fetch("/api/publish/youtube", {
@@ -534,20 +629,21 @@ export default function BulkPublishPage() {
           }),
         });
         const data = await res.json();
-        publishResults.push({
-          platform: "YouTube",
+        patch("youtube", {
           success: res.ok,
           message: res.ok ? "Video publicado" : data.error || "Error",
+          url: res.ok ? resolveUrl("youtube", data) : null,
         });
       } catch (err: any) {
-        publishResults.push({
-          platform: "YouTube",
+        patch("youtube", {
           success: false,
           message: err.message || "Error de conexión",
+          url: null,
         });
       }
     }
 
+    // ——— TikTok ———
     if (selectedTikTok && tiktokAccount) {
       try {
         const res = await fetch("/api/publish/tiktok", {
@@ -572,37 +668,80 @@ export default function BulkPublishPage() {
           }),
         });
         const data = await res.json();
-        publishResults.push({
-          platform: "TikTok",
+        patch("tiktok", {
           success: res.ok,
           message: res.ok ? "Video enviado a TikTok" : data.error || "Error",
+          url: res.ok ? resolveUrl("tiktok", data) : null,
         });
       } catch (err: any) {
-        publishResults.push({
-          platform: "TikTok",
+        patch("tiktok", {
           success: false,
           message: err.message || "Error de conexión",
+          url: null,
         });
       }
     }
 
-    setResults(publishResults);
     setPublishing(false);
 
-    const ok = publishResults.filter((r) => r.success).length;
-    const fail = publishResults.length - ok;
-    if (fail === 0) {
-      toast.success(`Publicado en ${ok} red${ok !== 1 ? "es" : ""}`, {
-        id: tid,
-      });
-      clearForm();
-    } else if (ok === 0) {
-      toast.error("No se pudo publicar en ninguna red", { id: tid });
-    } else {
-      toast.warning(`${ok} ok · ${fail} con error`, { id: tid });
-    }
+    // Resumen final sin borrar el listado de resultados
+    setResults((current) => {
+      const ok = current.filter((r) => r.success === true).length;
+      const fail = current.filter((r) => r.success === false).length;
+
+      if (fail === 0 && ok > 0) {
+        toast.success(`Publicado en ${ok} red${ok !== 1 ? "es" : ""}`);
+        clearForm(); // limpia inputs; no toca results
+      } else if (ok === 0) {
+        toast.error("No se pudo publicar en ninguna red");
+      } else {
+        toast.warning(`${ok} ok · ${fail} con error`);
+      }
+
+      return current;
+    });
   };
 
+  function pendingResult(
+    platform: string,
+    platformKey: PublishResult["platformKey"],
+  ): PublishResult {
+    return {
+      platform,
+      platformKey,
+      success: null,
+      message: "Publicando…",
+      url: null,
+    };
+  }
+
+  function postUrlFromResponse(
+    platformKey: PublishResult["platformKey"],
+    data: any,
+  ): string | null {
+    if (data?.permalink) return data.permalink as string;
+    if (data?.url) return data.url as string;
+
+    if (platformKey === "facebook") {
+      const id = data?.postId || data?.id || data?.result?.id;
+      return id ? `https://www.facebook.com/${id}` : null;
+    }
+    if (platformKey === "instagram") {
+      return (data?.permalink as string) || null;
+    }
+    if (platformKey === "linkedin") {
+      const id = data?.result?.id || data?.linkedinPostId || data?.id;
+      if (data?.result?.permalink) return data.result.permalink;
+      return id ? `https://www.linkedin.com/feed/update/${id}/` : null;
+    }
+    if (platformKey === "youtube") {
+      const id =
+        data?.videoId || data?.id || data?.result?.id || data?.result?.videoId;
+      return id ? `https://www.youtube.com/watch?v=${id}` : null;
+    }
+    // TikTok suele no devolver URL pública inmediata
+    return null;
+  }
   if (loadingAccounts) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
@@ -670,10 +809,11 @@ export default function BulkPublishPage() {
                   {facebookAccount && (
                     <div
                       className={cn(
-                        " rounded-xl border p-3 space-y-3",
-                        selectedTikTok
-                          ? "bg-white/15 border-white/30"
-                          : "bg-white/5 border-white/10",
+                        "rounded-xl border h-fit border-white/50 p-3 space-y-2",
+                        selectedFacebook
+                          ? "bg-zinc-950/35 border-yellow-400"
+                          : "bg-zinc-950/15",
+                        busy && "opacity-60 pointer-events-none",
                       )}
                     >
                       <label className="flex items-center gap-3 cursor-pointer">
@@ -684,19 +824,22 @@ export default function BulkPublishPage() {
                           }
                           disabled={busy}
                         />
-                        <span className="text-sm text-white font-medium">
+                        <span className="text-sm flex items-center gap-2 text-white font-medium">
+                          <img
+                            src="/facebook-icon.svg"
+                            className="h-6 w-6 rounded-md object-cover"
+                            alt="facebook icon"
+                          />
                           Facebook
                         </span>
-                        <span className="text-xs text-white/40 truncate ml-auto">
+                        <span className="text-xs bg-linear-to-r from-orange-400 to-yellow-500 text-white py-1 px-2 rounded-full truncate ml-auto">
                           {facebookAccount.name}
                         </span>
                       </label>
 
                       {selectedFacebook && (
                         <div className="space-y-2">
-                          <Label className="text-white font-bold">
-                            Enlace (solo Facebook)
-                          </Label>
+                          <Label className="text-white font-bold">Link:</Label>
                           <Input
                             placeholder="https://ejemplo.com"
                             value={link}
@@ -712,10 +855,11 @@ export default function BulkPublishPage() {
                   {instagramAccount && (
                     <div
                       className={cn(
-                        "rounded-xl border p-3 space-y-2",
+                        "rounded-xl border h-fit border-white/50 p-3 space-y-2",
                         selectedInstagram
-                          ? "bg-white/15 border-pink-400/40"
-                          : "bg-white/5 border-white/10",
+                          ? "bg-zinc-950/35 border-yellow-400"
+                          : "bg-zinc-950/15",
+                        busy && "opacity-60 pointer-events-none",
                       )}
                     >
                       <label className="flex items-center gap-3 cursor-pointer">
@@ -731,10 +875,15 @@ export default function BulkPublishPage() {
                           }}
                           disabled={busy}
                         />
-                        <span className="text-sm text-white font-medium">
+                        <span className="text-sm flex items-center gap-2 text-white font-medium">
+                          <img
+                            src="/instagram-icon.svg"
+                            className="h-6 w-6 rounded-md object-cover"
+                            alt="instagram icon"
+                          />
                           Instagram
                         </span>
-                        <span className="text-xs text-white/40 truncate ml-auto">
+                        <span className="text-xs bg-linear-to-r from-orange-400 to-yellow-500 text-white py-1 px-2 rounded-full truncate ml-auto">
                           @{instagramAccount.username}
                         </span>
                       </label>
@@ -777,10 +926,10 @@ export default function BulkPublishPage() {
                   {linkedinAccount && (
                     <label
                       className={cn(
-                        "flex items-center gap-3 p-3 rounded-xl border cursor-pointer",
+                        "flex items-center gap-3 p-3 rounded-xl border h-fit border-white/50 cursor-pointer",
                         selectedLinkedIn
-                          ? "bg-white/15 border-blue-400/40"
-                          : "bg-white/5 border-white/10 hover:bg-white/10",
+                          ? "bg-zinc-950/35 border-yellow-400"
+                          : "bg-zinc-950/15",
                         busy && "opacity-60 pointer-events-none",
                       )}
                     >
@@ -789,10 +938,15 @@ export default function BulkPublishPage() {
                         onCheckedChange={(c) => setSelectedLinkedIn(c === true)}
                         disabled={busy}
                       />
-                      <span className="text-sm text-white font-medium">
+                      <span className="text-sm flex items-center gap-2 text-white font-medium">
+                        <img
+                          src="/linkedin.svg"
+                          className="h-6 w-6 rounded-md object-cover bg-white"
+                          alt="linkedin icon"
+                        />
                         LinkedIn
                       </span>
-                      <span className="text-xs text-white/40 truncate ml-auto">
+                      <span className="text-xs bg-linear-to-r from-orange-400 to-yellow-500 text-white py-1 px-2 rounded-full truncate ml-auto">
                         {linkedinAccount.name}
                       </span>
                     </label>
@@ -801,10 +955,11 @@ export default function BulkPublishPage() {
                   {youtubeAccount && (
                     <div
                       className={cn(
-                        "rounded-xl border p-3 space-y-2",
+                        "rounded-xl border h-fit border-white/50 p-3 space-y-2",
                         selectedYouTube
-                          ? "bg-white/15 border-red-400/40"
-                          : "bg-white/5 border-white/10",
+                          ? "bg-zinc-950/35 border-yellow-400"
+                          : "bg-zinc-950/15",
+                        busy && "opacity-60 pointer-events-none",
                       )}
                     >
                       <label className="flex items-center gap-3 cursor-pointer">
@@ -815,10 +970,15 @@ export default function BulkPublishPage() {
                           }
                           disabled={busy}
                         />
-                        <span className="text-sm text-white font-medium">
+                        <span className="text-sm flex items-center gap-2 text-white font-medium">
+                          <img
+                            src="/youtube.svg"
+                            className="h-6 w-6 rounded-md object-cover"
+                            alt="youtube icon"
+                          />
                           YouTube
                         </span>
-                        <span className="text-xs text-white/40 truncate ml-auto">
+                        <span className="text-xs bg-linear-to-r from-orange-400 to-yellow-500 text-white py-1 px-2 rounded-full truncate ml-auto">
                           {youtubeAccount.name || "Canal"}
                         </span>
                       </label>
@@ -866,10 +1026,11 @@ export default function BulkPublishPage() {
                   {tiktokAccount && (
                     <div
                       className={cn(
-                        "sm:col-span-2 rounded-xl border p-3 space-y-3",
+                        "rounded-xl border h-fit border-white/50 p-3 space-y-2",
                         selectedTikTok
-                          ? "bg-white/15 border-white/30"
-                          : "bg-white/5 border-white/10",
+                          ? "bg-zinc-950/35 border-yellow-400"
+                          : "bg-zinc-950/15",
+                        busy && "opacity-60 pointer-events-none",
                       )}
                     >
                       <label className="flex items-center gap-3 cursor-pointer">
@@ -878,10 +1039,15 @@ export default function BulkPublishPage() {
                           onCheckedChange={(c) => setSelectedTikTok(c === true)}
                           disabled={busy}
                         />
-                        <span className="text-sm text-white font-medium">
+                        <span className="text-sm flex items-center gap-2 text-white font-medium">
+                          <img
+                            src="/tiktok.svg"
+                            className="h-6 w-6 rounded-md object-cover"
+                            alt="tiktok icon"
+                          />
                           TikTok
                         </span>
-                        <span className="text-xs text-white/40 truncate ml-auto">
+                        <span className="text-xs bg-linear-to-r from-orange-400 to-yellow-500 text-white py-1 px-2 rounded-full truncate ml-auto">
                           {tiktokAccount.name || tiktokAccount.username}
                         </span>
                       </label>
@@ -1211,7 +1377,7 @@ export default function BulkPublishPage() {
             videoUrl={videoUrl}
           />
           <Button
-            className="w-full h-12 text-base font-semibold rounded-xl bg-gradient-to-r from-orange-400 to-yellow-500 hover:from-orange-500 hover:to-yellow-500 text-white shadow-lg shadow-orange-500/25"
+            className="w-full h-12 text-base font-semibold rounded-xl bg-linear-to-r from-orange-400 to-yellow-500 hover:from-orange-500 hover:to-yellow-500 text-white shadow-lg shadow-orange-500/25"
             size="lg"
             onClick={handlePublish}
             disabled={!canEdit || !companyId || busy || selectedCount === 0}
@@ -1232,35 +1398,65 @@ export default function BulkPublishPage() {
           </Button>
 
           {results.length > 0 && (
-            <Card className="bg-white/70">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Resultados</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {results.map((result) => (
-                  <div
-                    key={result.platform}
-                    className="flex items-start gap-2 text-sm"
-                  >
-                    {result.success ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                    ) : (
-                      <XCircle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
+            <div className="space-y-2 rounded-xl border border-white/15 bg-zinc-950/60 p-3">
+              <p className="text-xs font-medium text-white/60 px-1">
+                Estado por red
+              </p>
+              {results.map((r) => (
+                <div
+                  key={r.platformKey}
+                  className="flex items-center gap-3 rounded-lg bg-white/5 px-3 py-2.5"
+                >
+                  <img
+                    src={PLATFORM_ICONS[r.platformKey]}
+                    alt=""
+                    className={cn(
+                      "h-7 w-7 rounded-md object-cover shrink-0",
+                      r.platformKey === "linkedin" && "bg-white",
                     )}
-                    <div>
-                      <span className="font-medium">{result.platform}: </span>
-                      <span
-                        className={
-                          result.success ? "text-green-700" : "text-red-700"
-                        }
-                      >
-                        {result.message}
-                      </span>
-                    </div>
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-white">
+                      {r.platform}
+                    </p>
+                    <p
+                      className={cn(
+                        "text-xs truncate flex gap-2 items-center",
+                        r.success === null && "text-white/50",
+                        r.success === true && "text-green-400",
+                        r.success === false && "text-red-400",
+                      )}
+                    >
+                      {r.message}
+                      {r.success === true && (
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      )}
+                      {r.success === false && (
+                        <XCircle className="h-4 w-4 text-red-500 shrink-0" />
+                      )}
+                    </p>
                   </div>
-                ))}
-              </CardContent>
-            </Card>
+
+                  {r.success === null && (
+                    <Loader2 className="h-5 w-5 animate-spin text-yellow-400 shrink-0" />
+                  )}
+                  {r.success === true && (
+                    <div className="flex items-center gap-2 shrink-0">
+                      {r.url && (
+                        <a
+                          href={r.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs font-medium text-yellow-400 hover:underline"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
