@@ -20,7 +20,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Loader2, Sparkles, ImagePlus, X, Info } from "lucide-react";
+import { Loader2, Sparkles, ImagePlus, X, Info, Download } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useAiUsage } from "@/app/hooks/useAiUsage";
 import { canUseAi } from "@/content/access";
@@ -260,6 +260,8 @@ export function AIImageGenerator({ onGenerate }: Props) {
   const [policiesOpen, setPoliciesOpen] = useState(false);
   const [imageBlocked, setImageBlocked] = useState(false);
 
+  const [previewOpen, setPreviewOpen] = useState(false);
+
   const { imagesLeft, imagesUsed, imagesLimit, setFromApi } = useAiUsage();
   const companyId = useAuthStore((s) => s.companyId);
   const memberRole = useAuthStore((s) => s.memberRole);
@@ -473,6 +475,28 @@ export function AIImageGenerator({ onGenerate }: Props) {
     if (generatedUrl) {
       onGenerate(generatedUrl);
       toast.success("Imagen aplicada al post");
+    }
+  };
+
+  const handleDownloadGenerated = async () => {
+    if (!generatedUrl) return;
+    try {
+      const res = await fetch(generatedUrl);
+      if (!res.ok) throw new Error("No se pudo descargar la imagen");
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = `trendly-ai-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+      toast.success("Descarga iniciada");
+    } catch (e: any) {
+      // Fallback: abrir en pestaña si el host bloquea CORS en el fetch
+      window.open(generatedUrl, "_blank", "noopener,noreferrer");
+      toast.message(e?.message || "Abriendo imagen en una pestaña…");
     }
   };
 
@@ -744,17 +768,75 @@ export function AIImageGenerator({ onGenerate }: Props) {
 
           {generatedUrl && (
             <div className="space-y-3 pt-2">
-              <div className="rounded-lg overflow-hidden border">
+              <div className="rounded-lg overflow-hidden border border-white/20 bg-black/30">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={generatedUrl}
                   alt="Imagen generada"
-                  className="w-full max-h-72 object-contain"
+                  className="w-full max-h-72 object-contain cursor-zoom-in"
+                  onClick={() => setPreviewOpen(true)}
                 />
               </div>
-              <Button onClick={handleUseImage} className="w-full">
-                Usar esta imagen en el post
-              </Button>
+
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1 bg-white/10 border-white/20 text-white hover:bg-white/15"
+                  onClick={() => setPreviewOpen(true)}
+                >
+                  Vista previa
+                </Button>
+                <Button onClick={handleUseImage} className="flex-1">
+                  Usar esta imagen en el post
+                </Button>
+              </div>
+
+              <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+                <DialogContent className="max-w-3xl bg-zinc-950 border-white/20 text-white p-0 overflow-hidden">
+                  <DialogHeader className="px-4 pt-4 pb-2">
+                    <DialogTitle className="text-yellow-500">
+                      Vista previa de la imagen
+                    </DialogTitle>
+                    <DialogDescription className="text-white/60">
+                      Revisa el resultado antes de usarlo o descargarlo.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="px-4 pb-2">
+                    <div className="rounded-lg overflow-hidden border border-white/10 bg-black/40 flex items-center justify-center max-h-[70vh]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={generatedUrl}
+                        alt="Vista previa generada"
+                        className="w-full h-auto max-h-[70vh] object-contain"
+                      />
+                    </div>
+                  </div>
+
+                  <DialogFooter className="px-4 py-4 gap-2 sm:gap-2 bg-transparent border-t border-white/10">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="bg-white/10 border-white/20 text-white hover:bg-white/15"
+                      onClick={handleDownloadGenerated}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Descargar
+                    </Button>
+                    <Button
+                      type="button"
+                      className="bg-gradient-to-r from-orange-400 to-yellow-500 text-white"
+                      onClick={() => {
+                        handleUseImage();
+                        setPreviewOpen(false);
+                      }}
+                    >
+                      Usar en el post
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           )}
         </div>
