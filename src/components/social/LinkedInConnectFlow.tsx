@@ -46,8 +46,7 @@ export function LinkedInConnectFlow({
           <CardHeader>
             <CardTitle>Conectar perfil</CardTitle>
             <CardDescription>
-              Se publicará como el perfil personal autorizado (OpenID +
-              w_member_social).
+              Se publicará como el perfil personal autorizado
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col items-center gap-3">

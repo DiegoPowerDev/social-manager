@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { LucideLoaderCircle } from "lucide-react";
 import {
   format,
@@ -29,6 +31,8 @@ import {
   eachDayOfInterval,
   isSameDay,
   isWithinInterval,
+  parseISO,
+  differenceInCalendarDays,
 } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -45,7 +49,8 @@ import {
   Legend,
 } from "recharts";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { cn } from "@/lib/utils";
+const cn = (...classes: (string | false | null | undefined)[]) =>
+  classes.filter(Boolean).join(" ");
 
 interface PublishedPost {
   id: string;
@@ -75,7 +80,7 @@ interface ScheduledPost {
   scheduledAt?: Date;
 }
 
-type RangeKey = "7" | "14" | "30" | "90";
+type RangeKey = "7" | "14" | "30" | "90" | "custom";
 type PlatformFilter =
   | "all"
   | "facebook"
@@ -88,10 +93,104 @@ const PLATFORM_COLORS: Record<string, string> = {
   facebook: "#1877F2",
   instagram: "#E4405F",
   linkedin: "#2E77FF",
-  tiktok: "#000000",
+  tiktok: "#fafafa",
   youtube: "#FF0000",
   other: "#94a3b8",
 };
+
+const STORAGE_PREFIX = "trendly.dashboard.filters.";
+
+type PersistedFilters = {
+  range: RangeKey;
+  dateFrom: string; // yyyy-MM-dd
+  dateTo: string; // yyyy-MM-dd
+  toIsToday: boolean;
+  platformFilter: PlatformFilter;
+  selectedUser: string | null;
+};
+
+function todayKey() {
+  return format(new Date(), "yyyy-MM-dd");
+}
+
+function defaultFilters(): PersistedFilters {
+  const to = todayKey();
+  const from = format(subDays(new Date(), 29), "yyyy-MM-dd");
+  return {
+    range: "30",
+    dateFrom: from,
+    dateTo: to,
+    toIsToday: true,
+    platformFilter: "all",
+    selectedUser: null,
+  };
+}
+
+function loadFilters(companyId: string): PersistedFilters {
+  if (typeof window === "undefined") return defaultFilters();
+  try {
+    const raw = localStorage.getItem(STORAGE_PREFIX + companyId);
+    if (!raw) return defaultFilters();
+    const parsed = JSON.parse(raw) as Partial<PersistedFilters>;
+    const base = defaultFilters();
+    const dateFrom =
+      typeof parsed.dateFrom === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(parsed.dateFrom)
+        ? parsed.dateFrom
+        : base.dateFrom;
+    let dateTo =
+      typeof parsed.dateTo === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(parsed.dateTo)
+        ? parsed.dateTo
+        : base.dateTo;
+    const toIsToday = parsed.toIsToday !== false;
+    if (toIsToday) dateTo = todayKey();
+    const platformFilter = (
+      ["all", "facebook", "instagram", "linkedin", "tiktok", "youtube"] as const
+    ).includes(parsed.platformFilter as PlatformFilter)
+      ? (parsed.platformFilter as PlatformFilter)
+      : "all";
+    const range = (["7", "14", "30", "90", "custom"] as const).includes(
+      parsed.range as RangeKey,
+    )
+      ? (parsed.range as RangeKey)
+      : "custom";
+    return {
+      range,
+      dateFrom,
+      dateTo,
+      toIsToday,
+      platformFilter,
+      selectedUser:
+        typeof parsed.selectedUser === "string" ? parsed.selectedUser : null,
+    };
+  } catch {
+    return defaultFilters();
+  }
+}
+
+function saveFilters(companyId: string, filters: PersistedFilters) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STORAGE_PREFIX + companyId, JSON.stringify(filters));
+  } catch {
+    /* ignore quota */
+  }
+}
+
+function applyPreset(
+  days: number,
+): Pick<PersistedFilters, "range" | "dateFrom" | "dateTo" | "toIsToday"> {
+  const to = todayKey();
+  const from = format(subDays(new Date(), days - 1), "yyyy-MM-dd");
+  const key = String(days) as RangeKey;
+  return {
+    range: (["7", "14", "30", "90"] as string[]).includes(key) ? key : "custom",
+    dateFrom: from,
+    dateTo: to,
+    toIsToday: true,
+  };
+}
 
 export default function DashboardPage() {
   const [published, setPublished] = useState<PublishedPost[]>([]);
@@ -101,9 +200,54 @@ export default function DashboardPage() {
   const companyId = useAuthStore((s) => s.companyId);
 
   const [range, setRange] = useState<RangeKey>("30");
+  const [dateFrom, setDateFrom] = useState(() =>
+    format(subDays(new Date(), 29), "yyyy-MM-dd"),
+  );
+  const [dateTo, setDateTo] = useState(todayKey);
+  const [toIsToday, setToIsToday] = useState(true);
   const [platformFilter, setPlatformFilter] = useState<PlatformFilter>("all");
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
+  const [filtersReady, setFiltersReady] = useState(false);
+
+  // Cargar filtros guardados al tener companyId
+  useEffect(() => {
+    if (!companyId) {
+      setFiltersReady(true);
+      return;
+    }
+    const f = loadFilters(companyId);
+    setRange(f.range);
+    setDateFrom(f.dateFrom);
+    setDateTo(f.toIsToday ? todayKey() : f.dateTo);
+    setToIsToday(f.toIsToday);
+    setPlatformFilter(f.platformFilter);
+    setSelectedUser(f.selectedUser);
+    setSelectedDay(null);
+    setFiltersReady(true);
+  }, [companyId]);
+
+  // Persistir (excepto selectedDay, que es temporal de UI)
+  useEffect(() => {
+    if (!companyId || !filtersReady) return;
+    saveFilters(companyId, {
+      range,
+      dateFrom,
+      dateTo: toIsToday ? todayKey() : dateTo,
+      toIsToday,
+      platformFilter,
+      selectedUser,
+    });
+  }, [
+    companyId,
+    filtersReady,
+    range,
+    dateFrom,
+    dateTo,
+    toIsToday,
+    platformFilter,
+    selectedUser,
+  ]);
 
   useEffect(() => {
     if (!companyId) {
@@ -194,21 +338,52 @@ export default function DashboardPage() {
     return null;
   };
 
-  const rangeDays = Number(range);
+  const effectiveToKey = toIsToday ? todayKey() : dateTo;
+
+  const rangeStart = useMemo(() => {
+    try {
+      return startOfDay(parseISO(dateFrom));
+    } catch {
+      return startOfDay(subDays(new Date(), 29));
+    }
+  }, [dateFrom]);
+
+  const rangeEnd = useMemo(() => {
+    try {
+      return endOfDay(parseISO(effectiveToKey));
+    } catch {
+      return endOfDay(new Date());
+    }
+  }, [effectiveToKey]);
+
+  // Si from > to, invertimos al filtrar
+  const interval = useMemo(() => {
+    if (rangeStart.getTime() <= rangeEnd.getTime()) {
+      return { start: rangeStart, end: rangeEnd };
+    }
+    return { start: startOfDay(rangeEnd), end: endOfDay(rangeStart) };
+  }, [rangeStart, rangeEnd]);
 
   const daysInRange = useMemo(() => {
-    const end = startOfDay(new Date());
-    const start = subDays(end, rangeDays - 1);
-    return eachDayOfInterval({ start, end });
-  }, [rangeDays]);
+    const days = differenceInCalendarDays(interval.end, interval.start) + 1;
+    // Evitar charts enormes si alguien pone años
+    if (days > 366) {
+      const cappedStart = startOfDay(subDays(interval.end, 365));
+      return eachDayOfInterval({
+        start: cappedStart,
+        end: startOfDay(interval.end),
+      });
+    }
+    return eachDayOfInterval({
+      start: startOfDay(interval.start),
+      end: startOfDay(interval.end),
+    });
+  }, [interval]);
 
   const filtered = useMemo(() => {
-    const start = startOfDay(subDays(new Date(), rangeDays - 1));
-    const end = endOfDay(new Date());
-
     return published.filter((p) => {
       if (!p.publishedAt) return false;
-      if (!isWithinInterval(p.publishedAt, { start, end })) return false;
+      if (!isWithinInterval(p.publishedAt, interval)) return false;
       if (platformFilter !== "all" && p.platform !== platformFilter)
         return false;
       if (selectedUser) {
@@ -217,7 +392,7 @@ export default function DashboardPage() {
       }
       return true;
     });
-  }, [published, rangeDays, platformFilter, selectedUser]);
+  }, [published, interval, platformFilter, selectedUser]);
 
   const listPosts = useMemo(() => {
     if (!selectedDay) return filtered;
@@ -255,14 +430,10 @@ export default function DashboardPage() {
     }));
   }, [filtered]);
 
-  /** Ranking por quién publicó (periodo + red; sin filtro de usuario para ver el ranking completo) */
   const byUser = useMemo(() => {
-    const start = startOfDay(subDays(new Date(), rangeDays - 1));
-    const end = endOfDay(new Date());
-
     const base = published.filter((p) => {
       if (!p.publishedAt) return false;
-      if (!isWithinInterval(p.publishedAt, { start, end })) return false;
+      if (!isWithinInterval(p.publishedAt, interval)) return false;
       if (platformFilter !== "all" && p.platform !== platformFilter)
         return false;
       return true;
@@ -286,7 +457,7 @@ export default function DashboardPage() {
     return Array.from(map.entries())
       .map(([uid, v]) => ({ uid, ...v }))
       .sort((a, b) => b.total - a.total);
-  }, [published, rangeDays, platformFilter]);
+  }, [published, interval, platformFilter]);
 
   const stats = useMemo(() => {
     const scheduledCount = scheduled.filter(
@@ -307,14 +478,54 @@ export default function DashboardPage() {
     };
   }, [filtered, scheduled, postsPerDay]);
 
+  const setPreset = (days: 7 | 14 | 30 | 90) => {
+    const next = applyPreset(days);
+    setRange(next.range);
+    setDateFrom(next.dateFrom);
+    setDateTo(next.dateTo);
+    setToIsToday(true);
+    setSelectedDay(null);
+  };
+
+  const onChangeFrom = (value: string) => {
+    setDateFrom(value);
+    setRange("custom");
+    setSelectedDay(null);
+  };
+
+  const onChangeTo = (value: string) => {
+    setDateTo(value);
+    setToIsToday(value === todayKey());
+    setRange("custom");
+    setSelectedDay(null);
+  };
+
+  const setUntilToday = () => {
+    setDateTo(todayKey());
+    setToIsToday(true);
+    setRange("custom");
+    setSelectedDay(null);
+  };
+
   const clearFilters = () => {
+    const next = applyPreset(30);
+    setRange(next.range);
+    setDateFrom(next.dateFrom);
+    setDateTo(next.dateTo);
+    setToIsToday(true);
     setPlatformFilter("all");
     setSelectedDay(null);
     setSelectedUser(null);
-    setRange("30");
   };
 
-  if (loading) {
+  const hasActiveFilters =
+    platformFilter !== "all" ||
+    selectedDay ||
+    selectedUser ||
+    range !== "30" ||
+    !toIsToday;
+
+  if (loading || !filtersReady) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <LucideLoaderCircle className="animate-spin h-16 w-16 text-orange-400" />
@@ -337,69 +548,127 @@ export default function DashboardPage() {
       <div className="p-6 space-y-6">
         {/* Filtros */}
         <Card className="bg-zinc-950/60">
-          <CardContent className="pt-4 flex flex-wrap items-center gap-3">
-            <span className="text-sm font-medium text-white">Periodo:</span>
-            {(["7", "14", "30", "90"] as RangeKey[]).map((r) => (
-              <Button
-                key={r}
-                size="sm"
-                variant={range === r ? "default" : "outline"}
-                className={cn(
-                  "border-none border-0",
-                  range === r
-                    ? "bg-gradient-to-r from-orange-400 to-yellow-500 text-white outline-none"
-                    : "bg-black text-white",
-                )}
-                onClick={() => {
-                  setRange(r);
-                  setSelectedDay(null);
-                }}
-              >
-                {r} días
-              </Button>
-            ))}
+          <CardContent className="pt-4 space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm font-medium text-white">Periodo:</span>
+              {([7, 14, 30, 90] as const).map((r) => (
+                <Button
+                  key={r}
+                  size="sm"
+                  variant={range === String(r) ? "default" : "outline"}
+                  className={cn(
+                    "border-none border-0",
+                    range === String(r)
+                      ? "bg-gradient-to-r from-orange-400 to-yellow-500 text-white outline-none"
+                      : "bg-black text-white",
+                  )}
+                  onClick={() => setPreset(r)}
+                >
+                  {r} días
+                </Button>
+              ))}
+              {range === "custom" && (
+                <Badge
+                  variant="secondary"
+                  className="bg-white/10 text-white border-0"
+                >
+                  Personalizado
+                </Badge>
+              )}
+            </div>
 
-            <span className="text-sm font-medium text-white ml-2">Red:</span>
-            {(
-              [
-                ["all", "Todas"],
-                ["facebook", "Facebook"],
-                ["instagram", "Instagram"],
-                ["linkedin", "LinkedIn"],
-                ["tiktok", "TikTok"],
-                ["youtube", "YouTube"],
-              ] as const
-            ).map(([key, label]) => (
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="dash-from" className="text-white text-xs">
+                  Desde
+                </Label>
+                <Input
+                  id="dash-from"
+                  type="date"
+                  value={dateFrom}
+                  max={effectiveToKey}
+                  onChange={(e) => onChangeFrom(e.target.value)}
+                  className="bg-white text-black w-[11rem]"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="dash-to" className="text-white text-xs">
+                  Hasta
+                </Label>
+                <Input
+                  id="dash-to"
+                  type="date"
+                  value={effectiveToKey}
+                  min={dateFrom}
+                  max={todayKey()}
+                  onChange={(e) => onChangeTo(e.target.value)}
+                  className="bg-white text-black w-[11rem]"
+                />
+              </div>
               <Button
-                key={key}
+                type="button"
                 size="sm"
-                variant={platformFilter === key ? "default" : "outline"}
+                variant={toIsToday ? "default" : "outline"}
                 className={cn(
-                  "border-none border-0",
-                  platformFilter === key
+                  "mb-0.5",
+                  toIsToday
                     ? "bg-gradient-to-r from-orange-400 to-yellow-500 text-white border-0"
-                    : "bg-black text-white",
+                    : "bg-black text-white border-0",
                 )}
-                onClick={() => {
-                  setPlatformFilter(key);
-                  setSelectedDay(null);
-                }}
+                onClick={setUntilToday}
               >
-                {label}
+                Hasta hoy
               </Button>
-            ))}
+              <p className="text-xs text-white/50 pb-2">
+                {format(interval.start, "d MMM yyyy", { locale: es })} —{" "}
+                {format(interval.end, "d MMM yyyy", { locale: es })}
+                {toIsToday ? " (actualidad)" : ""}
+              </p>
+            </div>
 
-            {(platformFilter !== "all" || selectedDay || selectedUser) && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={clearFilters}
-                className="ml-auto text-white"
-              >
-                <X className="h-4 w-4 mr-1" />
-                Limpiar filtros
-              </Button>
-            )}
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm font-medium text-white">Red:</span>
+              {(
+                [
+                  ["all", "Todas"],
+                  ["facebook", "Facebook"],
+                  ["instagram", "Instagram"],
+                  ["linkedin", "LinkedIn"],
+                  ["tiktok", "TikTok"],
+                  ["youtube", "YouTube"],
+                ] as const
+              ).map(([key, label]) => (
+                <Button
+                  key={key}
+                  size="sm"
+                  variant={platformFilter === key ? "default" : "outline"}
+                  className={cn(
+                    "border-none border-0",
+                    platformFilter === key
+                      ? "bg-gradient-to-r from-orange-400 to-yellow-500 text-white border-0"
+                      : "bg-black text-white",
+                  )}
+                  onClick={() => {
+                    setPlatformFilter(key);
+                    setSelectedDay(null);
+                  }}
+                >
+                  {label}
+                </Button>
+              ))}
+
+              {hasActiveFilters && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={clearFilters}
+                  className="ml-auto text-white"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Limpiar filtros
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
 

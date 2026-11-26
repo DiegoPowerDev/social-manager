@@ -818,7 +818,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
                     <Button
                       type="button"
                       variant="outline"
-                      className="bg-white/10 border-white/20 text-white hover:bg-white/15"
+                      className="bg-white/10 border-white/20 text-white hover:bg-white/15 hover:text-white"
                       onClick={handleDownloadGenerated}
                     >
                       <Download className="h-4 w-4 mr-2" />
