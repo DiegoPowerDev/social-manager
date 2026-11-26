@@ -42,6 +42,20 @@ async function authHeaders(): Promise<HeadersInit> {
   };
 }
 
+async function readErrorMessage(res: Response): Promise<string> {
+  const text = await res.text();
+  try {
+    const data = JSON.parse(text);
+    if (data?.error) return String(data.error);
+  } catch {
+    /* respuesta no JSON (p. ej. Vercel 413) */
+  }
+  if (res.status === 413 || /entity too large|payload_too_large/i.test(text)) {
+    return "La imagen es demasiado grande para el servidor. Usa un archivo más liviano (< 8MB).";
+  }
+  return text.slice(0, 200) || `Error HTTP ${res.status}`;
+}
+
 const MAX_REFS = 3;
 const MAX_REF_SIZE = 8 * 1024 * 1024;
 const SUPPORT_EMAIL = "bussiness_manager@trendly.studio";
@@ -147,7 +161,7 @@ function PoliciesModal({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl!   bg-zinc-950 border-white/20 text-white">
+      <DialogContent className="max-w-2xl! bg-zinc-950 border-white/20 text-white">
         <DialogHeader className="sticky top-1 bg-black">
           <DialogTitle className="text-yellow-500">
             Condiciones de generación de imágenes
@@ -285,27 +299,50 @@ export function AIImageGenerator({ onGenerate }: Props) {
     });
   };
 
+  /** Subida directa a R2 vía URL firmada (evita límite ~4.5MB de Vercel). */
   const uploadReferenceToR2 = async (file: File): Promise<string> => {
     if (!companyId) {
       throw new Error(
         "No hay empresa asociada. Recarga la página o vuelve a iniciar sesión.",
       );
     }
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("platform", "ai-reference");
-    formData.append("companyId", companyId);
 
-    const res = await fetch("/api/upload", {
+    const signRes = await fetch("/api/upload/sign", {
       method: "POST",
-      body: formData,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        companyId,
+        platform: "ai-reference",
+        contentType: file.type || "image/png",
+        fileName: file.name || "reference.png",
+        size: file.size,
+      }),
     });
 
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || "Error al subir la imagen de referencia");
+    if (!signRes.ok) {
+      throw new Error(await readErrorMessage(signRes));
     }
-    return data.publicUrl as string;
+
+    const signed = await signRes.json();
+    if (!signed?.uploadUrl || !signed?.publicUrl) {
+      throw new Error("Respuesta inválida al firmar la subida");
+    }
+
+    const putRes = await fetch(signed.uploadUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": file.type || "image/png",
+      },
+      body: file,
+    });
+
+    if (!putRes.ok) {
+      throw new Error(
+        "No se pudo subir la imagen de referencia al almacenamiento",
+      );
+    }
+
+    return signed.publicUrl as string;
   };
 
   const buildFinalPrompt = () => {
@@ -384,7 +421,16 @@ export function AIImageGenerator({ onGenerate }: Props) {
           aspectRatio,
         }),
       });
-      const data = await res.json();
+
+      const raw = await res.text();
+      let data: any = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        throw new Error(
+          raw.slice(0, 200) || `Error al generar la imagen (${res.status})`,
+        );
+      }
 
       if (!res.ok) {
         if (data.code === "AI_SAFETY_WARNING") {
@@ -594,7 +640,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
 
             <p className="text-xs text-white/60">
               {refs.length === 0
-                ? "Opcional: sube fotos de producto, estilo o una imagen a retocar."
+                ? "Opcional: sube fotos de producto, estilo o una imagen a retocar (máx. 8MB c/u)."
                 : refMode === "edit"
                   ? "Se modificará la primera imagen según tu descripción"
                   : "Las fotos solo orientan estilo o sujeto; el formato lo eliges arriba."}
