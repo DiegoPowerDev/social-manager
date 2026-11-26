@@ -793,7 +793,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
               </div>
 
               <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-                <DialogContent className="max-w-3xl bg-zinc-950 border-white/20 text-white p-0 overflow-hidden">
+                <DialogContent className="sm:max-w-3xl w-[95vw]  bg-zinc-950 border-white/20 text-white p-0 overflow-hidden">
                   <DialogHeader className="px-4 pt-4 pb-2">
                     <DialogTitle className="text-yellow-500">
                       Vista previa de la imagen
@@ -826,7 +826,7 @@ export function AIImageGenerator({ onGenerate }: Props) {
                     </Button>
                     <Button
                       type="button"
-                      className="bg-gradient-to-r from-orange-400 to-yellow-500 text-white"
+                      className="bg-linear-to-r from-orange-400 to-yellow-500 text-white"
                       onClick={() => {
                         handleUseImage();
                         setPreviewOpen(false);
